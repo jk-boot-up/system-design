@@ -1,5 +1,7 @@
 # E-commerce platform: delivery plan
 
+> Detailed work lists: [design plan](DESIGN-PLAN.md) · [implementation plan](IMPLEMENTATION-PLAN.md) · current progress: [status](../STATUS.md)
+
 This plan covers how the e-commerce system described in [SPEC.md](SPEC.md) is built, in what order, and how each step is verified.
 
 * **Plan and spec** live on `main`.

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design plan</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../README.html">E-commerce platform</a>
+  <span class="src">DESIGN-PLAN.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="design-plan">Design plan<a class="headerlink" href="#design-plan" title="Permanent link">#</a></h1>
+<p>Every design deliverable for the e-commerce platform: what it is, where it lives, and its status. The implementation work is in
+<a href="IMPLEMENTATION-PLAN.html">IMPLEMENTATION-PLAN.md</a>; the overview and milestones are in <a href="PLAN.html">PLAN.md</a>.</p>
+<p>Status: ✅ done · 🔄 in progress · ⏳ planned</p>
+<h2 id="1-rules-every-design-document-follows">1. Rules every design document follows<a class="headerlink" href="#1-rules-every-design-document-follows" title="Permanent link">#</a></h2>
+<ol>
+<li><strong>Two formats.</strong> Every Markdown file has an HTML counterpart beside it, with light, medium and dark themes.</li>
+<li><strong>Diagrams are images.</strong> Diagrams are SVG files in a light and a dark variant, rendered from editable sources in
+   <code>design/diagrams/src</code>. A diagram that does not render fails the documentation build.</li>
+<li><strong>Matches the code.</strong> Names of classes, tables, endpoints and events in the documents are the names used in the code.</li>
+<li><strong>Two levels.</strong> The whole system is designed in <code>e-commerce/design/</code>. Each service repeats the parts it owns in more detail in
+   <code>services/&lt;service&gt;/design/</code>.</li>
+<li><strong>Animated.</strong> Every design has an animated walkthrough with themes and optional narration (an on/off button, female voice).</li>
+</ol>
+<h2 id="2-whole-system-design-e-commercedesign">2. Whole-system design (<code>e-commerce/design/</code>)<a class="headerlink" href="#2-whole-system-design-e-commercedesign" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Deliverable</th>
+<th>Contents</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1</td>
+<td><a href="SPEC.html">SPEC.md</a></td>
+<td>Requirements, capacity estimates, architecture, flows, data, cross-cutting concerns, technology, deployment, failure modes, scaling, polyglot persistence, patterns, languages</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S2</td>
+<td><a href="PLAN.html">PLAN.md</a></td>
+<td>Goals, non-goals, technology summary, milestones, principles, risks</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S3</td>
+<td><a href="01-high-level-design.html">01 High-level design</a></td>
+<td>C4 context and containers, layers, hexagon, request and event paths, technology map, quality attributes</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S4</td>
+<td><a href="02-data-flow-diagrams.html">02 Data-flow diagrams</a></td>
+<td>DFD levels 0, 1 and 2 (place order), data stores, trust boundaries</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S5</td>
+<td><a href="03-deployment.html">03 Deployment design</a></td>
+<td>Kubernetes topology across zones, node pools, objects per service, network policies, CI/CD, environments, local stack, disaster recovery</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S6</td>
+<td><a href="04-database-design.html">04 Database design</a></td>
+<td>ER diagrams and DDL per store, partitioning, Cassandra tables, Redis keys, OpenSearch mapping, RabbitMQ topology, ClickHouse tables, retention</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S7</td>
+<td><a href="05-sequence-diagrams.html">05 Sequence diagrams</a></td>
+<td>Sign-in, browse, search, cart, checkout (happy path and every failure), cancellation, outbox, idempotent consumer, indexing, uploads, reviews, emails, recommendations</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S8</td>
+<td><a href="06-flow-diagrams.html">06 Flow diagrams</a></td>
+<td>Checkout decisions, saga recovery, reservation expiry, gateway pipeline, rate limiting, retry and dead letters, cache-aside, flash sale, recommendations</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S9</td>
+<td><a href="07-state-diagrams.html">07 State diagrams</a></td>
+<td>Order, saga step, payment, reservation, email job</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S10</td>
+<td><a href="08-class-diagrams.html">08 Class and UML diagrams</a></td>
+<td>Component, domain classes per context, ports and adapters, outbox, package and UML deployment views</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S11</td>
+<td><a href="09-api-catalogue.html">09 API catalogue</a></td>
+<td>Conventions, every public and internal endpoint, error codes</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S12</td>
+<td><a href="10-event-catalogue.html">10 Event catalogue</a></td>
+<td>Envelope, topics, every event payload, consumers, evolution rules</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>S13</td>
+<td>11 System, module and service diagrams</td>
+<td>System diagram, module diagram of every service, service-interaction map, UML communication diagrams of the key flows</td>
+<td>🔄</td>
+</tr>
+<tr>
+<td>S14</td>
+<td>12 Security design</td>
+<td>Threat model (STRIDE per trust boundary), authentication and authorisation flows, secrets, data protection</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>S15</td>
+<td>13 Observability and SLOs</td>
+<td>SLIs and SLOs per journey, dashboards, alerts with burn rates, tracing and log conventions</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>S16</td>
+<td>14 Capacity and performance model</td>
+<td>Per-service throughput, connection and partition budgets at 1× and 10×, load-test plan and budgets</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>S17</td>
+<td>15 Runbooks</td>
+<td>Outbox backlog, DLQ replay, stuck sagas, hot SKU, database failover, Kafka broker loss, cache stampede</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>S18</td>
+<td><a href="adr/README.html">ADRs</a></td>
+<td>11 decision records (microservices, no shared code, saga, outbox, brokers, languages, polyglot persistence, ids, JDBC, diagrams)</td>
+<td>✅ (new ADRs as decisions arise)</td>
+</tr>
+<tr>
+<td>S19</td>
+<td>System walkthrough (<code>walkthrough/</code>)</td>
+<td>Animated: architecture tour (system → services → modules), browse and search, cart, checkout happy path, out of stock, payment declined, payment timeout, cancellation and refund, event fan-out, flash sale, failure of a dependency</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>S20</td>
+<td><a href="../PREREQUISITES.html">PREREQUISITES.md</a></td>
+<td>Tools, versions, resources, ports, verification</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-per-service-design-servicesservicedesign">3. Per-service design (<code>services/&lt;service&gt;/design/</code>)<a class="headerlink" href="#3-per-service-design-servicesservicedesign" title="Permanent link">#</a></h2>
+<p>Each service's design folder contains the same sections, so they are easy to compare:</p>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Responsibilities</td>
+<td>What it does and, just as important, what it does not do</td>
+</tr>
+<tr>
+<td>Guarantees</td>
+<td>The correctness properties it promises and how each is achieved</td>
+</tr>
+<tr>
+<td>Module diagram</td>
+<td>Its internal modules (domain, application, ports, adapters) and their dependencies</td>
+</tr>
+<tr>
+<td>Interaction diagram</td>
+<td>Who calls it, whom it calls, which events it publishes and consumes</td>
+</tr>
+<tr>
+<td>Class diagram</td>
+<td>Domain model, ports and adapters with their main methods</td>
+</tr>
+<tr>
+<td>Sequence diagrams</td>
+<td>Its main use cases end to end</td>
+</tr>
+<tr>
+<td>State diagrams</td>
+<td>Lifecycles it owns</td>
+</tr>
+<tr>
+<td>Data model</td>
+<td>ER diagram or key/table design of its own store, with a link to the migration or schema</td>
+</tr>
+<tr>
+<td>Background work</td>
+<td>Scheduled jobs and consumers: where they run, how often, what they do</td>
+</tr>
+<tr>
+<td>Scaling and performance</td>
+<td>Replicas, pools, partitions, hot spots, caching, budgets</td>
+</tr>
+<tr>
+<td>Failure handling</td>
+<td>Each dependency failing, and what the service does then</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>Each test suite and what it proves</td>
+</tr>
+<tr>
+<td>Walkthrough</td>
+<td><code>walkthrough/index.html</code>: an animated version of the sections above</td>
+</tr>
+</tbody>
+</table>
+<p>Each service also has its own <code>README.md</code> (build, run, configure, operate) and <code>PREREQUISITES.md</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Language</th>
+<th>Design doc</th>
+<th>Walkthrough</th>
+<th>README + prerequisites</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>inventory-service</td>
+<td>Java</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>order-service</td>
+<td>Java</td>
+<td>🔄</td>
+<td>⏳</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>payment-service</td>
+<td>Java</td>
+<td>⏳</td>
+<td>⏳</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>cart-service</td>
+<td>Java</td>
+<td>⏳</td>
+<td>⏳</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>catalog-service</td>
+<td>Java</td>
+<td>⏳</td>
+<td>⏳</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>search-service</td>
+<td>Java</td>
+<td>⏳</td>
+<td>⏳</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>review-service</td>
+<td>Java</td>
+<td>⏳</td>
+<td>⏳</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>api-gateway (+ NGINX edge)</td>
+<td>Java</td>
+<td>⏳</td>
+<td>⏳</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>notification-service</td>
+<td>Go</td>
+<td>⏳</td>
+<td>⏳</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>recommendation-service</td>
+<td>Python</td>
+<td>⏳</td>
+<td>⏳</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>analytics</td>
+<td>ClickHouse SQL</td>
+<td>⏳</td>
+<td>⏳</td>
+<td>⏳</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-order-of-work">4. Order of work<a class="headerlink" href="#4-order-of-work" title="Permanent link">#</a></h2>
+<ol>
+<li>Finish the system diagrams in S13. They anchor every per-service module and interaction diagram.</li>
+<li>Write each service's design together with its implementation, in the order of <a href="IMPLEMENTATION-PLAN.html">IMPLEMENTATION-PLAN.md</a>. The document is updated in the same commit as the code it describes.</li>
+<li>Write the system walkthrough (S19) once checkout works end to end, so every animated step mirrors real behaviour.</li>
+<li>Finish the cross-cutting documents (S14 to S17) once the services, compose stack and dashboards exist, so they describe real
+   configuration.</li>
+</ol>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

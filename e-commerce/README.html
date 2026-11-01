@@ -56,6 +56,14 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 </thead>
 <tbody>
 <tr>
+<td><a href="STATUS.html">Status</a></td>
+<td>Current progress: what is done, in progress and next</td>
+</tr>
+<tr>
+<td><a href="design/DESIGN-PLAN.html">Design plan</a> · <a href="design/IMPLEMENTATION-PLAN.html">Implementation plan</a></td>
+<td>Every design and implementation work item, with status</td>
+</tr>
+<tr>
 <td><a href="PREREQUISITES.html">Prerequisites</a></td>
 <td>Tools, versions, machine resources, ports, and how to verify your setup</td>
 </tr>
@@ -81,9 +89,12 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 <pre class="highlight"><code>e-commerce/
 ├─ README.md                     this page
 ├─ PREREQUISITES.md              tools, versions, resources and ports for the whole system
+├─ STATUS.md                     current progress
 ├─ design/                       WHOLE-SYSTEM DESIGN
 │  ├─ README.md                  index of the design documents
 │  ├─ SPEC.md, PLAN.md           specification and delivery plan
+│  ├─ DESIGN-PLAN.md             every design deliverable with status
+│  ├─ IMPLEMENTATION-PLAN.md     every implementation work item, definition of done, test strategy
 │  ├─ 01-high-level-design.md … 10-event-catalogue.md
 │  ├─ adr/                       architecture decision records
 │  ├─ diagrams/                  SVG diagrams (light + dark); editable sources in diagrams/src

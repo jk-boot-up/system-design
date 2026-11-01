@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Implementation plan</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../README.html">E-commerce platform</a>
+  <span class="src">IMPLEMENTATION-PLAN.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="implementation-plan">Implementation plan<a class="headerlink" href="#implementation-plan" title="Permanent link">#</a></h1>
+<p>Every implementation work item for the e-commerce platform, in the order it is built, with its definition of done and status. The
+design work is in <a href="DESIGN-PLAN.html">DESIGN-PLAN.md</a>; the overview and milestones are in <a href="PLAN.html">PLAN.md</a>.</p>
+<p>Status: ✅ done · 🔄 in progress · ⏳ planned</p>
+<h2 id="1-definition-of-done-every-service">1. Definition of done (every service)<a class="headerlink" href="#1-definition-of-done-every-service" title="Permanent link">#</a></h2>
+<p>A service is done when all of these hold:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Criterion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D1</td>
+<td>Standalone project in <code>services/&lt;service&gt;/</code> with its own build (Gradle wrapper and version catalog, Go module or Python project); builds alone with one command</td>
+</tr>
+<tr>
+<td>D2</td>
+<td>Hexagonal structure: <code>domain</code> (no framework code), <code>application</code> (use cases and ports), <code>adapter.*</code>; enforced by architecture tests (ArchUnit in Java, import rules in Go and Python)</td>
+</tr>
+<tr>
+<td>D3</td>
+<td>Unit tests for the domain and the use cases (with in-memory test doubles)</td>
+</tr>
+<tr>
+<td>D4</td>
+<td>Container integration tests against the real store and brokers (Testcontainers), tagged so they run when Docker is available</td>
+</tr>
+<tr>
+<td>D5</td>
+<td>Contracts: <code>contracts/openapi.yaml</code>, JSON Schemas for published events, the consumer's own copies of consumed events</td>
+</tr>
+<tr>
+<td>D6</td>
+<td>Production readiness: health probes, Prometheus metrics, structured logs, graceful shutdown, timeouts and circuit breakers on every remote call, idempotent commands and consumers</td>
+</tr>
+<tr>
+<td>D7</td>
+<td><code>Dockerfile</code> (non-root, layered or distroless, small) and <code>k8s/</code> base (Deployment, Service, HPA, PDB, NetworkPolicy, ConfigMap)</td>
+</tr>
+<tr>
+<td>D8</td>
+<td>CI workflow <code>.github/workflows/e-commerce-&lt;service&gt;.yml</code>, triggered only by changes to that service</td>
+</tr>
+<tr>
+<td>D9</td>
+<td>Documents: README, PREREQUISITES, <code>design/README.md</code> (low-level design with diagrams) and <code>design/walkthrough/</code> (animation), with HTML counterparts</td>
+</tr>
+<tr>
+<td>D10</td>
+<td>Wired into <code>deploy/compose</code> and <code>deploy/k8s/overlays</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-services-in-build-order">2. Services, in build order<a class="headerlink" href="#2-services-in-build-order" title="Permanent link">#</a></h2>
+<p>The order follows the checkout path first, because it carries the hardest correctness requirements. Read paths and asynchronous
+consumers come after it.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Service</th>
+<th>Main work</th>
+<th>Proves</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>inventory-service</strong> (Java)</td>
+<td>Conditional stock updates, all-or-nothing reservations, expiry job, outbox relay, <code>OrderCancelled</code> safety-net consumer</td>
+<td>50 concurrent orders for 10 units → exactly 10 reserved</td>
+<td>✅ D1–D9 (D10 with the compose stack)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>order-service</strong> (Java)</td>
+<td>Order aggregate and state machine, checkout saga with compensations, idempotency keys, recovery job, monthly partitions, keyset history, JWT security</td>
+<td>Every saga path: happy, out of stock, declined, unknown, capture failure, crash recovery, customer cancellation</td>
+<td>🔄 domain, application, persistence done; clients, web, jobs, tests, docs next</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>payment-service</strong> (Java)</td>
+<td>Payment aggregate, provider port with a simulated provider (approve / decline / timeout tokens), idempotent authorise / capture / void / refund, reconciler for unknown outcomes, attempt audit log</td>
+<td>A late provider success after a timeout is voided; no double charge on retries</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>cart-service</strong> (Java)</td>
+<td>Redis hash carts for guests and customers, merge on sign-in, re-pricing through catalog with a fallback, checkout snapshot, <code>OrderConfirmed</code> consumer that clears the cart</td>
+<td>Degraded pricing when catalog is down; idempotent clearing</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>catalog-service</strong> (Java)</td>
+<td>Products and categories (PostgreSQL + JSONB), optimistic locking with ETags, Redis cache-aside, presigned image uploads to MinIO, <code>ProductChanged</code> outbox</td>
+<td>Cache invalidation after commit; stale writes rejected with 412</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>search-service</strong> (Java)</td>
+<td>OpenSearch index and alias, consumers for <code>ProductChanged</code> and <code>StockChanged</code> with external versioning, faceted search with <code>search_after</code> cursors</td>
+<td>Out-of-order events never overwrite newer data</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>review-service</strong> (Java)</td>
+<td>Cassandra tables per query, LWT guard (one review per customer per product), counters, verified purchases from <code>OrderConfirmed</code></td>
+<td>Second review rejected; verified badge only after a purchase</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>api-gateway</strong> (Java) + <strong>NGINX edge</strong></td>
+<td>Spring Cloud Gateway routes, JWT validation, Redis token-bucket rate limits, request ids, circuit-breaker fallbacks; NGINX TLS, compression, micro-caching and static documentation</td>
+<td>429 with <code>Retry-After</code> past the limit; 503 fallback when a service is down</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>notification-service</strong> (Go)</td>
+<td>Kafka router → RabbitMQ quorum priority queue → email worker (SMTP to Mailpit), retries via TTL and dead-letter exchanges, Redis dedupe</td>
+<td>Each email sent once even with duplicate events; poison jobs dead-lettered</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>recommendation-service</strong> (Python)</td>
+<td>FastAPI, Kafka consumer for <code>OrderConfirmed</code>, Redis sorted-set co-purchase counts, top-N endpoint</td>
+<td>Pairs counted once per order event</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>analytics</strong> (ClickHouse)</td>
+<td>Kafka engine tables, materialised views, rollups, Grafana dashboard</td>
+<td>Revenue per minute available within a minute of an order</td>
+<td>⏳</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-platform-and-system-level-work">3. Platform and system-level work<a class="headerlink" href="#3-platform-and-system-level-work" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Item</th>
+<th>Contents</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1</td>
+<td>Local stack <code>deploy/compose</code></td>
+<td>Compose project <code>e-commerce</code>: PostgreSQL (one database per service), Kafka (KRaft), Redis, RabbitMQ, OpenSearch, Cassandra, ClickHouse, MinIO, Keycloak (realm import), Mailpit, NGINX, OpenTelemetry collector, Prometheus, Grafana, Tempo, Loki, plus every service; health checks and start order</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Kubernetes overlays <code>deploy/k8s/overlays</code></td>
+<td><code>dev</code>, <code>staging</code>, <code>prod</code> composing every service's <code>k8s/</code> base; namespaces <code>e-commerce-shop</code>, <code>e-commerce-platform</code>; operator manifests for data stores</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>P3</td>
+<td>End-to-end tests <code>tests/e2e</code></td>
+<td>Journeys against the running stack: browse, search, cart, checkout, cancel, review, email received, analytics row present</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>P4</td>
+<td>Performance tests <code>tests/performance</code></td>
+<td>Gatling simulations for browse, search, add to cart and checkout, with p99 budgets from the spec</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>P5</td>
+<td>Observability</td>
+<td>Grafana dashboards (RED per service, saga outcomes, outbox backlog, consumer lag, DLQ depth), Prometheus alert rules with burn rates</td>
+<td>⏳</td>
+</tr>
+<tr>
+<td>P6</td>
+<td>Documentation pipeline <code>tools/</code></td>
+<td>Diagrams → SVG (light + dark), Markdown → HTML, walkthrough builder and checker, link checker</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>P7</td>
+<td>Walkthrough engine</td>
+<td>Animated diagrams, themes, narration on/off (female voice, "Amy" when available), keyboard controls, automated check</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-testing-strategy-pyramid">4. Testing strategy (pyramid)<a class="headerlink" href="#4-testing-strategy-pyramid" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Where</th>
+<th>Runs</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Domain unit</td>
+<td>Every service</td>
+<td>Every build</td>
+<td>Business rules and state machines, in milliseconds</td>
+</tr>
+<tr>
+<td>Application with test doubles</td>
+<td>Every service</td>
+<td>Every build</td>
+<td>Use cases and saga paths without infrastructure</td>
+</tr>
+<tr>
+<td>Architecture rules</td>
+<td>Every service</td>
+<td>Every build</td>
+<td>Dependency direction stays hexagonal</td>
+</tr>
+<tr>
+<td>Container integration</td>
+<td>Every service</td>
+<td><code>-PwithContainers</code> locally, always in CI</td>
+<td>Real SQL, real Kafka, real Redis, OpenSearch and Cassandra behaviour</td>
+</tr>
+<tr>
+<td>Contract</td>
+<td>Producers and consumers</td>
+<td>Every build</td>
+<td>Published events match their schemas; consumers parse their copies</td>
+</tr>
+<tr>
+<td>End to end</td>
+<td><code>tests/e2e</code></td>
+<td>Nightly and before release</td>
+<td>Journeys across services</td>
+</tr>
+<tr>
+<td>Performance</td>
+<td><code>tests/performance</code></td>
+<td>Before release</td>
+<td>p99 budgets at target load</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-commit-and-push-routine">5. Commit and push routine<a class="headerlink" href="#5-commit-and-push-routine" title="Permanent link">#</a></h2>
+<ul>
+<li>Small commits, each describing one change, pushed to <code>system-design-e-commerce-draft-1</code> and fast-forwarded to <code>main</code> about every
+  two minutes of work.</li>
+<li>Before each push: the documentation pipeline regenerates diagrams, HTML and walkthroughs. Changed services must compile, and their
+  tests must pass before a service is marked done.</li>
+<li>No build output is committed (see <code>.gitignore</code>), and commit messages describe the change only.</li>
+</ul>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

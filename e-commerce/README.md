@@ -5,6 +5,8 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 
 | Read | |
 |---|---|
+| [Status](STATUS.md) | Current progress: what is done, in progress and next |
+| [Design plan](design/DESIGN-PLAN.md) · [Implementation plan](design/IMPLEMENTATION-PLAN.md) | Every design and implementation work item, with status |
 | [Prerequisites](PREREQUISITES.md) | Tools, versions, machine resources, ports, and how to verify your setup |
 | [Specification](design/SPEC.md) | Requirements, capacity estimates, architecture, flows, data, operations, patterns, languages |
 | [Plan](design/PLAN.md) | Goals, technology, milestones, working agreements |
@@ -17,9 +19,12 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 e-commerce/
 ├─ README.md                     this page
 ├─ PREREQUISITES.md              tools, versions, resources and ports for the whole system
+├─ STATUS.md                     current progress
 ├─ design/                       WHOLE-SYSTEM DESIGN
 │  ├─ README.md                  index of the design documents
 │  ├─ SPEC.md, PLAN.md           specification and delivery plan
+│  ├─ DESIGN-PLAN.md             every design deliverable with status
+│  ├─ IMPLEMENTATION-PLAN.md     every implementation work item, definition of done, test strategy
 │  ├─ 01-high-level-design.md … 10-event-catalogue.md
 │  ├─ adr/                       architecture decision records
 │  ├─ diagrams/                  SVG diagrams (light + dark); editable sources in diagrams/src

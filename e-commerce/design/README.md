@@ -1,5 +1,7 @@
 # Design documents
 
+Plans and progress: [design plan](DESIGN-PLAN.md) · [implementation plan](IMPLEMENTATION-PLAN.md) · [status](../STATUS.md)
+
 The detailed design of the e-commerce platform. Start with the [specification](SPEC.md) for requirements and the reasons behind
 the design, then read these documents in order.
 
