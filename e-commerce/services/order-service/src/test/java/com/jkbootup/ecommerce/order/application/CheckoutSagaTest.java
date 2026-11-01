@@ -44,6 +44,14 @@ class CheckoutSagaTest {
     }
 
     @Test
+    void ordersAreCreatedAtMillisecondPrecisionToMatchTheirId() {
+        var precise = Clock.fixed(Instant.parse("2026-11-01T10:00:00.123456789Z"), ZoneOffset.UTC);
+        var s = new CheckoutSaga(f.repository, f.cartPort, f.inventory, f.payment, f.tx, f.ids, precise);
+        var order = s.place(new PlaceOrderCommand(customer, "ada@example.com", "k-ms", "tok_ok")).order();
+        assertThat(order.createdAt()).isEqualTo(Instant.parse("2026-11-01T10:00:00.123Z"));
+    }
+
+    @Test
     void sameIdempotencyKeyReturnsTheSameOrderWithoutCallingAnything() {
         CheckoutResult first = checkout("k1");
         f.calls.clear();

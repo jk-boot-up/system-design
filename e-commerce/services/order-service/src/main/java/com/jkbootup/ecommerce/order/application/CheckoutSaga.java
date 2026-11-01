@@ -15,6 +15,7 @@ import com.jkbootup.ecommerce.order.domain.OrderStatus;
 import com.jkbootup.ecommerce.order.domain.SagaStep;
 
 import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -55,7 +56,8 @@ public class CheckoutSaga {
             case CartPort.Snapshot.Ready r -> toLines(r.lines());
         };
 
-        var now = clock.instant();
+        // millisecond precision: the UUIDv7 id carries the same instant, which is the partition key for lookups by id
+        var now = clock.instant().truncatedTo(ChronoUnit.MILLIS);
         Order order = Order.place(ids.newId(now), now, cmd.customerId(), cmd.customerEmail(), lines);
         boolean inserted = tx.inTransaction(() -> orders.insert(order, cmd.idempotencyKey()));
         if (!inserted) {                                    // same key used concurrently: return that order
