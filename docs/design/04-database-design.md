@@ -157,7 +157,7 @@ erDiagram
         text sku PK
         text warehouse
         int quantity "> 0"
-        text status "RESERVED | COMMITTED | RELEASED | EXPIRED"
+        text status "RESERVED | COMMITTED | RELEASED | EXPIRED | RETURNED"
         timestamptz expires_at
         timestamptz created_at
         timestamptz updated_at
@@ -180,7 +180,7 @@ create table reservations (
   sku        text not null,
   warehouse  text not null default 'MAIN',
   quantity   int  not null check (quantity > 0),
-  status     text not null check (status in ('RESERVED', 'COMMITTED', 'RELEASED', 'EXPIRED')),
+  status     text not null check (status in ('RESERVED', 'COMMITTED', 'RELEASED', 'EXPIRED', 'RETURNED')),
   expires_at timestamptz not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
