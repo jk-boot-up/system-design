@@ -1,0 +1,814 @@
+{
+ "title": "inventory-service",
+ "subtitle": "Stock reservations that never oversell",
+ "nodes": [
+  {
+   "id": "order",
+   "label": "order-service",
+   "kind": "service",
+   "tech": "checkout saga",
+   "x": 110,
+   "y": 110
+  },
+  {
+   "id": "inv",
+   "label": "inventory",
+   "kind": "service",
+   "tech": "Java 25 · REST",
+   "x": 430,
+   "y": 110
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL",
+   "kind": "db",
+   "tech": "stock · reservations",
+   "x": 750,
+   "y": 110
+  },
+  {
+   "id": "expiry",
+   "label": "Expiry job",
+   "kind": "job",
+   "tech": "ShedLock · 30 s",
+   "x": 110,
+   "y": 330
+  },
+  {
+   "id": "relay",
+   "label": "Outbox relay",
+   "kind": "job",
+   "tech": "every 100 ms",
+   "x": 430,
+   "y": 330
+  },
+  {
+   "id": "kafka",
+   "label": "Kafka",
+   "kind": "queue",
+   "tech": "inventory / order",
+   "x": 750,
+   "y": 330
+  },
+  {
+   "id": "search",
+   "label": "search-service",
+   "kind": "service",
+   "tech": "shows availability",
+   "x": 1040,
+   "y": 330
+  }
+ ],
+ "edges": [
+  {
+   "from": "order",
+   "to": "inv"
+  },
+  {
+   "from": "inv",
+   "to": "db"
+  },
+  {
+   "from": "expiry",
+   "to": "inv"
+  },
+  {
+   "from": "relay",
+   "to": "db"
+  },
+  {
+   "from": "relay",
+   "to": "kafka"
+  },
+  {
+   "from": "kafka",
+   "to": "search"
+  },
+  {
+   "from": "kafka",
+   "to": "inv",
+   "dashed": true
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "reserve",
+   "title": "Reserve an order",
+   "summary": "All lines in one transaction",
+   "steps": [
+    {
+     "say": "A customer checks out two pairs of trail shoes. order-service asks inventory to reserve them for order 7.",
+     "active": [
+      "order",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "order",
+       "to": "inv",
+       "label": "POST /reservations (SKU-1001 × 2)",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "SKU-1001",
+      "rows": {
+       "available": 5,
+       "reserved": 0
+      }
+     }
+    },
+    {
+     "say": "Inventory first checks whether order 7 already holds stock. It does not, so this is a new reservation, not a retry.",
+     "active": [
+      "inv",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "SELECT … FOR UPDATE",
+       "kind": "req"
+      }
+     ],
+     "log": "BEGIN"
+    },
+    {
+     "say": "One conditional update moves two units from available to reserved, but only if at least two are available. There is no read-then-write gap for another order to slip into.",
+     "active": [
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "UPDATE stock … WHERE available >= 2",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "SKU-1001",
+      "rows": {
+       "available": 3,
+       "reserved": 2
+      }
+     },
+     "badges": [
+      {
+       "node": "db",
+       "text": "1 row",
+       "tone": "ok"
+      }
+     ]
+    },
+    {
+     "say": "The reservation is stored with a 15-minute hold, and a StockChanged event is written to the outbox in the same transaction.",
+     "active": [
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "INSERT reservation + outbox",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Order 7",
+      "rows": {
+       "SKU-1001": "RESERVED × 2",
+       "expires": "10:15"
+      }
+     },
+     "log": "COMMIT"
+    },
+    {
+     "say": "Inventory answers: reserved until a quarter past ten. The saga can move on to payment.",
+     "ok": [
+      "inv",
+      "order"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "order",
+       "label": "200 RESERVED",
+       "kind": "res"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "last-unit",
+   "title": "Two customers, one item left",
+   "summary": "Conditional update: no overselling",
+   "steps": [
+    {
+     "say": "Only one unit of a limited sneaker is left. Two customers press buy within the same millisecond.",
+     "active": [
+      "order",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "order",
+       "to": "inv",
+       "label": "order A: reserve × 1",
+       "kind": "req"
+      },
+      {
+       "from": "order",
+       "to": "inv",
+       "label": "order B: reserve × 1",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "SKU-LIMITED",
+      "rows": {
+       "available": 1,
+       "reserved": 0
+      }
+     }
+    },
+    {
+     "say": "Both transactions run the same statement. PostgreSQL locks the stock row, so one update waits for the other.",
+     "active": [
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "A: UPDATE … WHERE available >= 1",
+       "kind": "req"
+      },
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "B: UPDATE … WHERE available >= 1",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Order A updates one row: the unit is now reserved.",
+     "ok": [
+      "db"
+     ],
+     "state": {
+      "title": "SKU-LIMITED",
+      "rows": {
+       "available": 0,
+       "reserved": 1
+      }
+     },
+     "badges": [
+      {
+       "node": "db",
+       "text": "A: 1 row",
+       "tone": "ok"
+      }
+     ]
+    },
+    {
+     "say": "Order B's update now sees zero available and matches no rows. Nothing was taken, so there is nothing to undo.",
+     "bad": [
+      "db"
+     ],
+     "badges": [
+      {
+       "node": "db",
+       "text": "B: 0 rows",
+       "tone": "bad"
+      }
+     ]
+    },
+    {
+     "say": "A gets reserved; B gets a clear out-of-stock answer. In the container test, 50 parallel orders for 10 units always give exactly 10 reservations.",
+     "active": [
+      "inv",
+      "order"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "order",
+       "label": "A: 200 RESERVED",
+       "kind": "res"
+      },
+      {
+       "from": "inv",
+       "to": "order",
+       "label": "B: 409 OUT_OF_STOCK",
+       "kind": "error"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "out-of-stock",
+   "title": "One line short: nothing reserved",
+   "summary": "All or nothing per order",
+   "steps": [
+    {
+     "say": "Order 8 wants shoes and socks. There are plenty of shoes but no socks left.",
+     "active": [
+      "order",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "order",
+       "to": "inv",
+       "label": "reserve shoes × 1, socks × 2",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Stock",
+      "rows": {
+       "SKU-SHOES": "5 available",
+       "SKU-SOCKS": "1 available"
+      }
+     }
+    },
+    {
+     "say": "Lines are sorted by SKU, so every order locks rows in the same order and two orders can never deadlock. Shoes come first and are reserved.",
+     "active": [
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "UPDATE SKU-SHOES (ok)",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Stock",
+      "rows": {
+       "SKU-SHOES": "4 available",
+       "SKU-SOCKS": "1 available"
+      }
+     }
+    },
+    {
+     "say": "The sock update matches no rows. The service throws inside the transaction…",
+     "bad": [
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "UPDATE SKU-SOCKS (0 rows)",
+       "kind": "error"
+      }
+     ]
+    },
+    {
+     "say": "…and the whole transaction rolls back, shoes included. The order holds nothing.",
+     "active": [
+      "db"
+     ],
+     "state": {
+      "title": "Stock",
+      "rows": {
+       "SKU-SHOES": "5 available",
+       "SKU-SOCKS": "1 available"
+      }
+     },
+     "log": "ROLLBACK"
+    },
+    {
+     "say": "Inventory replies out of stock and names the SKU, so the customer can be told which item is missing.",
+     "packets": [
+      {
+       "from": "inv",
+       "to": "order",
+       "label": "409 OUT_OF_STOCK (SKU-SOCKS)",
+       "kind": "error"
+      }
+     ],
+     "bad": [
+      "order"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "commit",
+   "title": "Payment captured: commit",
+   "summary": "Reserved stock becomes sold",
+   "steps": [
+    {
+     "say": "Payment for order 7 was authorised. The saga asks inventory to commit the reservation.",
+     "active": [
+      "order",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "order",
+       "to": "inv",
+       "label": "POST /reservations/7/commit",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "SKU-1001",
+      "rows": {
+       "available": 3,
+       "reserved": 2
+      }
+     }
+    },
+    {
+     "say": "Commit takes the two units out of reserved: they are sold and leave the counters for good.",
+     "active": [
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "UPDATE reserved = reserved − 2",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "SKU-1001",
+      "rows": {
+       "available": 3,
+       "reserved": 0
+      }
+     }
+    },
+    {
+     "say": "The network drops the answer and order-service retries. The reservation is already committed, so the retry changes nothing and still succeeds.",
+     "active": [
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "order",
+       "to": "inv",
+       "label": "retry commit",
+       "kind": "req"
+      },
+      {
+       "from": "inv",
+       "to": "order",
+       "label": "200 COMMITTED",
+       "kind": "res"
+      }
+     ],
+     "badges": [
+      {
+       "node": "inv",
+       "text": "idempotent",
+       "tone": "ok"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "release",
+   "title": "Payment declined: release",
+   "summary": "Compensation is safe to repeat",
+   "steps": [
+    {
+     "say": "The bank declines the card for order 9. The saga compensates by releasing its reservation.",
+     "active": [
+      "order",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "order",
+       "to": "inv",
+       "label": "POST /reservations/9/release",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "SKU-2002",
+      "rows": {
+       "available": 0,
+       "reserved": 3
+      }
+     }
+    },
+    {
+     "say": "The three units move back from reserved to available, ready for the next customer.",
+     "active": [
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "UPDATE available += 3, reserved −= 3",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "SKU-2002",
+      "rows": {
+       "available": 3,
+       "reserved": 0
+      }
+     }
+    },
+    {
+     "say": "Search must learn that the item is in stock again, so a StockChanged event goes into the outbox.",
+     "active": [
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "INSERT outbox StockChanged",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "If the saga's recovery job repeats the release later, nothing happens: the reservation is already released.",
+     "packets": [
+      {
+       "from": "order",
+       "to": "inv",
+       "label": "release again",
+       "kind": "req"
+      },
+      {
+       "from": "inv",
+       "to": "order",
+       "label": "200 RELEASED",
+       "kind": "res"
+      }
+     ],
+     "badges": [
+      {
+       "node": "inv",
+       "text": "no-op",
+       "tone": "ok"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "expiry",
+   "title": "Abandoned checkout: hold expires",
+   "summary": "Stock is never stuck",
+   "steps": [
+    {
+     "say": "Order 10 reserved one unit, then order-service crashed before paying. Nobody will release that unit.",
+     "dim": [
+      "order"
+     ],
+     "state": {
+      "title": "Reservation 10",
+      "rows": {
+       "status": "RESERVED",
+       "expires": "10:15"
+      }
+     }
+    },
+    {
+     "say": "Every 30 seconds one replica, chosen by ShedLock, runs the expiry job.",
+     "active": [
+      "expiry",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "expiry",
+       "to": "inv",
+       "label": "expireDue(500)",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "It locks reservations past their expiry with SKIP LOCKED, so a second runner would simply take different rows.",
+     "active": [
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "SELECT … expires_at <= now FOR UPDATE SKIP LOCKED",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The unit returns to available and the reservation is marked expired.",
+     "ok": [
+      "db"
+     ],
+     "state": {
+      "title": "Reservation 10",
+      "rows": {
+       "status": "EXPIRED",
+       "SKU-3003 available": "+1"
+      }
+     }
+    },
+    {
+     "say": "If order-service comes back and tries to commit now, inventory refuses with reservation expired, and the saga cancels the order safely.",
+     "packets": [
+      {
+       "from": "order",
+       "to": "inv",
+       "label": "commit 10",
+       "kind": "req"
+      },
+      {
+       "from": "inv",
+       "to": "order",
+       "label": "409 RESERVATION_EXPIRED",
+       "kind": "error"
+      }
+     ],
+     "bad": [
+      "order"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "outbox",
+   "title": "Outbox relay to search",
+   "summary": "Events are never lost",
+   "steps": [
+    {
+     "say": "Every stock change wrote a StockChanged row into the outbox, inside the same transaction as the change.",
+     "active": [
+      "db"
+     ],
+     "state": {
+      "title": "Outbox",
+      "rows": {
+       "unpublished": 3
+      }
+     }
+    },
+    {
+     "say": "The relay runs in every replica. Each one claims a batch of up to 500 rows with SKIP LOCKED, so two replicas never take the same row.",
+     "active": [
+      "relay",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "relay",
+       "to": "db",
+       "label": "SELECT unpublished LIMIT 500 SKIP LOCKED",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "It sends the batch to the inventory.events topic, keyed by SKU, so events for one SKU stay in order.",
+     "active": [
+      "relay",
+      "kafka"
+     ],
+     "packets": [
+      {
+       "from": "relay",
+       "to": "kafka",
+       "label": "3 × StockChanged",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "Only after Kafka acknowledges every record are the rows marked as published.",
+     "active": [
+      "relay",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "relay",
+       "to": "db",
+       "label": "UPDATE published_at = now()",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Outbox",
+      "rows": {
+       "unpublished": 0
+      }
+     }
+    },
+    {
+     "say": "search-service consumes the events and updates its index. Sold-out items disappear from in-stock filters within about a second.",
+     "ok": [
+      "search"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "search",
+       "label": "StockChanged",
+       "kind": "event"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "safety-net",
+   "title": "OrderCancelled safety net",
+   "summary": "Idempotent consumer",
+   "steps": [
+    {
+     "say": "order-service cancels order 11 and publishes OrderCancelled. Inventory listens as a safety net in case any stock is still held.",
+     "active": [
+      "kafka",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "inv",
+       "label": "OrderCancelled (event e42)",
+       "kind": "event"
+      }
+     ],
+     "state": {
+      "title": "processed_events",
+      "rows": {
+       "e42": "—"
+      }
+     }
+    },
+    {
+     "say": "In one transaction it records event e42 as processed and releases whatever order 11 still holds.",
+     "active": [
+      "inv",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "db",
+       "label": "INSERT processed_events e42 + release",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "processed_events",
+      "rows": {
+       "e42": "processed"
+      }
+     }
+    },
+    {
+     "say": "Kafka delivers at least once, so the same event can arrive again after a restart.",
+     "active": [
+      "kafka",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "inv",
+       "label": "OrderCancelled (e42 again)",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "Inserting e42 a second time hits the primary key, so the handler skips it. The effect happened exactly once.",
+     "ok": [
+      "inv"
+     ],
+     "badges": [
+      {
+       "node": "inv",
+       "text": "duplicate skipped",
+       "tone": "ok"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

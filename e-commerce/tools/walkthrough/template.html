@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walkthrough</title>
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body>
+<header>
+  <div><h1 id="title"></h1><div class="sub" id="subtitle"></div></div>
+  <div class="grow"></div>
+  <div class="legend" aria-hidden="true">
+    <span><i style="background:var(--req)"></i>request</span><span><i style="background:var(--res)"></i>response</span>
+    <span><i style="background:var(--evt)"></i>event</span><span><i style="background:var(--err)"></i>failure</span>
+  </div>
+  <button class="btn" id="narrate" aria-pressed="false" title="Narration on/off (N)">🔇 Narration off</button>
+  <div class="seg" role="group" aria-label="Theme">
+    <button data-set-theme="light">☀ Light</button><button data-set-theme="medium">◐ Medium</button><button data-set-theme="dark">☾ Dark</button>
+  </div>
+  <a class="btn" href="__BACK__" title="Back to the design document">⟵ Design</a>
+</header>
+<main>
+  <aside class="left"><div id="scenarios" role="list" aria-label="Scenarios"></div></aside>
+  <section class="stage" id="stage"></section>
+  <aside class="right">
+    <div class="card"><h3>Narration</h3><div class="say" id="say" aria-live="polite"></div></div>
+    <div class="card"><h3 id="stateTitle">State</h3><table class="kv"><tbody id="state"></tbody></table></div>
+    <div class="card"><h3>Message log</h3><ul class="log" id="log"></ul></div>
+  </aside>
+</main>
+<footer>
+  <button class="btn" id="restart" title="Restart scenario">⟲</button>
+  <button class="btn" id="prev" title="Previous step (←)">◀</button>
+  <button class="btn" id="play" title="Play / pause (space)">▶ Play</button>
+  <button class="btn" id="next" title="Next step (→)">▶|</button>
+  <div class="progress" id="progress" title="Jump to a step"><div id="bar"></div></div>
+  <span class="count" id="count"></span>
+  <label class="sub">Speed <select id="speed"><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
+  <label class="sub"><input type="checkbox" id="autoNext" checked> continue to next scenario</label>
+  <span class="sub"><kbd>space</kbd> play · <kbd>←</kbd><kbd>→</kbd> step · <kbd>N</kbd> narration · <kbd>T</kbd> theme</span>
+</footer>
+<script>
+window.WALKTHROUGH = /*__DATA__*/;
+</script>
+<script>
+/*__JS__*/
+</script>
+</body>
+</html>
