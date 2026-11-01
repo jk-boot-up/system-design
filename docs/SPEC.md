@@ -4,7 +4,7 @@
 |---|---|
 | Status | Draft 1 |
 | Scope | Online store: catalogue, search, cart, checkout, inventory, payments, notifications |
-| Stack | Java 25, Gradle, Spring Boot 4, PostgreSQL, Cassandra, Redis, OpenSearch, Kafka, MinIO, Keycloak, Kubernetes |
+| Stack | Java 25 (main), Go, Python; PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO; Kafka, RabbitMQ; Keycloak; Kubernetes |
 
 ## Contents
 
@@ -23,6 +23,7 @@
 13. [Scalability, modularity and performance](#13-scalability-modularity-and-performance)
 14. [Polyglot persistence](#14-polyglot-persistence)
 15. [Design patterns applied](#15-design-patterns-applied)
+16. [Languages](#16-languages)
 
 ---
 
@@ -59,6 +60,8 @@ The system must:
 | F9 | Registration and sign-in use OpenID Connect, with roles `customer` and `staff`. |
 | F10 | Customers can rate and review products they bought; product pages show the rating summary and the newest reviews. |
 | F11 | Staff upload product images directly to object storage; the platform never proxies the image bytes. |
+| F12 | Product pages show "customers who bought this also bought" recommendations. |
+| F13 | Staff see sales dashboards (orders, revenue, top products, cancellation reasons) that are at most a minute behind. |
 
 ### 2.2 Non-functional
 
@@ -193,12 +196,14 @@ flowchart TB
 | **api-gateway** | TLS end, routing, JWT validation, rate limiting, request ids, CORS | Redis (rate-limit buckets) | | |
 | **catalog-service** | Products, categories, prices, attributes, media; source of truth for product data | PostgreSQL (+ MinIO for images) | `ProductChanged`, `PriceChanged` | |
 | **search-service** | Full-text and faceted search; read model of catalogue plus availability | OpenSearch | | `ProductChanged`, `StockChanged` |
-| **cart-service** | Carts for guests and customers; validates price and availability on read | Redis | `CartCheckedOut` | `PriceChanged` |
+| **cart-service** | Carts for guests and customers; re-prices lines on read; checkout snapshot for orders | Redis | | `OrderConfirmed` (clears the cart) |
 | **inventory-service** | Stock per SKU and warehouse; reservations with expiry; atomic decrement | PostgreSQL | `StockReserved`, `StockReservationFailed`, `StockReleased`, `StockChanged` | `OrderCancelled` |
-| **order-service** | Order lifecycle; checkout **saga orchestrator**; idempotent order placement | PostgreSQL | `OrderPlaced`, `OrderConfirmed`, `OrderCancelled` | `PaymentCaptured`, `PaymentFailed` |
+| **order-service** | Order lifecycle; checkout **saga orchestrator** (calls inventory and payment synchronously); idempotent order placement | PostgreSQL | `OrderPlaced`, `OrderConfirmed`, `OrderCancelled` | |
 | **payment-service** | Payment intents; authorise, capture, refund through a provider port | PostgreSQL | `PaymentAuthorized`, `PaymentCaptured`, `PaymentFailed`, `PaymentRefunded` | |
 | **review-service** | Ratings and reviews per product; rating summaries | Cassandra | `ReviewPosted` | `OrderConfirmed` (verified-purchase check) |
-| **notification-service** | Emails for order events; templates; retries with backoff | Redis (dedupe keys with expiry) | | `OrderConfirmed`, `OrderCancelled`, `OrderShipped` |
+| **recommendation-service** (Python) | "Also bought" recommendations from co-purchase counts | Redis (sorted sets) | | `OrderConfirmed` |
+| **notification-service** (Go) | Turns order events into email jobs; a worker sends them with priorities and delayed retries | RabbitMQ (work queues) + Redis (dedupe keys) | | `OrderConfirmed`, `OrderCancelled` |
+| **analytics** (ClickHouse) | Sales analytics; ingests events directly through the Kafka table engine; Grafana dashboards | ClickHouse | | `order.events`, `payment.events` |
 | **Keycloak** (external) | Users, roles, OIDC tokens | PostgreSQL | | |
 
 ### 5.1 Public API (through the gateway)
@@ -208,6 +213,7 @@ flowchart TB
 | GET | `/api/v1/products/{id}` | public | Product detail |
 | GET | `/api/v1/categories` | public | Category tree |
 | GET / POST | `/api/v1/products/{id}/reviews` | public / customer | Newest reviews (cursor) / post a review |
+| GET | `/api/v1/products/{sku}/recommendations` | public | Products often bought together |
 | POST | `/api/v1/admin/products/{id}/images` | staff | Returns a presigned upload URL (Valet Key) |
 | GET | `/api/v1/search?q=&category=&brand=&minPrice=&maxPrice=&sort=&page=` | public | Faceted search |
 | GET | `/api/v1/cart` | guest token or customer | Current cart with live prices |
@@ -418,11 +424,15 @@ The `check (available >= 0)` constraint is a second line of defence against over
 
 | Need | Choice | Why | Alternatives considered |
 |---|---|---|---|
-| Language | Java 25 | Virtual threads simplify blocking I/O at high concurrency; records and sealed types model the domain; LTS | Kotlin, Go |
+| Main language | Java 25 | Virtual threads simplify blocking I/O at high concurrency; records and sealed types model the domain; LTS | Kotlin |
+| Lightweight event workers | Go 1.24 | Small static binaries, fast start, low memory per pod for I/O-bound consumers | Rust |
+| Data and ML-style services | Python 3.12 + FastAPI | The natural ecosystem for recommendation and analytics work; async I/O | — |
 | Framework | Spring Boot 4 | Mature ecosystem (data, security, Kafka, observability), first-class virtual threads | Quarkus, Micronaut |
 | Build | Gradle 9 (Kotlin DSL) | Fast incremental builds, version catalog, convention plugins for consistent service setup | Maven |
 | Relational | PostgreSQL 17 | ACID, partitioning, JSONB, strong tooling | MySQL |
-| Messaging | Kafka 4 (KRaft) | Durable, ordered per key, replayable; scales to far beyond the estimates | RabbitMQ, Pulsar |
+| Event streaming | Kafka 4 (KRaft) | Durable, ordered per key, replayable; scales to far beyond the estimates | Pulsar |
+| Work queues | RabbitMQ 4 | Per-message acknowledgement, priorities, delayed retries via TTL + dead-letter exchanges; ideal for jobs such as sending email | Kafka (no per-message priority or delay) |
+| Analytics | ClickHouse | Columnar OLAP; ingests from Kafka natively; sub-second aggregations over billions of rows | Apache Druid, Pinot |
 | Cache / cart | Redis 8 | Sub-millisecond reads and writes; data structures with expiry | Memcached, Hazelcast |
 | Wide-column | Apache Cassandra 5 | Linear write scaling for reviews; partition per product, newest first | ScyllaDB, HBase |
 | Object storage | MinIO (S3 API) | Images served from the CDN; presigned uploads; any S3 store in production | Ceph RGW |
@@ -561,7 +571,9 @@ Each service uses the store whose data model and access pattern fit its data. Th
 | order | PostgreSQL (partitioned; Citus later) | Transactions, constraints and joins for order + lines + outbox in one commit |
 | payment | PostgreSQL | Financial records: ACID, append-only attempt log, auditability |
 | review | Apache Cassandra | Write-heavy, append-only, read by product newest-first; scales linearly across nodes |
-| notification | Redis | Short-lived dedupe keys (`SET NX` with expiry); no long-term state |
+| notification | RabbitMQ + Redis | Email jobs are tasks, not facts: a queue with acknowledgements, priorities and delayed retries; Redis holds short-lived dedupe keys |
+| recommendation | Redis sorted sets | `ZINCRBY` per co-purchased pair, `ZREVRANGE` for the top N: O(log n) writes, constant-time reads |
+| analytics | ClickHouse | Columnar storage and vectorised aggregation for dashboards over all orders |
 | gateway | Redis | Shared token buckets for rate limiting across gateway replicas |
 | identity | PostgreSQL (Keycloak's own) | Managed by Keycloak |
 
@@ -609,6 +621,19 @@ Pattern names follow the course in [jk-boot-up/java-design-patterns](https://git
 | [Distributed Tracing](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/platform-design-patterns/distributed-tracing-pattern) / [Externalised Configuration](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/platform-design-patterns/externalised-configuration-pattern) | OpenTelemetry; Spring config + Kubernetes ConfigMaps | Observable, environment-independent builds |
 | [Token Authentication](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/security-design-patterns/token-authentication-pattern) / [Authorization Policy](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/security-design-patterns/authorization-policy-pattern) / [Input Validation](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/security-design-patterns/input-validation-pattern) | Keycloak JWTs; ownership checks; Bean Validation | Defence in depth |
 | [Test Double](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/testing-design-patterns/test-double-pattern) / [Object Mother](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/testing-design-patterns/object-mother-pattern) | In-memory adapters; test fixtures | Fast, deterministic tests |
+
+## 16. Languages
+
+Java is the main language. Other languages are used where their strengths clearly matter, and every service still follows the same
+contracts: HTTP + JSON with problem details, the shared event envelope, OpenTelemetry, Prometheus metrics, health endpoints and
+container images.
+
+| Language | Services | Why there |
+|---|---|---|
+| Java 25 (Spring Boot 4) | gateway, catalog, search, cart, inventory, order, payment, review | Rich transactional domain logic, mature data and messaging libraries, virtual threads |
+| Go 1.24 | notification-service (event router + email worker) | I/O-bound event processing with tiny memory per pod and instant start, so it scales out cheaply under bursts |
+| Python 3.12 (FastAPI) | recommendation-service | Data-oriented logic; easy path to richer models (implicit-feedback collaborative filtering) later |
+| SQL (ClickHouse) | analytics | Ingestion and aggregation expressed as materialised views; no service code needed |
 
 ---
 
