@@ -5,6 +5,7 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 
 | Read | |
 |---|---|
+| [Prerequisites](PREREQUISITES.md) | Tools, versions, machine resources, ports, and how to verify your setup |
 | [Specification](design/SPEC.md) | Requirements, capacity estimates, architecture, flows, data, operations, patterns, languages |
 | [Plan](design/PLAN.md) | Goals, technology, milestones, working agreements |
 | [System design documents](design/README.md) | HLD, data flow, deployment, database, sequence, flow, state and class diagrams, API and event catalogues |
@@ -15,6 +16,7 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 ```
 e-commerce/
 ├─ README.md                     this page
+├─ PREREQUISITES.md              tools, versions, resources and ports for the whole system
 ├─ design/                       WHOLE-SYSTEM DESIGN
 │  ├─ README.md                  index of the design documents
 │  ├─ SPEC.md, PLAN.md           specification and delivery plan
@@ -25,6 +27,7 @@ e-commerce/
 ├─ services/                     IMPLEMENTATION: one standalone project per service, nothing shared
 │  └─ <service>/
 │     ├─ README.md               what it does; how to build, run and test it
+│     ├─ PREREQUISITES.md        what this service alone needs
 │     ├─ design/                 the service's own design
 │     │  ├─ README.md            low-level design: API, events, data, classes, sequences, scaling, failure handling
 │     │  ├─ diagrams/            its SVG diagrams and their sources

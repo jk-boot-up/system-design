@@ -56,6 +56,10 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 </thead>
 <tbody>
 <tr>
+<td><a href="PREREQUISITES.html">Prerequisites</a></td>
+<td>Tools, versions, machine resources, ports, and how to verify your setup</td>
+</tr>
+<tr>
 <td><a href="design/SPEC.html">Specification</a></td>
 <td>Requirements, capacity estimates, architecture, flows, data, operations, patterns, languages</td>
 </tr>
@@ -76,6 +80,7 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 <h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">#</a></h2>
 <pre class="highlight"><code>e-commerce/
 ├─ README.md                     this page
+├─ PREREQUISITES.md              tools, versions, resources and ports for the whole system
 ├─ design/                       WHOLE-SYSTEM DESIGN
 │  ├─ README.md                  index of the design documents
 │  ├─ SPEC.md, PLAN.md           specification and delivery plan
@@ -86,6 +91,7 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 ├─ services/                     IMPLEMENTATION: one standalone project per service, nothing shared
 │  └─ &lt;service&gt;/
 │     ├─ README.md               what it does; how to build, run and test it
+│     ├─ PREREQUISITES.md        what this service alone needs
 │     ├─ design/                 the service's own design
 │     │  ├─ README.md            low-level design: API, events, data, classes, sequences, scaling, failure handling
 │     │  ├─ diagrams/            its SVG diagrams and their sources
