@@ -91,8 +91,8 @@ public class OrderConfiguration {
 
     @Bean
     @ConditionalOnProperty(name = "order.jobs.enabled", havingValue = "true", matchIfMissing = true)
-    OrderJobs orderJobs(SagaRecovery recovery, OrderPartitions partitions) {
-        return new OrderJobs(recovery, partitions);
+    OrderJobs orderJobs(SagaRecovery recovery) {
+        return new OrderJobs(recovery);
     }
 
     @Bean
