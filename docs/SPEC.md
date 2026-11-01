@@ -4,7 +4,7 @@
 |---|---|
 | Status | Draft 1 |
 | Scope | Online store: catalogue, search, cart, checkout, inventory, payments, notifications |
-| Stack | Java 25, Gradle, Spring Boot 4, PostgreSQL, Kafka, Redis, OpenSearch, Keycloak, Kubernetes |
+| Stack | Java 25, Gradle, Spring Boot 4, PostgreSQL, Cassandra, Redis, OpenSearch, Kafka, MinIO, Keycloak, Kubernetes |
 
 ## Contents
 
@@ -20,6 +20,9 @@
 10. [Deployment](#10-deployment)
 11. [Failure modes](#11-failure-modes)
 12. [Extensions](#12-extensions)
+13. [Scalability, modularity and performance](#13-scalability-modularity-and-performance)
+14. [Polyglot persistence](#14-polyglot-persistence)
+15. [Design patterns applied](#15-design-patterns-applied)
 
 ---
 
@@ -54,6 +57,8 @@ The system must:
 | F7 | Staff manage products, categories, prices and stock levels. |
 | F8 | Customers receive email for order confirmation, cancellation and shipping. |
 | F9 | Registration and sign-in use OpenID Connect, with roles `customer` and `staff`. |
+| F10 | Customers can rate and review products they bought; product pages show the rating summary and the newest reviews. |
+| F11 | Staff upload product images directly to object storage; the platform never proxies the image bytes. |
 
 ### 2.2 Non-functional
 
@@ -186,13 +191,14 @@ flowchart TB
 | Service | Responsibility | Store | Publishes | Consumes |
 |---|---|---|---|---|
 | **api-gateway** | TLS end, routing, JWT validation, rate limiting, request ids, CORS | Redis (rate-limit buckets) | | |
-| **catalog-service** | Products, categories, prices, attributes; source of truth for product data | PostgreSQL | `ProductChanged`, `PriceChanged` | |
+| **catalog-service** | Products, categories, prices, attributes, media; source of truth for product data | PostgreSQL (+ MinIO for images) | `ProductChanged`, `PriceChanged` | |
 | **search-service** | Full-text and faceted search; read model of catalogue plus availability | OpenSearch | | `ProductChanged`, `StockChanged` |
 | **cart-service** | Carts for guests and customers; validates price and availability on read | Redis | `CartCheckedOut` | `PriceChanged` |
 | **inventory-service** | Stock per SKU and warehouse; reservations with expiry; atomic decrement | PostgreSQL | `StockReserved`, `StockReservationFailed`, `StockReleased`, `StockChanged` | `OrderCancelled` |
 | **order-service** | Order lifecycle; checkout **saga orchestrator**; idempotent order placement | PostgreSQL | `OrderPlaced`, `OrderConfirmed`, `OrderCancelled` | `PaymentCaptured`, `PaymentFailed` |
 | **payment-service** | Payment intents; authorise, capture, refund through a provider port | PostgreSQL | `PaymentAuthorized`, `PaymentCaptured`, `PaymentFailed`, `PaymentRefunded` | |
-| **notification-service** | Emails for order events; templates; retries with backoff | PostgreSQL (dedupe log) | | `OrderConfirmed`, `OrderCancelled`, `OrderShipped` |
+| **review-service** | Ratings and reviews per product; rating summaries | Cassandra | `ReviewPosted` | `OrderConfirmed` (verified-purchase check) |
+| **notification-service** | Emails for order events; templates; retries with backoff | Redis (dedupe keys with expiry) | | `OrderConfirmed`, `OrderCancelled`, `OrderShipped` |
 | **Keycloak** (external) | Users, roles, OIDC tokens | PostgreSQL | | |
 
 ### 5.1 Public API (through the gateway)
@@ -201,6 +207,8 @@ flowchart TB
 |---|---|---|---|
 | GET | `/api/v1/products/{id}` | public | Product detail |
 | GET | `/api/v1/categories` | public | Category tree |
+| GET / POST | `/api/v1/products/{id}/reviews` | public / customer | Newest reviews (cursor) / post a review |
+| POST | `/api/v1/admin/products/{id}/images` | staff | Returns a presigned upload URL (Valet Key) |
 | GET | `/api/v1/search?q=&category=&brand=&minPrice=&maxPrice=&sort=&page=` | public | Faceted search |
 | GET | `/api/v1/cart` | guest token or customer | Current cart with live prices |
 | PUT | `/api/v1/cart/items/{sku}` | guest token or customer | Set quantity (0 removes) |
@@ -416,6 +424,11 @@ The `check (available >= 0)` constraint is a second line of defence against over
 | Relational | PostgreSQL 17 | ACID, partitioning, JSONB, strong tooling | MySQL |
 | Messaging | Kafka 4 (KRaft) | Durable, ordered per key, replayable; scales to far beyond the estimates | RabbitMQ, Pulsar |
 | Cache / cart | Redis 8 | Sub-millisecond reads and writes; data structures with expiry | Memcached, Hazelcast |
+| Wide-column | Apache Cassandra 5 | Linear write scaling for reviews; partition per product, newest first | ScyllaDB, HBase |
+| Object storage | MinIO (S3 API) | Images served from the CDN; presigned uploads; any S3 store in production | Ceph RGW |
+| Pooling / scale-out SQL | PgBouncer; Citus (when orders outgrow one primary) | Thousands of client connections onto few server connections; transparent sharding by `customer_id` | Vitess (MySQL) |
+| Scheduled jobs | ShedLock | Exactly one replica runs each job (outbox relay sweep, reservation expiry, saga recovery) | Quartz cluster |
+| Load testing | Gatling (Java DSL) | Performance budgets checked in CI against the SLOs in §2.2 | k6, JMeter |
 | Search | OpenSearch 3 | Open-source full text with aggregations for facets | Solr, Meilisearch |
 | Identity | Keycloak | Standards-based OIDC, user federation, admin UI | Authentik, Ory |
 | Gateway | Spring Cloud Gateway | Same stack as services; filters for JWT and rate limits | Envoy, Kong |
@@ -477,6 +490,125 @@ flowchart LR
 * Promotions and coupon engine (rules evaluated at cart pricing).
 * Marketplace: seller onboarding and split payments.
 * Storefront web app (server-rendered, CDN cached).
+
+## 13. Scalability, modularity and performance
+
+### 13.1 Scaling up and out
+
+Every tier has a planned way to grow. None of them needs a redesign at 10× the estimates in §3.
+
+| Tier | First step (vertical) | Next step (horizontal) | Limit it removes |
+|---|---|---|---|
+| Gateway and services | More CPU per pod; virtual threads use it without more threads | HPA adds stateless pods behind the load balancer | Request throughput |
+| Kafka consumers | Larger fetch batches | One consumer per partition (12 → raise partitions ahead of need) | Event throughput |
+| PostgreSQL (orders, inventory, payments) | Bigger primary; PgBouncer transaction pooling | Read replicas for history and admin; then Citus hash-sharding orders by `customer_id` | Write throughput per primary |
+| Cassandra (reviews) | | Add nodes; data rebalances by token range | Write volume |
+| OpenSearch | | More shards (set at index creation) and replicas for query load; reindex behind the alias to change shard count | Query and index throughput |
+| Redis | | Redis Cluster: 16,384 hash slots spread across primaries | Memory and ops per node |
+| Object storage / CDN | | Effectively unlimited; the CDN absorbs image traffic | Bandwidth |
+
+**Hot partition rules**
+
+* Kafka keys are aggregate ids, so load spreads evenly while order per aggregate is kept.
+* Cassandra review partitions are bucketed by month (`(product_id, month)`), so a best-selling product never grows one partition without limit.
+* Hot SKUs in inventory can be split into sub-bucket rows (§6.4).
+
+### 13.2 Modularity
+
+* **Bounded contexts → services.**
+  * Each service owns one context: catalogue, search, cart, inventory, ordering, payment, reviews, notification.
+  * It has its own store, its own release cadence and its own scaling profile.
+* **Inside a service: hexagonal layers.**
+  * `domain` (pure Java), `application` (use cases and ports) and `adapter` (web, persistence, messaging, clients).
+  * ArchUnit fails the build if `domain` imports Spring or an adapter.
+* **Shared code is platform only.**
+  * `shared-kernel`, `event-contracts` and `outbox` hold no business rules.
+  * Services never share domain classes; they share versioned event contracts.
+* **Replaceable adapters.**
+  * A payment provider, search engine or mail relay is one adapter behind a port.
+  * Swapping one does not touch the domain. The payment adapter is the anti-corruption layer for the provider's model.
+* **Convention plugins.** Gradle `build-logic` defines how every service is built, tested and packaged, so a new service is a short build file.
+
+### 13.3 Performance
+
+| Technique | Where | Effect |
+|---|---|---|
+| Virtual threads (Java 25) | All servlet services | Blocking JDBC and HTTP calls without thread-pool exhaustion; high concurrency with simple code |
+| Multi-tier caching | CDN → Redis → Caffeine | Most reads never reach a database (§8.4) |
+| Read models (CQRS) | search-service, order history replicas | Queries served from stores shaped for them |
+| Keyset (cursor) pagination | All list endpoints | Constant cost per page, unlike `OFFSET` |
+| Covering and partial indexes | Orders by customer, pending sagas, unpublished outbox rows | Index-only scans on hot queries |
+| Batching | Outbox relay (batches of 500), Kafka producer (`linger.ms=5`, zstd compression), JDBC batch inserts | Fewer round trips; smaller payloads |
+| Conditional single-statement updates | Stock decrement | No read-modify-write races, no locks held across calls |
+| Connection pooling | HikariCP in services + PgBouncer | Bounded database connections at any pod count |
+| HTTP/2 and response compression | Gateway | Less latency and bandwidth for clients |
+| Async side effects | Notifications, indexing, reviews' verified-purchase check | Not on the request path |
+| Startup and footprint | Class Data Sharing (AppCDS) + Spring AOT; layered container images | Fast scale-out and smaller images |
+
+**Performance budgets** are the latency targets in §2.2. Gatling simulations for browse, search, add-to-cart and checkout run in CI against a production-like stack. A regression of more than 10% in p99 fails the pipeline.
+
+## 14. Polyglot persistence
+
+Each service uses the store whose data model and access pattern fit its data. They are open-source products, and no two services share a database.
+
+| Service | Store | Why this store |
+|---|---|---|
+| catalog | PostgreSQL + JSONB | Relational core (categories, prices) with flexible per-category attributes; GIN indexes; strong consistency for staff edits |
+| catalog media | MinIO (S3 API) | Large binary objects belong in object storage behind a CDN, not in a database |
+| search | OpenSearch | Inverted index, relevance scoring, aggregations for facets; a rebuildable read model |
+| cart | Redis | Key-value access by owner, sub-millisecond, expiring data that is cheap to lose |
+| inventory | PostgreSQL | Contended counters need ACID transactions, check constraints and row-level atomic updates |
+| order | PostgreSQL (partitioned; Citus later) | Transactions, constraints and joins for order + lines + outbox in one commit |
+| payment | PostgreSQL | Financial records: ACID, append-only attempt log, auditability |
+| review | Apache Cassandra | Write-heavy, append-only, read by product newest-first; scales linearly across nodes |
+| notification | Redis | Short-lived dedupe keys (`SET NX` with expiry); no long-term state |
+| gateway | Redis | Shared token buckets for rate limiting across gateway replicas |
+| identity | PostgreSQL (Keycloak's own) | Managed by Keycloak |
+
+**Consistency across stores.** No transaction spans two stores. Changes flow between services through events (transactional outbox + idempotent consumers) and through sagas for multi-step business transactions (§6.3).
+
+## 15. Design patterns applied
+
+Pattern names follow the course in [jk-boot-up/java-design-patterns](https://github.com/jk-boot-up/java-design-patterns). Each link leads to the plain-Java project that explains the pattern.
+
+| Pattern | Where it is used | Why |
+|---|---|---|
+| [Hexagonal Architecture](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/architectural-design-patterns/hexagonal-architecture-pattern) | Every service | Domain independent of frameworks and infrastructure |
+| [Event-Driven Architecture](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/architectural-design-patterns/event-driven-architecture-pattern) | Kafka between contexts | Loose coupling and independent scaling |
+| [Bounded Context](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/bounded-context-pattern) / [Context Map](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/context-map-pattern) | One service per context | Clear ownership of models and data |
+| [Aggregate](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/aggregate-pattern) | `Order`, `Cart`, `StockItem`, `Payment` | Invariants enforced in one consistency boundary |
+| [Value Object](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/value-object-pattern) / [Money](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/money-pattern) | `Money`, `Sku`, `Quantity`, identifiers | Immutable, validated domain primitives; no floating-point money |
+| [Domain Event](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/domain-event-pattern) | `OrderPlaced`, `StockReserved`, … | Facts other contexts react to |
+| [Specification](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/specification-pattern) | Search filters; cancellation eligibility | Composable business rules |
+| [Anti-Corruption Layer](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/anti-corruption-layer-pattern) | Payment provider adapter | Provider's model never leaks into ours |
+| [State](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/behavioural/state-pattern) | Order and payment lifecycles | Only legal transitions compile and run |
+| [Strategy](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/behavioural/strategy-pattern) | Payment providers; pricing rules | Swap behaviour without changing callers |
+| [Chain of Responsibility](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/behavioural/chain-of-responsibility-pattern) | Gateway filters; validation pipeline | Ordered, independent request checks |
+| [Adapter](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/structural/adapter-pattern) / [Facade](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/structural/facade-pattern) | Persistence and client adapters; application services | Ports implemented by infrastructure; simple entry points |
+| [Builder](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/creational/builder-pattern) | Search queries; test data | Readable construction of complex objects |
+| [Repository](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/repository-pattern) / [Data Mapper](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/data-mapper-pattern) | Persistence adapters | Domain objects stay free of persistence concerns |
+| [Service Layer](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/service-layer-pattern) / [Unit of Work](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/unit-of-work-pattern) | Application use cases with one transaction each | Clear transaction boundaries |
+| [Optimistic Offline Lock](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/optimistic-offline-lock-pattern) | `version` columns on orders, stock, payments | Lost-update protection without long locks |
+| [Gateway](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/gateway-pattern) | Clients for inventory, payment, provider | One place for remote-call concerns |
+| [Saga](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/saga-pattern) / [Process Manager](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/messaging-integration-patterns/process-manager-pattern) | Checkout and cancellation in order-service | Multi-service transaction with compensations |
+| [Transactional Outbox](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/transactional-outbox-pattern) | Every event producer | No dual writes; guaranteed publication |
+| [Idempotent Consumer](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/idempotent-consumer-pattern) | Every event consumer; `Idempotency-Key` on orders | Effectively-once effects |
+| [Database per Service](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/database-per-service-pattern) | All services (§14) | Independent schemas, scaling and technology |
+| [CQRS](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/cqrs-pattern) / [Materialized View](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/materialized-view-pattern) | Search index; rating summaries | Reads served from query-shaped models |
+| [Event-Carried State Transfer](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/event-carried-state-transfer-pattern) | `ProductChanged` carries the product | Consumers need no call back to catalog |
+| [API Gateway](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/api-gateway-pattern) / [Gateway Offloading](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/gateway-offloading-pattern) | api-gateway | One entry point; TLS, auth and rate limits off the services |
+| [Circuit Breaker](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/circuit-breaker-pattern), [Retry](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/retry-pattern), [Timeout](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/timeout-pattern), [Bulkhead](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/bulkhead-pattern) | All synchronous clients (§8.3) | Contain failures; protect callers |
+| [Rate Limiter](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/rate-limiter-pattern) | Gateway, per user and per hot SKU | Admission control during flash sales |
+| [Cache-Aside](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/cache-aside-pattern) | Product detail in Redis | Fast reads with simple invalidation |
+| [Valet Key](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/valet-key-pattern) | Presigned image uploads | Clients write to storage directly, with scoped short-lived rights |
+| [Sharding](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/sharding-pattern) | Kafka partitions; Cassandra partitions; Citus for orders | Spread load across nodes |
+| [Competing Consumers](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/competing-consumers-pattern) | Kafka consumer groups | Parallel event processing |
+| [Health Endpoint Monitoring](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/health-endpoint-monitoring-pattern) | Actuator liveness and readiness | Safe rollouts and self-healing |
+| [Dead Letter Channel](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/messaging-integration-patterns/dead-letter-channel-pattern) / [Guaranteed Delivery](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/messaging-integration-patterns/guaranteed-delivery-pattern) | Kafka DLQs; `acks=all` | Poison messages isolated; nothing lost |
+| [Scheduler](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/concurrency-design-patterns/scheduler-pattern) / [Producer–Consumer](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/concurrency-design-patterns/producer-consumer-pattern) | Reservation expiry, saga recovery, outbox relay | Background work outside the request path |
+| [Distributed Tracing](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/platform-design-patterns/distributed-tracing-pattern) / [Externalised Configuration](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/platform-design-patterns/externalised-configuration-pattern) | OpenTelemetry; Spring config + Kubernetes ConfigMaps | Observable, environment-independent builds |
+| [Token Authentication](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/security-design-patterns/token-authentication-pattern) / [Authorization Policy](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/security-design-patterns/authorization-policy-pattern) / [Input Validation](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/security-design-patterns/input-validation-pattern) | Keycloak JWTs; ownership checks; Bean Validation | Defence in depth |
+| [Test Double](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/testing-design-patterns/test-double-pattern) / [Object Mother](https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/testing-design-patterns/object-mother-pattern) | In-memory adapters; test fixtures | Fast, deterministic tests |
 
 ---
 

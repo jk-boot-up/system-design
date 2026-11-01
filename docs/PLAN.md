@@ -32,7 +32,9 @@ All components are open source. See [SPEC.md §9](SPEC.md#9-technology-choices) 
 | Service framework | Spring Boot 4.0, Spring Cloud 2025.1 |
 | API gateway | Spring Cloud Gateway |
 | Identity | Keycloak (OIDC / OAuth 2.1, JWT) |
-| Relational data | PostgreSQL 17, database per service, Flyway migrations |
+| Relational data | PostgreSQL 17 (catalog, inventory, orders, payments), Flyway migrations, PgBouncer; Citus when orders need sharding |
+| Wide-column data | Apache Cassandra 5 (reviews) |
+| Object storage | MinIO, S3 API (product images, presigned uploads) |
 | Cache, cart, rate limits | Redis 8 (Valkey-compatible) |
 | Events | Apache Kafka 4 (KRaft), transactional outbox |
 | Search | OpenSearch 3 |
@@ -41,6 +43,8 @@ All components are open source. See [SPEC.md §9](SPEC.md#9-technology-choices) 
 | Local platform | Docker Compose |
 | Production platform | Kubernetes (Kustomize manifests, HPA, PDB) |
 | Testing | JUnit 6, AssertJ, ArchUnit, Testcontainers |
+| Load testing | Gatling (Java DSL) with p99 budgets in CI |
+| Scheduled jobs | ShedLock (one runner per job across replicas) |
 | CI | GitHub Actions |
 
 ## 4. Repository layout (target)
@@ -61,6 +65,7 @@ system-design/
 │  ├─ cart-service/
 │  ├─ order-service/        checkout saga orchestrator
 │  ├─ payment-service/
+│  ├─ review-service/       Cassandra
 │  └─ notification-service/
 ├─ deploy/
 │  ├─ compose/              local stack: Postgres, Kafka, Redis, OpenSearch, Keycloak, observability
@@ -86,12 +91,22 @@ ArchUnit tests enforce the dependency direction.
 | M3 | Catalog and search | product/category CRUD, outbox events, OpenSearch indexing and faceted search | API tests, indexing integration test |
 | M4 | Cart and inventory | Redis cart, stock with reservations and expiry | Concurrency test: no overselling under parallel reservations |
 | M5 | Orders and payments | checkout saga, idempotency keys, payment provider port | Saga tests: happy path, payment failure, inventory failure, timeout |
+| M5b | Reviews and media | Cassandra-backed reviews, presigned image uploads | Review pagination test, verified-purchase consumer test |
 | M6 | Gateway, identity, notifications | routing, JWT validation, rate limits, email notifications | End-to-end flow through the gateway |
 | M7 | Operations | Compose stack, Kubernetes manifests, dashboards, alerts, runbooks | Stack starts locally; manifests pass `kubectl --dry-run` |
 | M8 | Design docs | ADRs, per-service designs, data model, API and event catalogues, capacity model, failure modes | Docs cover every decision in the spec |
+| M8b | Performance | Gatling simulations, AppCDS/AOT images, index and cache tuning | p99 budgets from SPEC §2.2 met in CI |
 | M9 | Visual walkthroughs | animated architecture and flows, themes, narration toggle | Every scenario plays end to end with no console errors |
 
-## 6. Working agreements
+## 6. Design principles
+
+* **Scale up, then out:** every tier has a documented vertical and horizontal growth path (SPEC §13.1).
+* **Modular:** one bounded context per service, hexagonal inside, shared code limited to platform libraries (SPEC §13.2).
+* **High performance:** virtual threads, layered caching, read models, batching and keyset pagination, with budgets enforced by load tests (SPEC §13.3).
+* **Right store for the data:** polyglot persistence, one store per service (SPEC §14).
+* **Proven patterns, named:** each one is mapped to its project in [jk-boot-up/java-design-patterns](https://github.com/jk-boot-up/java-design-patterns) (SPEC §15).
+
+## 7. Working agreements
 
 * **Branching:** all implementation goes to `system-design-e-commerce-draft-1`. Commits are small and describe one change each.
 * **Quality gates on every commit:**
@@ -102,7 +117,7 @@ ArchUnit tests enforce the dependency direction.
 * **Contracts first:** event schemas and OpenAPI definitions change through versioned, backward-compatible additions. Breaking changes need a new version.
 * **Every decision is recorded:** one ADR in `docs/adr/` per significant choice.
 
-## 7. Risks and mitigations
+## 8. Risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
