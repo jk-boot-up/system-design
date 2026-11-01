@@ -1,11 +1,12 @@
 package com.jkbootup.ecommerce.inventory.adapter.persistence;
 
+import com.jkbootup.ecommerce.inventory.application.port.ProcessedEventLedger;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.util.UUID;
 
-/** Idempotent-consumer ledger: remembers which events a consumer has already applied. */
-public class ProcessedEvents {
+/** PostgreSQL implementation of the idempotent-consumer ledger. */
+public class ProcessedEvents implements ProcessedEventLedger {
 
     private final JdbcClient jdbc;
 
@@ -13,7 +14,7 @@ public class ProcessedEvents {
         this.jdbc = jdbc;
     }
 
-    /** @return true the first time this event is seen by this consumer, inside the caller's transaction. */
+    @Override
     public boolean firstTime(String consumer, UUID eventId) {
         return jdbc.sql("insert into processed_events (consumer, event_id) values (:c, :e) on conflict do nothing")
                 .param("c", consumer).param("e", eventId).update() == 1;

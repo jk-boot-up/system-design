@@ -1,7 +1,7 @@
 package com.jkbootup.ecommerce.inventory.adapter.messaging;
 
-import com.jkbootup.ecommerce.inventory.adapter.persistence.ProcessedEvents;
 import com.jkbootup.ecommerce.inventory.application.ReservationService;
+import com.jkbootup.ecommerce.inventory.application.port.ProcessedEventLedger;
 import com.jkbootup.ecommerce.inventory.application.port.Transactions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,11 +21,11 @@ public class OrderCancelledListener {
     private static final Logger log = LoggerFactory.getLogger(OrderCancelledListener.class);
 
     private final ReservationService service;
-    private final ProcessedEvents processed;
+    private final ProcessedEventLedger processed;
     private final Transactions tx;
     private final JsonMapper json;
 
-    public OrderCancelledListener(ReservationService service, ProcessedEvents processed, Transactions tx, JsonMapper json) {
+    public OrderCancelledListener(ReservationService service, ProcessedEventLedger processed, Transactions tx, JsonMapper json) {
         this.service = service;
         this.processed = processed;
         this.tx = tx;

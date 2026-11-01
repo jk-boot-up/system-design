@@ -7,7 +7,7 @@ import com.jkbootup.ecommerce.inventory.adapter.persistence.JdbcStockRepository;
 import com.jkbootup.ecommerce.inventory.adapter.persistence.OutboxStockEvents;
 import com.jkbootup.ecommerce.inventory.adapter.persistence.ProcessedEvents;
 import com.jkbootup.ecommerce.inventory.adapter.persistence.SpringTransactions;
-import com.jkbootup.ecommerce.inventory.adapter.scheduling.InventoryJobs;
+import com.jkbootup.ecommerce.inventory.adapter.scheduling.ReservationExpiryJob;
 import com.jkbootup.ecommerce.inventory.application.ReservationService;
 import com.jkbootup.ecommerce.inventory.application.port.Transactions;
 import net.javacrumbs.shedlock.core.LockProvider;
@@ -52,6 +52,7 @@ public class InventoryConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "inventory.jobs.enabled", havingValue = "true", matchIfMissing = true)
     OutboxRelay outboxRelay(JdbcClient jdbc, KafkaTemplate<String, String> kafka, TransactionTemplate tx,
                             @Value("${inventory.outbox.batch-size:500}") int batchSize) {
         return new OutboxRelay(jdbc, kafka, tx, batchSize);
@@ -59,8 +60,8 @@ public class InventoryConfiguration {
 
     @Bean
     @ConditionalOnProperty(name = "inventory.jobs.enabled", havingValue = "true", matchIfMissing = true)
-    InventoryJobs inventoryJobs(ReservationService service, OutboxRelay relay) {
-        return new InventoryJobs(service, relay);
+    ReservationExpiryJob reservationExpiryJob(ReservationService service) {
+        return new ReservationExpiryJob(service);
     }
 
     @Bean

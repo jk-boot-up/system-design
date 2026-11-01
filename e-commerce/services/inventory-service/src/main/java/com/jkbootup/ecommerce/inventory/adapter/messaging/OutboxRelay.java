@@ -2,8 +2,12 @@ package com.jkbootup.ecommerce.inventory.adapter.messaging;
 
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeader;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
@@ -17,6 +21,8 @@ import java.util.concurrent.TimeUnit;
  * batch. A crash after sending and before marking re-sends the batch; consumers deduplicate by event id.
  */
 public class OutboxRelay {
+
+    private static final Logger log = LoggerFactory.getLogger(OutboxRelay.class);
 
     private record Row(UUID id, String topic, String key, String type, String payload) {}
 
@@ -61,8 +67,23 @@ public class OutboxRelay {
         return sent == null ? 0 : sent;
     }
 
-    /** Deletes published rows older than the retention period. */
-    public int purgePublished(int days) {
-        return jdbc.sql("delete from outbox where published_at < now() - make_interval(days => :d)").param("d", days).update();
+    /** Drains the outbox; scheduled in every replica. */
+    @Scheduled(fixedDelayString = "${inventory.outbox.poll-interval:100ms}")
+    public void drain() {
+        try {
+            while (relayOnce() > 0) {
+                // keep going while there is a backlog
+            }
+        } catch (RuntimeException e) {
+            log.warn("Outbox relay pass failed, will retry: {}", e.getMessage());
+        }
+    }
+
+    /** Deletes published rows older than 7 days; one replica only. */
+    @Scheduled(cron = "${inventory.outbox.purge-cron:0 17 3 * * *}")
+    @SchedulerLock(name = "inventory.purge-outbox", lockAtMostFor = "PT30M")
+    public void purgePublished() {
+        int n = jdbc.sql("delete from outbox where published_at < now() - interval '7 days'").update();
+        log.info("Purged {} published outbox rows", n);
     }
 }
