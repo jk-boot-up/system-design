@@ -1,0 +1,46 @@
+flowchart LR
+    subgraph web[adapter.web]
+        RC[ReservationController]
+        SC[StockController]
+        PH[ProblemHandler]
+    end
+    subgraph app[application]
+        RS[ReservationService]
+        P1[[StockRepository]]
+        P2[[ReservationRepository]]
+        P3[[StockEvents]]
+        P4[[Transactions]]
+        P5[[ProcessedEventLedger]]
+    end
+    subgraph dom[domain]
+        R[Reservation]
+        S[Sku / Quantity]
+        O[ReserveOutcome]
+    end
+    subgraph per[adapter.persistence]
+        JS[JdbcStockRepository]
+        JR[JdbcReservationRepository]
+        OB[OutboxStockEvents]
+        TX[SpringTransactions]
+        PE[ProcessedEvents]
+    end
+    subgraph msg[adapter.messaging]
+        REL[OutboxRelay]
+        OCL[OrderCancelledListener]
+    end
+    subgraph sch[adapter.scheduling]
+        EXP[ReservationExpiryJob]
+    end
+    RC & SC --> RS
+    OCL --> RS
+    EXP --> RS
+    RS --> dom
+    RS --> P1 & P2 & P3 & P4
+    OCL --> P5 & P4
+    P1 -.-> JS
+    P2 -.-> JR
+    P3 -.-> OB
+    P4 -.-> TX
+    P5 -.-> PE
+    REL --> K{{Kafka}}
+    JS & JR & OB & PE & REL --> DB[(PostgreSQL)]

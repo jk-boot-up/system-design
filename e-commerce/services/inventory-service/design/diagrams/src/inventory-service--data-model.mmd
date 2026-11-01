@@ -1,0 +1,30 @@
+erDiagram
+    STOCK ||--o{ RESERVATIONS : "held from"
+    STOCK {
+        text sku PK
+        text warehouse PK
+        int available
+        int reserved
+        bigint version
+        timestamptz updated_at
+    }
+    RESERVATIONS {
+        uuid order_id PK
+        text sku PK
+        text warehouse
+        int quantity
+        text status
+        timestamptz expires_at
+    }
+    OUTBOX {
+        uuid id PK
+        text aggregate_id
+        text event_type
+        text topic
+        jsonb payload
+        timestamptz published_at
+    }
+    PROCESSED_EVENTS {
+        text consumer PK
+        uuid event_id PK
+    }

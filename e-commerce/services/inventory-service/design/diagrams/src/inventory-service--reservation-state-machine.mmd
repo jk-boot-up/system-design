@@ -1,0 +1,9 @@
+stateDiagram-v2
+    [*] --> RESERVED: reserve
+    RESERVED --> COMMITTED: commit
+    RESERVED --> RELEASED: release / OrderCancelled
+    RESERVED --> EXPIRED: expiry job (15 min)
+    COMMITTED --> RETURNED: return (order cancelled after confirmation)
+    RELEASED --> [*]
+    EXPIRED --> [*]
+    RETURNED --> [*]

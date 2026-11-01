@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inventory-service: low-level design</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="inventory-service-low-level-design">inventory-service: low-level design<a class="headerlink" href="#inventory-service-low-level-design" title="Permanent link">#</a></h1>
+<p>Part of the <a href="../../../design/README.html">e-commerce system design</a>. Animated version: <a href="walkthrough/index.html">walkthrough</a>.</p>
+<h2 id="1-responsibilities">1. Responsibilities<a class="headerlink" href="#1-responsibilities" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Does</th>
+<th>Does not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keep available and reserved units per SKU</td>
+<td>Know prices or product details (catalog-service)</td>
+</tr>
+<tr>
+<td>Reserve all lines of an order atomically, or none</td>
+<td>Decide whether checkout continues (order-service)</td>
+</tr>
+<tr>
+<td>Commit, release, return and expire reservations</td>
+<td>Talk to customers directly (not routed by the gateway)</td>
+</tr>
+<tr>
+<td>Publish <code>StockChanged</code> so search and carts show availability</td>
+<td>Hold stock for carts; only checkout reserves</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-guarantees">2. Guarantees<a class="headerlink" href="#2-guarantees" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>No overselling</strong></td>
+<td>One conditional statement per SKU: <code>UPDATE … SET available = available - q WHERE available &gt;= q</code>. No read-then-write; plus <code>CHECK (available &gt;= 0)</code></td>
+</tr>
+<tr>
+<td><strong>All or nothing per order</strong></td>
+<td>All lines in one transaction; any short line throws and rolls back the whole reservation</td>
+</tr>
+<tr>
+<td><strong>No deadlocks</strong></td>
+<td>Lines are merged per SKU and locked in SKU order</td>
+</tr>
+<tr>
+<td><strong>Idempotent commands</strong></td>
+<td>Reservations are keyed by <code>(order_id, sku)</code>; repeating reserve, commit, release or return returns the current result</td>
+</tr>
+<tr>
+<td><strong>Stock is never stuck</strong></td>
+<td>Every reservation expires after 15 minutes; a ShedLock job returns expired stock</td>
+</tr>
+<tr>
+<td><strong>Events are never lost</strong></td>
+<td>Transactional outbox in the same transaction; relay with <code>SKIP LOCKED</code>; consumers deduplicate</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-components">3. Components<a class="headerlink" href="#3-components" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Components diagram" src="diagrams/inventory-service--components.light.svg" data-light="diagrams/inventory-service--components.light.svg" data-dark="diagrams/inventory-service--components.dark.svg" loading="lazy"></figure></p>
+<h2 id="4-class-diagram">4. Class diagram<a class="headerlink" href="#4-class-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Class diagram diagram" src="diagrams/inventory-service--class-diagram.light.svg" data-light="diagrams/inventory-service--class-diagram.light.svg" data-dark="diagrams/inventory-service--class-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="5-reserve-sequence">5. Reserve: sequence<a class="headerlink" href="#5-reserve-sequence" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Reserve: sequence diagram" src="diagrams/inventory-service--reserve-sequence.light.svg" data-light="diagrams/inventory-service--reserve-sequence.light.svg" data-dark="diagrams/inventory-service--reserve-sequence.dark.svg" loading="lazy"></figure></p>
+<h2 id="6-reservation-state-machine">6. Reservation state machine<a class="headerlink" href="#6-reservation-state-machine" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Reservation state machine diagram" src="diagrams/inventory-service--reservation-state-machine.light.svg" data-light="diagrams/inventory-service--reservation-state-machine.light.svg" data-dark="diagrams/inventory-service--reservation-state-machine.dark.svg" loading="lazy"></figure></p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Stock movement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>reserve</td>
+<td>available → reserved</td>
+</tr>
+<tr>
+<td>commit</td>
+<td>reserved → sold (leaves the counters)</td>
+</tr>
+<tr>
+<td>release / expire</td>
+<td>reserved → available</td>
+</tr>
+<tr>
+<td>return</td>
+<td>sold → available</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-data-model">7. Data model<a class="headerlink" href="#7-data-model" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Data model diagram" src="diagrams/inventory-service--data-model.light.svg" data-light="diagrams/inventory-service--data-model.light.svg" data-dark="diagrams/inventory-service--data-model.dark.svg" loading="lazy"></figure></p>
+<p>Full DDL: <a href="../src/main/resources/db/migration/V1__inventory_schema.sql"><code>V1__inventory_schema.sql</code></a>.</p>
+<h2 id="8-background-work">8. Background work<a class="headerlink" href="#8-background-work" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Runs</th>
+<th>Interval</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Outbox relay</td>
+<td>every replica (<code>SKIP LOCKED</code>)</td>
+<td>100 ms, drains backlog</td>
+<td>Publishes unpublished outbox rows to Kafka, then marks them</td>
+</tr>
+<tr>
+<td>Reservation expiry</td>
+<td>one replica (ShedLock)</td>
+<td>30 s</td>
+<td>Expires due reservations in batches of 500 and returns their stock</td>
+</tr>
+<tr>
+<td>Outbox purge</td>
+<td>one replica (ShedLock)</td>
+<td>daily 03:17</td>
+<td>Deletes published outbox rows older than 7 days</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-scaling-and-performance">9. Scaling and performance<a class="headerlink" href="#9-scaling-and-performance" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Stateless pods</strong> behind an HPA (3–20 replicas on CPU). Each pod holds 20 pooled connections; PgBouncer keeps the database's
+  connection count bounded at any pod count.</li>
+<li><strong>Short hot path:</strong> a reservation of <em>n</em> SKUs costs one <code>SELECT … FOR UPDATE</code> plus <em>n</em> conditional updates, one insert and <em>n</em>
+  outbox inserts, all in one round-trip-light transaction. No locks are held across network calls.</li>
+<li><strong>Hot SKUs (flash sales):</strong> row-level contention on one SKU serialises updates for that row only. If one row becomes the
+  bottleneck, its stock can be split into several bucket rows (<code>warehouse</code> = <code>MAIN#1..N</code>) and reservations pick a random bucket.</li>
+<li><strong>Virtual threads</strong> let a pod serve thousands of concurrent blocking requests without a large thread pool.</li>
+</ul>
+<h2 id="10-failure-handling">10. Failure handling<a class="headerlink" href="#10-failure-handling" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Database unavailable</td>
+<td>Requests fail fast (2 s connection timeout) → order-service's circuit breaker opens → checkout returns 503</td>
+</tr>
+<tr>
+<td>Kafka unavailable</td>
+<td>Outbox rows accumulate; relay retries every 100 ms; nothing is lost</td>
+</tr>
+<tr>
+<td>Duplicate <code>OrderCancelled</code></td>
+<td><code>processed_events</code> insert conflicts → skipped</td>
+</tr>
+<tr>
+<td>order-service crashes after reserving</td>
+<td>The reservation expires after 15 minutes, or saga recovery releases it earlier</td>
+</tr>
+<tr>
+<td>Commit after expiry</td>
+<td>409 <code>RESERVATION_EXPIRED</code> → order-service compensates (voids payment, cancels order)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="11-tests">11. Tests<a class="headerlink" href="#11-tests" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Kind</th>
+<th>Proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ReservationTest</code></td>
+<td>domain unit</td>
+<td>State rules, idempotent transitions, value validation</td>
+</tr>
+<tr>
+<td><code>ReservationServiceTest</code></td>
+<td>application, in-memory test doubles</td>
+<td>All-or-nothing, merging, idempotency, expiry, commit-after-expiry</td>
+</tr>
+<tr>
+<td><code>HexagonalArchitectureTest</code></td>
+<td>ArchUnit</td>
+<td>Domain is pure Java; application depends only on domain; adapters independent</td>
+</tr>
+<tr>
+<td><code>InventoryContainersIT</code></td>
+<td>PostgreSQL + Kafka containers</td>
+<td>50 concurrent orders for 10 units → exactly 10 reserved; REST contract and problem details; outbox → Kafka; <code>OrderCancelled</code> releases stock, duplicates ignored</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

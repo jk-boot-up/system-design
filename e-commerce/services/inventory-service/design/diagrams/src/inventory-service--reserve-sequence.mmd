@@ -1,0 +1,27 @@
+sequenceDiagram
+    autonumber
+    participant O as order-service
+    participant C as ReservationController
+    participant S as ReservationService
+    participant DB as PostgreSQL
+    O->>C: POST /internal/reservations {orderId, lines}
+    C->>S: reserve(orderId, lines)
+    S->>S: merge lines per SKU, sort by SKU
+    S->>DB: BEGIN
+    S->>DB: SELECT reservations WHERE order_id = ? FOR UPDATE
+    alt already reserved (retry)
+        S-->>C: Reserved(expiresAt)
+    else new
+        loop each SKU in order
+            S->>DB: UPDATE stock SET available -= q, reserved += q WHERE available >= q
+            alt 0 rows
+                S->>DB: ROLLBACK
+                S-->>C: OutOfStock(sku)
+            end
+        end
+        S->>DB: INSERT reservations (RESERVED, expires_at = now + 15 min)
+        S->>DB: INSERT outbox StockChanged per SKU
+        S->>DB: COMMIT
+        S-->>C: Reserved(expiresAt)
+    end
+    C-->>O: 200 RESERVED  or  409 OUT_OF_STOCK problem

@@ -1,0 +1,68 @@
+classDiagram
+    direction LR
+    class ReservationService {
+      -StockRepository stock
+      -ReservationRepository reservations
+      -StockEvents events
+      -Transactions tx
+      -Clock clock
+      -Duration holdFor
+      +reserve(UUID orderId, List~OrderLine~ lines) ReserveOutcome
+      +commit(UUID orderId)
+      +release(UUID orderId)
+      +returnStock(UUID orderId)
+      +expireDue(int limit) int
+      +setAvailable(Sku sku, int available)
+      +level(Sku sku) Optional~StockLevel~
+    }
+    class Reservation {
+      -UUID orderId
+      -Sku sku
+      -Quantity quantity
+      -ReservationStatus status
+      -Instant expiresAt
+      +hold(...) Reservation$
+      +moveTo(ReservationStatus) boolean
+      +isDue(Instant now) boolean
+    }
+    class ReservationStatus {
+      <<enumeration>>
+      RESERVED
+      COMMITTED
+      RELEASED
+      EXPIRED
+      RETURNED
+      +canMoveTo(ReservationStatus) boolean
+    }
+    class ReserveOutcome {
+      <<sealed interface>>
+    }
+    class Reserved { <<record>> +Instant expiresAt }
+    class OutOfStock { <<record>> +Sku sku }
+    class StockRepository {
+      <<port>>
+      +tryReserve(Sku, Quantity) boolean
+      +commitReserved(Sku, Quantity)
+      +releaseReserved(Sku, Quantity)
+      +returnSold(Sku, Quantity)
+      +setAvailable(Sku, int)
+      +find(Sku) Optional~StockLevel~
+    }
+    class ReservationRepository {
+      <<port>>
+      +lockByOrder(UUID) List~Reservation~
+      +insertAll(List~Reservation~)
+      +updateStatus(Reservation)
+      +lockDue(Instant, int) List~Reservation~
+    }
+    class StockEvents { <<port>> +stockChanged(StockLevel) }
+    class Transactions { <<port>> +inTransaction(Supplier~T~) T }
+    ReservationService --> StockRepository
+    ReservationService --> ReservationRepository
+    ReservationService --> StockEvents
+    ReservationService --> Transactions
+    ReservationService ..> Reservation
+    ReservationService ..> ReserveOutcome
+    Reservation --> ReservationStatus
+    ReserveOutcome <|.. Reserved
+    ReserveOutcome <|.. OutOfStock

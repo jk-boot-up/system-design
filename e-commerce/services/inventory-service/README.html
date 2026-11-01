@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inventory-service</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="inventory-service">inventory-service<a class="headerlink" href="#inventory-service" title="Permanent link">#</a></h1>
+<p>Owns stock levels and stock reservations. It guarantees the platform <strong>never sells stock it does not have</strong>, even when thousands of
+customers check out the same item at the same moment.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Language / framework</td>
+<td>Java 25, Spring Boot 4.0 (virtual threads)</td>
+</tr>
+<tr>
+<td>Store</td>
+<td>PostgreSQL (<code>stock</code>, <code>reservations</code>, <code>outbox</code>, <code>processed_events</code>, <code>shedlock</code>)</td>
+</tr>
+<tr>
+<td>Publishes</td>
+<td><code>inventory.StockChanged</code> on <code>inventory.events</code></td>
+</tr>
+<tr>
+<td>Consumes</td>
+<td><code>order.OrderCancelled</code> from <code>order.events</code> (safety-net release)</td>
+</tr>
+<tr>
+<td>Called by</td>
+<td>order-service (checkout saga)</td>
+</tr>
+<tr>
+<td>Port</td>
+<td>8084</td>
+</tr>
+<tr>
+<td>Design</td>
+<td><a href="design/README.html">design/README.md</a> · <a href="design/walkthrough/index.html">walkthrough</a></td>
+</tr>
+<tr>
+<td>Prerequisites</td>
+<td><a href="PREREQUISITES.html">PREREQUISITES.md</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">#</a></h2>
+<pre class="highlight"><code>inventory-service/
+├─ README.md, PREREQUISITES.md
+├─ design/                      low-level design, diagrams, walkthrough
+├─ contracts/                   openapi.yaml, events/ (published), consumed/ (own copies)
+├─ src/main/java/com/jkbootup/ecommerce/inventory/
+│  ├─ domain/                   Sku, Quantity, Reservation, ReservationStatus, ReserveOutcome (pure Java)
+│  ├─ application/              ReservationService (use cases) + port/ (interfaces)
+│  ├─ adapter/web/              REST controllers, problem details
+│  ├─ adapter/persistence/      JDBC repositories, outbox writer, processed-events ledger
+│  ├─ adapter/messaging/        outbox relay → Kafka, OrderCancelled listener
+│  ├─ adapter/scheduling/       reservation expiry job (ShedLock)
+│  └─ config/                   Spring wiring
+├─ src/main/resources/          application.yaml, db/migration (Flyway)
+├─ src/test/java/…              domain, application (in-memory doubles), ArchUnit, container integration tests
+├─ Dockerfile                   layered jar + class-data-sharing archive, non-root
+├─ k8s/                         Deployment, Service, HPA, PDB, NetworkPolicy (Kustomize base)
+└─ build.gradle.kts, settings.gradle.kts, gradle/ (own wrapper and version catalog)</code></pre>
+<h2 id="build-and-test">Build and test<a class="headerlink" href="#build-and-test" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash">./gradlew build                     # compile, unit + architecture tests, jar
+./gradlew test -PwithContainers     # also run the PostgreSQL + Kafka integration tests (needs Docker)
+docker build -t e-commerce/inventory-service .</code></pre>
+<h2 id="run-locally">Run locally<a class="headerlink" href="#run-locally" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash"># infrastructure only (from e-commerce/deploy/compose)
+docker compose up -d postgres kafka
+# the service
+./gradlew bootRun</code></pre>
+<p>Configuration (environment variables):</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DB_URL</code></td>
+<td><code>jdbc:postgresql://localhost:5432/inventory</code></td>
+<td>JDBC URL (PgBouncer in production)</td>
+</tr>
+<tr>
+<td><code>DB_USER</code> / <code>DB_PASSWORD</code></td>
+<td><code>inventory</code> / <code>inventory</code></td>
+<td>Database credentials (from a secret in Kubernetes)</td>
+</tr>
+<tr>
+<td><code>DB_POOL_SIZE</code></td>
+<td><code>20</code></td>
+<td>HikariCP pool size per pod</td>
+</tr>
+<tr>
+<td><code>KAFKA_BOOTSTRAP</code></td>
+<td><code>localhost:9092</code></td>
+<td>Kafka bootstrap servers</td>
+</tr>
+<tr>
+<td><code>PORT</code></td>
+<td><code>8084</code></td>
+<td>HTTP port</td>
+</tr>
+</tbody>
+</table>
+<h2 id="try-it">Try it<a class="headerlink" href="#try-it" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash">curl -X PUT localhost:8084/internal/stock/SKU-1001 -H 'content-type: application/json' -d '{"available": 3}'
+curl -X POST localhost:8084/internal/reservations -H 'content-type: application/json' \
+     -d '{"orderId":"0193a1b0-0000-7000-8000-000000000001","lines":[{"sku":"SKU-1001","quantity":2}]}'
+curl localhost:8084/internal/stock/SKU-1001        # {"available":1,"reserved":2,...}
+curl -X POST localhost:8084/internal/reservations/0193a1b0-0000-7000-8000-000000000001/commit</code></pre>
+<h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Health</td>
+<td><code>/actuator/health/liveness</code>, <code>/actuator/health/readiness</code></td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td><code>/actuator/prometheus</code> (HTTP, JDBC pool, Kafka producer and consumer, JVM)</td>
+</tr>
+<tr>
+<td>Outbox backlog</td>
+<td><code>select count(*) from outbox where published_at is null</code> — alert when the oldest row is older than 30 s</td>
+</tr>
+<tr>
+<td>Stuck reservations</td>
+<td><code>select count(*) from reservations where status = 'RESERVED' and expires_at &lt; now() - interval '5 minutes'</code> should be 0</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>
