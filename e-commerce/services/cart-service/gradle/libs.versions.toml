@@ -1,0 +1,13 @@
+[versions]
+java = "25"
+spring-boot = "4.0.9"
+resilience4j = "2.4.0"
+archunit = "1.5.1"
+
+[libraries]
+resilience4j-circuitbreaker = { module = "io.github.resilience4j:resilience4j-circuitbreaker", version.ref = "resilience4j" }
+resilience4j-retry = { module = "io.github.resilience4j:resilience4j-retry", version.ref = "resilience4j" }
+archunit = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
