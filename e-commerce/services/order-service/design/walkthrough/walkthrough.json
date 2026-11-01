@@ -1,0 +1,907 @@
+{
+ "title": "order-service",
+ "subtitle": "The checkout saga: reserve, pay, confirm, or undo",
+ "nodes": [
+  {
+   "id": "cust",
+   "label": "Customer",
+   "kind": "client",
+   "tech": "browser / app",
+   "x": 130,
+   "y": 90
+  },
+  {
+   "id": "gw",
+   "label": "api-gateway",
+   "kind": "edge",
+   "tech": "JWT · rate limit",
+   "x": 130,
+   "y": 290
+  },
+  {
+   "id": "ord",
+   "label": "order-service",
+   "kind": "service",
+   "tech": "checkout saga",
+   "x": 470,
+   "y": 290
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL",
+   "kind": "db",
+   "tech": "orders · outbox",
+   "x": 470,
+   "y": 500
+  },
+  {
+   "id": "cart",
+   "label": "cart-service",
+   "kind": "service",
+   "tech": "priced snapshot",
+   "x": 820,
+   "y": 90
+  },
+  {
+   "id": "inv",
+   "label": "inventory",
+   "kind": "service",
+   "tech": "reserve · commit",
+   "x": 820,
+   "y": 290
+  },
+  {
+   "id": "pay",
+   "label": "payment",
+   "kind": "service",
+   "tech": "authorise · capture",
+   "x": 820,
+   "y": 500
+  },
+  {
+   "id": "kafka",
+   "label": "Kafka",
+   "kind": "queue",
+   "tech": "order.events",
+   "x": 130,
+   "y": 500
+  },
+  {
+   "id": "rec",
+   "label": "Recovery job",
+   "kind": "job",
+   "tech": "ShedLock · 15 s",
+   "x": 470,
+   "y": 90
+  }
+ ],
+ "edges": [
+  {
+   "from": "cust",
+   "to": "gw"
+  },
+  {
+   "from": "gw",
+   "to": "ord"
+  },
+  {
+   "from": "ord",
+   "to": "cart"
+  },
+  {
+   "from": "ord",
+   "to": "inv"
+  },
+  {
+   "from": "ord",
+   "to": "pay"
+  },
+  {
+   "from": "ord",
+   "to": "db"
+  },
+  {
+   "from": "db",
+   "to": "kafka",
+   "dashed": true
+  },
+  {
+   "from": "rec",
+   "to": "ord"
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "happy",
+   "title": "Checkout that succeeds",
+   "summary": "Reserve, authorise, commit, capture, confirm",
+   "steps": [
+    {
+     "say": "Ada presses Buy. The app sends the order with an idempotency key, so a retried request can never create a second order.",
+     "active": [
+      "cust",
+      "gw"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "gw",
+       "label": "POST /orders · key k1",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The gateway checks her token and forwards the request. order-service has never seen key k1, so this is a new checkout.",
+     "active": [
+      "gw",
+      "ord"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "ord",
+       "label": "place(Ada, k1)",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "It fetches her cart with current prices. The order is priced by the server, never by the browser.",
+     "active": [
+      "ord",
+      "cart"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "cart",
+       "label": "checkout snapshot",
+       "kind": "req"
+      },
+      {
+       "from": "cart",
+       "to": "ord",
+       "label": "2 × Trail Runner, 179.80 €",
+       "kind": "res"
+      }
+     ]
+    },
+    {
+     "say": "The order is stored as PENDING, together with the key and an OrderPlaced event, in one transaction.",
+     "active": [
+      "ord",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "db",
+       "label": "INSERT order + key + outbox",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "PENDING",
+       "saga step": "STARTED",
+       "total": "179.80 €"
+      }
+     }
+    },
+    {
+     "say": "Step one: reserve the stock.",
+     "active": [
+      "ord",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "reserve",
+       "kind": "req"
+      },
+      {
+       "from": "inv",
+       "to": "ord",
+       "label": "RESERVED",
+       "kind": "res"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "PENDING",
+       "saga step": "STOCK_RESERVED",
+       "total": "179.80 €"
+      }
+     }
+    },
+    {
+     "say": "Step two: authorise 179.80 euros. The payment provider holds the money but does not take it yet.",
+     "active": [
+      "ord",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "authorize 179.80 €",
+       "kind": "req"
+      },
+      {
+       "from": "pay",
+       "to": "ord",
+       "label": "AUTHORIZED",
+       "kind": "res"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "PENDING",
+       "saga step": "PAYMENT_AUTHORIZED",
+       "total": "179.80 €"
+      }
+     }
+    },
+    {
+     "say": "Step three: commit the reservation, so the shoes are sold. Step four: capture the money.",
+     "active": [
+      "ord",
+      "inv",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "commit",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "capture",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "PENDING",
+       "saga step": "PAYMENT_CAPTURED",
+       "total": "179.80 €"
+      }
+     }
+    },
+    {
+     "say": "The order becomes CONFIRMED, and OrderConfirmed is written to the outbox in the same transaction.",
+     "ok": [
+      "ord",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "db",
+       "label": "CONFIRMED + OrderConfirmed",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "CONFIRMED",
+       "saga step": "COMPLETED",
+       "total": "179.80 €"
+      }
+     }
+    },
+    {
+     "say": "Ada gets 201 Created. A moment later the relay publishes the event: her cart is cleared, an email goes out, and analytics counts the sale.",
+     "ok": [
+      "cust",
+      "kafka"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "gw",
+       "label": "201 Created",
+       "kind": "res"
+      },
+      {
+       "from": "db",
+       "to": "kafka",
+       "label": "OrderConfirmed",
+       "kind": "event"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "replay",
+   "title": "Double-click: same key, same order",
+   "summary": "Idempotency key",
+   "steps": [
+    {
+     "say": "Ada's network drops the answer, and the app retries with the same idempotency key k1.",
+     "active": [
+      "cust",
+      "gw"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "gw",
+       "label": "POST /orders · key k1 (again)",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "order-service finds key k1 already stored for Ada.",
+     "active": [
+      "ord",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "db",
+       "label": "SELECT idempotency_keys",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "ord",
+       "text": "seen before",
+       "tone": "warn"
+      }
+     ]
+    },
+    {
+     "say": "It returns the existing order as it is. Cart, inventory and payment are not called at all, so nothing can happen twice.",
+     "ok": [
+      "ord"
+     ],
+     "dim": [
+      "cart",
+      "inv",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "gw",
+       "label": "200 OK (same order)",
+       "kind": "res"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "oos",
+   "title": "Out of stock",
+   "summary": "Nothing to undo",
+   "steps": [
+    {
+     "say": "Ben checks out the last pair of a limited sneaker, but someone was faster.",
+     "active": [
+      "ord",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "reserve",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Inventory reserves nothing and says which SKU is short.",
+     "bad": [
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "ord",
+       "label": "409 OUT_OF_STOCK",
+       "kind": "error"
+      }
+     ]
+    },
+    {
+     "say": "Nothing was reserved and no money was touched, so the order is simply cancelled with reason OUT_OF_STOCK.",
+     "active": [
+      "ord",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "db",
+       "label": "CANCELLED + OrderCancelled",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "CANCELLED",
+       "reason": "OUT_OF_STOCK"
+      }
+     }
+    },
+    {
+     "say": "Ben gets 409 with a clear problem description and the order id.",
+     "bad": [
+      "cust"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "gw",
+       "label": "409 OUT_OF_STOCK",
+       "kind": "error"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "declined",
+   "title": "Card declined",
+   "summary": "Release the stock",
+   "steps": [
+    {
+     "say": "Stock is reserved for Cara's order. Now the saga asks payment to authorise her card.",
+     "active": [
+      "ord",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "authorize",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "saga step": "STOCK_RESERVED"
+      }
+     }
+    },
+    {
+     "say": "The bank declines the card.",
+     "bad": [
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "ord",
+       "label": "402 DECLINED",
+       "kind": "error"
+      }
+     ]
+    },
+    {
+     "say": "Compensation: the saga releases the reserved stock so other customers can buy it.",
+     "active": [
+      "ord",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "release",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "saga step": "COMPENSATING"
+      }
+     }
+    },
+    {
+     "say": "The order is cancelled with reason PAYMENT_DECLINED, and Cara gets 402.",
+     "packets": [
+      {
+       "from": "ord",
+       "to": "db",
+       "label": "CANCELLED",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "gw",
+       "label": "402 PAYMENT_DECLINED",
+       "kind": "error"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "CANCELLED",
+       "saga step": "COMPENSATED",
+       "reason": "PAYMENT_DECLINED"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "unknown",
+   "title": "Payment too slow",
+   "summary": "Unknown outcome: void it",
+   "steps": [
+    {
+     "say": "The payment provider is slow. After two seconds order-service stops waiting.",
+     "active": [
+      "ord",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "authorize",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "pay",
+       "text": "> 2 s",
+       "tone": "warn"
+      }
+     ]
+    },
+    {
+     "say": "Did the provider take the money or not? Nobody knows yet, so the saga assumes it might have.",
+     "bad": [
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "ord",
+       "label": "504 UNKNOWN",
+       "kind": "error"
+      }
+     ]
+    },
+    {
+     "say": "It asks payment-service to void the authorisation. If the provider answers late with a success, payment-service voids it right away.",
+     "active": [
+      "ord",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "void",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Stock is released and the order is cancelled. Dan sees a clear message that he will not be charged.",
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "release",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "gw",
+       "label": "504 PAYMENT_UNKNOWN",
+       "kind": "error"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "CANCELLED",
+       "reason": "PAYMENT_UNKNOWN"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "outage-after-auth",
+   "title": "Outage after authorisation",
+   "summary": "Move forward, finish later",
+   "steps": [
+    {
+     "say": "Eve's payment is authorised. Then inventory times out when the saga tries to commit the stock.",
+     "active": [
+      "ord",
+      "inv"
+     ],
+     "bad": [
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "commit",
+       "kind": "req"
+      },
+      {
+       "from": "inv",
+       "to": "ord",
+       "label": "timeout",
+       "kind": "error"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "PENDING",
+       "saga step": "PAYMENT_AUTHORIZED"
+      }
+     }
+    },
+    {
+     "say": "Money is already held and the stock is reserved, so cancelling now would be the wrong answer. The order stays PENDING and Eve gets 202: we are finishing your order.",
+     "active": [
+      "ord"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "gw",
+       "label": "202 Accepted",
+       "kind": "res"
+      }
+     ]
+    },
+    {
+     "say": "Fifteen seconds later the recovery job, running on one replica only, finds the order waiting.",
+     "active": [
+      "rec",
+      "ord"
+     ],
+     "packets": [
+      {
+       "from": "rec",
+       "to": "ord",
+       "label": "resume stuck orders",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Inventory is back. Recovery commits the stock, captures the payment and confirms the order, exactly where it stopped.",
+     "ok": [
+      "ord",
+      "inv",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "commit",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "capture",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "CONFIRMED",
+       "saga step": "COMPLETED"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "crash",
+   "title": "Crash in the middle",
+   "summary": "Recovery moves back",
+   "steps": [
+    {
+     "say": "order-service reserved stock for Finn and then the pod was killed before it could call payment.",
+     "bad": [
+      "ord"
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "PENDING",
+       "saga step": "STOCK_RESERVED"
+      }
+     }
+    },
+    {
+     "say": "Thirty seconds later the recovery job finds the order still at STOCK_RESERVED.",
+     "active": [
+      "rec",
+      "ord",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "rec",
+       "to": "ord",
+       "label": "resume",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "db",
+       "label": "SELECT stuck orders",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "No money was taken yet, so the safe direction is backwards: void any authorisation and release the stock.",
+     "active": [
+      "ord",
+      "pay",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "void",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "release",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The order is cancelled as CHECKOUT_ABANDONED and an event tells the customer. Nothing is left hanging.",
+     "ok": [
+      "ord"
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "CANCELLED",
+       "reason": "CHECKOUT_ABANDONED"
+      }
+     },
+     "packets": [
+      {
+       "from": "db",
+       "to": "kafka",
+       "label": "OrderCancelled",
+       "kind": "event"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cancel",
+   "title": "Customer cancels a confirmed order",
+   "summary": "Refund, then return stock",
+   "steps": [
+    {
+     "say": "Gus changes his mind and cancels a confirmed order.",
+     "active": [
+      "cust",
+      "gw",
+      "ord"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "gw",
+       "label": "POST /orders/7/cancel",
+       "kind": "req"
+      },
+      {
+       "from": "gw",
+       "to": "ord",
+       "label": "cancel",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Only the owner or staff may do this. The order moves to CANCELLING, and that step is saved first.",
+     "active": [
+      "ord",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "db",
+       "label": "CANCELLING",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "CANCELLING",
+       "saga step": "REFUNDING"
+      }
+     }
+    },
+    {
+     "say": "The payment is refunded and the sold stock is returned to inventory.",
+     "active": [
+      "pay",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "refund",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "return stock",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The order is cancelled and OrderCancelled is published. If the refund had failed, the order would stay CANCELLING and recovery would retry it.",
+     "ok": [
+      "ord"
+     ],
+     "packets": [
+      {
+       "from": "db",
+       "to": "kafka",
+       "label": "OrderCancelled",
+       "kind": "event"
+      }
+     ],
+     "state": {
+      "title": "Order",
+      "rows": {
+       "status": "CANCELLED",
+       "reason": "CUSTOMER_REQUEST"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

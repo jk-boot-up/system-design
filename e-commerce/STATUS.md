@@ -12,8 +12,8 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Specification and plans | ██████████ 100% | SPEC, PLAN, design plan, implementation plan, prerequisites | Keep in step with changes |
 | System design documents | ███████░░░ 70% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, 11 ADRs | System/module/service diagrams; security, observability, capacity, runbooks |
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
-| Services (11) | ██░░░░░░░░ 15% | inventory-service complete | order-service (in progress), then payment, cart, catalog, search, review, gateway, notification, recommendation, analytics |
-| Walkthroughs | █░░░░░░░░░ 10% | inventory-service (8 scenarios, 36 steps) | order-service, system walkthrough |
+| Services (11) | ███░░░░░░░ 25% | inventory-service, order-service complete | payment-service, then cart, catalog, search, review, gateway, notification, recommendation, analytics |
+| Walkthroughs | ██░░░░░░░░ 20% | inventory-service, order-service (8 scenarios each) | Each new service, system walkthrough |
 | Local stack and Kubernetes overlays | ░░░░░░░░░░ 0% | inventory-service `k8s/` base | Compose stack, overlays |
 | End-to-end and performance tests | ░░░░░░░░░░ 0% | — | After checkout works end to end |
 
@@ -22,7 +22,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Service | Code | Tests | Contracts | Docker + k8s | CI | Docs | Walkthrough |
 |---|---|---|---|---|---|---|---|
 | inventory-service | ✅ | ✅ 19 passing (incl. PostgreSQL + Kafka containers) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| order-service | 🔄 domain, application, persistence | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ |
+| order-service | ✅ | ✅ 29 passing (incl. PostgreSQL + Kafka + HTTP) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | payment-service | ⏳ | | | | | | |
 | cart-service | ⏳ | | | | | | |
 | catalog-service | ⏳ | | | | | | |
@@ -35,6 +35,10 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## Recently completed
 
+* order-service: checkout saga with every compensation path, idempotency keys, crash recovery, monthly partitions with id-based
+  pruning, JWT-secured API, circuit breakers and retries; container tests caught and fixed a millisecond/microsecond mismatch
+  between order ids and partition keys.
+
 * inventory-service: no-overselling reservations, expiry job, outbox relay, cancellation safety net, REST API with problem details;
   tests prove 50 concurrent orders for 10 units reserve exactly 10.
 * Walkthrough engine: animated diagrams, light / medium / dark themes, narration on/off with a female voice, automated step check.
@@ -43,8 +47,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* order-service: checkout saga with compensations and recovery are written; HTTP clients with circuit breakers, REST API with JWT,
-  scheduled jobs, tests, documents and walkthrough are next.
+* payment-service: payment aggregate, simulated provider, idempotent authorise / capture / void / refund, reconciler.
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

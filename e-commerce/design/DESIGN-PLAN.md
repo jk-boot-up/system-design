@@ -65,7 +65,7 @@ Each service also has its own `README.md` (build, run, configure, operate) and `
 | Service | Language | Design doc | Walkthrough | README + prerequisites |
 |---|---|---|---|---|
 | inventory-service | Java | ✅ | ✅ | ✅ |
-| order-service | Java | 🔄 | ⏳ | ⏳ |
+| order-service | Java | ✅ | ✅ | ✅ |
 | payment-service | Java | ⏳ | ⏳ | ⏳ |
 | cart-service | Java | ⏳ | ⏳ | ⏳ |
 | catalog-service | Java | ⏳ | ⏳ | ⏳ |

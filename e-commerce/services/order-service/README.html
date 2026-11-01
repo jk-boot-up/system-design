@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>order-service</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="order-service">order-service<a class="headerlink" href="#order-service" title="Permanent link">#</a></h1>
+<p>Owns orders and runs <strong>checkout as a saga</strong>: it takes the priced cart, reserves stock, authorises and captures payment, and either
+confirms the order or undoes every step it took. It also cancels confirmed orders (refund and stock return) and finishes any saga
+interrupted by a crash or an outage.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Language / framework</td>
+<td>Java 25, Spring Boot 4.0 (virtual threads), Resilience4j</td>
+</tr>
+<tr>
+<td>Store</td>
+<td>PostgreSQL: <code>orders</code> and <code>order_lines</code> partitioned by month, <code>idempotency_keys</code>, <code>outbox</code>, <code>shedlock</code></td>
+</tr>
+<tr>
+<td>Publishes</td>
+<td><code>order.OrderPlaced</code>, <code>order.OrderConfirmed</code>, <code>order.OrderCancelled</code> on <code>order.events</code></td>
+</tr>
+<tr>
+<td>Calls</td>
+<td>cart-service (snapshot), inventory-service (reserve, commit, release, return), payment-service (authorise, capture, void, refund)</td>
+</tr>
+<tr>
+<td>Called by</td>
+<td>api-gateway (customers with a JWT)</td>
+</tr>
+<tr>
+<td>Port</td>
+<td>8085</td>
+</tr>
+<tr>
+<td>Design</td>
+<td><a href="design/README.html">design/README.md</a> · <a href="design/walkthrough/index.html">walkthrough</a></td>
+</tr>
+<tr>
+<td>Prerequisites</td>
+<td><a href="PREREQUISITES.html">PREREQUISITES.md</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">#</a></h2>
+<pre class="highlight"><code>order-service/
+├─ README.md, PREREQUISITES.md
+├─ design/                      low-level design, diagrams, walkthrough
+├─ contracts/                   openapi.yaml, events/ (OrderPlaced, OrderConfirmed, OrderCancelled)
+├─ src/main/java/com/jkbootup/ecommerce/order/
+│  ├─ domain/                   Order (aggregate), OrderLine, Money, OrderStatus, SagaStep, CancelReason, OrderEvent
+│  ├─ application/              CheckoutSaga, OrderQueries, SagaRecovery + port/ (OrderRepository, CartPort, InventoryPort, PaymentPort, …)
+│  ├─ adapter/web/              OrderController (JWT), ProblemHandler
+│  ├─ adapter/client/           Cart/Inventory/Payment HTTP clients with circuit breaker + retry (ResilientCall)
+│  ├─ adapter/persistence/      JdbcOrderRepository (partitions, optimistic lock), OutboxWriter, OrderPartitions, UuidV7
+│  ├─ adapter/messaging/        OutboxRelay → Kafka
+│  ├─ adapter/scheduling/       OrderJobs (saga recovery)
+│  └─ config/                   wiring, security
+├─ src/main/resources/          application.yaml, db/migration (Flyway: partitioned schema + partition function)
+├─ src/test/java/…              domain, saga (14 paths with test doubles), ArchUnit, UUIDv7, container integration
+├─ Dockerfile, k8s/
+└─ build.gradle.kts, settings.gradle.kts, gradle/ (own wrapper and version catalog)</code></pre>
+<h2 id="build-and-test">Build and test<a class="headerlink" href="#build-and-test" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash">./gradlew build                     # unit, saga and architecture tests
+./gradlew test -PwithContainers     # + PostgreSQL, Kafka and real HTTP to fake downstream services (needs Docker)
+docker build -t e-commerce/order-service .</code></pre>
+<h2 id="run-locally">Run locally<a class="headerlink" href="#run-locally" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash">cd ../../deploy/compose &amp;&amp; docker compose up -d postgres kafka keycloak    # infrastructure
+./gradlew bootRun                                                         # needs cart, inventory and payment running for checkout</code></pre>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DB_URL</code>, <code>DB_USER</code>, <code>DB_PASSWORD</code></td>
+<td><code>jdbc:postgresql://localhost:5432/orders</code>, <code>orders</code>, <code>orders</code></td>
+<td>Database</td>
+</tr>
+<tr>
+<td><code>DB_POOL_SIZE</code></td>
+<td><code>30</code></td>
+<td>HikariCP pool size per pod</td>
+</tr>
+<tr>
+<td><code>KAFKA_BOOTSTRAP</code></td>
+<td><code>localhost:9092</code></td>
+<td>Kafka</td>
+</tr>
+<tr>
+<td><code>JWT_ISSUER</code></td>
+<td><code>http://localhost:8180/realms/shop</code></td>
+<td>Keycloak realm that signs customer tokens</td>
+</tr>
+<tr>
+<td><code>CART_URL</code>, <code>INVENTORY_URL</code>, <code>PAYMENT_URL</code></td>
+<td><code>http://localhost:8083</code>, <code>:8084</code>, <code>:8086</code></td>
+<td>Downstream services</td>
+</tr>
+<tr>
+<td><code>PORT</code></td>
+<td><code>8085</code></td>
+<td>HTTP port</td>
+</tr>
+</tbody>
+</table>
+<p>Timeouts: connect 200 ms, read 800 ms (payment 2 s). Circuit breakers open at 50% failures over 20 calls for 10 s.</p>
+<h2 id="try-it">Try it<a class="headerlink" href="#try-it" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash">TOKEN=…   # a customer access token from Keycloak (realm "shop")
+curl -X POST localhost:8085/api/v1/orders -H "Authorization: Bearer $TOKEN" -H 'Idempotency-Key: 6f1c' \
+     -H 'content-type: application/json' -d '{"paymentToken":"tok_ok"}'
+curl localhost:8085/api/v1/orders -H "Authorization: Bearer $TOKEN"</code></pre>
+<h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Where / query</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Health, metrics</td>
+<td><code>/actuator/health/{liveness,readiness}</code>, <code>/actuator/prometheus</code> (includes circuit-breaker states via Resilience4j metrics)</td>
+</tr>
+<tr>
+<td>Orders stuck in flight</td>
+<td><code>select count(*) from orders where status in ('PENDING','CANCELLING') and updated_at &lt; now() - interval '5 minutes'</code> should be 0</td>
+</tr>
+<tr>
+<td>Outbox backlog</td>
+<td><code>select min(created_at) from outbox where published_at is null</code> older than 30 s → alert</td>
+</tr>
+<tr>
+<td>Partitions ready</td>
+<td><code>select ensure_order_partitions(3)</code> returns 0 when the next three months exist</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

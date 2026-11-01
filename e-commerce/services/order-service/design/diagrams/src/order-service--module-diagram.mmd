@@ -1,0 +1,56 @@
+flowchart TB
+    subgraph web[adapter.web]
+        OC[OrderController]
+        PH[ProblemHandler]
+        SEC[SecurityConfiguration<br/>JWT resource server]
+    end
+    subgraph app[application]
+        CS[CheckoutSaga<br/>process manager]
+        OQ[OrderQueries]
+        SR[SagaRecovery]
+        subgraph ports[port]
+            ORp[[OrderRepository]]
+            CPp[[CartPort]]
+            IPp[[InventoryPort]]
+            PPp[[PaymentPort]]
+            TXp[[Transactions]]
+            IDp[[IdGenerator]]
+        end
+    end
+    subgraph dom[domain]
+        O[Order aggregate]
+        OS[OrderStatus · SagaStep · CancelReason]
+        OE[OrderEvent]
+        M[Money · OrderLine]
+    end
+    subgraph client[adapter.client]
+        CC[CartHttpClient]
+        IC[InventoryHttpClient]
+        PC[PaymentHttpClient]
+        RC[ResilientCall<br/>circuit breaker + retry]
+    end
+    subgraph per[adapter.persistence]
+        JR[JdbcOrderRepository]
+        OW[OutboxWriter]
+        PT[OrderPartitions]
+        U7[UuidV7]
+        ST[SpringTransactions]
+    end
+    subgraph msg[adapter.messaging]
+        REL[OutboxRelay]
+    end
+    subgraph sch[adapter.scheduling]
+        JOB[OrderJobs]
+    end
+    OC --> CS & OQ
+    JOB --> SR --> CS
+    CS & OQ --> dom
+    CS --> ORp & CPp & IPp & PPp & TXp & IDp
+    ORp -.-> JR
+    CPp -.-> CC
+    IPp -.-> IC
+    PPp -.-> PC
+    TXp -.-> ST
+    IDp -.-> U7
+    CC & IC & PC --> RC
+    JR --> OW

@@ -1,0 +1,8 @@
+stateDiagram-v2
+    [*] --> PENDING
+    PENDING --> CONFIRMED: captured
+    PENDING --> CANCELLED: any failure before capture
+    CONFIRMED --> CANCELLING: customer cancels
+    CANCELLING --> CANCELLED: refunded + stock returned
+    CONFIRMED --> SHIPPED
+    SHIPPED --> DELIVERED

@@ -79,15 +79,15 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>Services (11)</td>
-<td>██░░░░░░░░ 15%</td>
-<td>inventory-service complete</td>
-<td>order-service (in progress), then payment, cart, catalog, search, review, gateway, notification, recommendation, analytics</td>
+<td>███░░░░░░░ 25%</td>
+<td>inventory-service, order-service complete</td>
+<td>payment-service, then cart, catalog, search, review, gateway, notification, recommendation, analytics</td>
 </tr>
 <tr>
 <td>Walkthroughs</td>
-<td>█░░░░░░░░░ 10%</td>
-<td>inventory-service (8 scenarios, 36 steps)</td>
-<td>order-service, system walkthrough</td>
+<td>██░░░░░░░░ 20%</td>
+<td>inventory-service, order-service (8 scenarios each)</td>
+<td>Each new service, system walkthrough</td>
 </tr>
 <tr>
 <td>Local stack and Kubernetes overlays</td>
@@ -130,13 +130,13 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>order-service</td>
-<td>🔄 domain, application, persistence</td>
-<td>⏳</td>
-<td>⏳</td>
-<td>⏳</td>
-<td>⏳</td>
-<td>⏳</td>
-<td>⏳</td>
+<td>✅</td>
+<td>✅ 29 passing (incl. PostgreSQL + Kafka + HTTP)</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>payment-service</td>
@@ -232,16 +232,22 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </table>
 <h2 id="recently-completed">Recently completed<a class="headerlink" href="#recently-completed" title="Permanent link">#</a></h2>
 <ul>
-<li>inventory-service: no-overselling reservations, expiry job, outbox relay, cancellation safety net, REST API with problem details;
-  tests prove 50 concurrent orders for 10 units reserve exactly 10.</li>
+<li>
+<p>order-service: checkout saga with every compensation path, idempotency keys, crash recovery, monthly partitions with id-based
+  pruning, JWT-secured API, circuit breakers and retries; container tests caught and fixed a millisecond/microsecond mismatch
+  between order ids and partition keys.</p>
+</li>
+<li>
+<p>inventory-service: no-overselling reservations, expiry job, outbox relay, cancellation safety net, REST API with problem details;
+  tests prove 50 concurrent orders for 10 units reserve exactly 10.</p>
+</li>
 <li>Walkthrough engine: animated diagrams, light / medium / dark themes, narration on/off with a female voice, automated step check.</li>
 <li>Repository structure: <code>e-commerce/</code> self-contained, with <code>design/</code> (system), <code>services/</code> (independent projects), <code>deploy/</code>,
   <code>tests/</code> and <code>tools/</code>.</li>
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>order-service: checkout saga with compensations and recovery are written; HTTP clients with circuit breakers, REST API with JWT,
-  scheduled jobs, tests, documents and walkthrough are next.</li>
+<li>payment-service: payment aggregate, simulated provider, idempotent authorise / capture / void / refund, reconciler.</li>
 <li>System, module and service diagrams (design document 11).</li>
 </ul>
 <h2 id="risks-and-notes">Risks and notes<a class="headerlink" href="#risks-and-notes" title="Permanent link">#</a></h2>

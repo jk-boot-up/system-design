@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walkthrough</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#141b2e;--panel2:#1b243d;--line:#2a3554;--fg:#e8edf7;--mut:#93a0bd;--accent:#6d8cff;--req:#6d8cff;--res:#2fc46b;--evt:#f5a524;--err:#f0525b;--node:#18213a;--glow:rgba(109,140,255,.55)}
+[data-theme="medium"]{--bg:#283041;--panel:#333b50;--panel2:#3d465c;--line:#56607a;--fg:#eef1f7;--mut:#b7bfd2;--accent:#8aa5ff;--req:#8aa5ff;--res:#4fd88a;--evt:#ffb84d;--err:#ff7078;--node:#2f3850;--glow:rgba(138,165,255,.55)}
+[data-theme="light"]{--bg:#f3f5fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d3d9e8;--fg:#18202f;--mut:#5b6780;--accent:#3d63f2;--req:#3d63f2;--res:#138a45;--evt:#c77700;--err:#cc2b35;--node:#ffffff;--glow:rgba(61,99,242,.35)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{display:flex;gap:14px;align-items:center;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:17px;margin:0}
+header .sub{color:var(--mut);font-size:13px}
+.grow{flex:1}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button,.btn{background:var(--panel);color:var(--mut);border:0;padding:6px 11px;cursor:pointer;font:inherit;font-size:13px}
+.seg button.on{background:var(--accent);color:#fff}
+.btn{border:1px solid var(--line);border-radius:10px}
+.btn:hover,.seg button:hover{color:var(--fg)}
+.btn.on{border-color:var(--accent);color:var(--fg)}
+main{flex:1;display:grid;grid-template-columns:230px 1fr 340px;min-height:0}
+@media (max-width:1100px){main{grid-template-columns:1fr}aside.left{display:none}}
+aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:12px}
+aside.right{border-right:0;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.scn{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;color:var(--fg);padding:9px 10px;border-radius:10px;cursor:pointer;font:inherit;margin-bottom:4px}
+.scn small{display:block;color:var(--mut);font-size:12px}
+.scn.on{background:var(--panel2);border-color:var(--accent)}
+.stage{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:10px}
+.stage svg{width:100%;height:100%;max-height:calc(100vh - 150px)}
+.edge{stroke:var(--line);stroke-width:2;fill:none}
+.edge.dashed{stroke-dasharray:6 6}
+.edge.hot{stroke:var(--accent);stroke-width:3}
+.node rect{fill:var(--node);stroke:var(--line);stroke-width:1.5;transition:all .25s}
+.node text{fill:var(--fg);font-size:21px;font-weight:650}
+.node text.tech{fill:var(--mut);font-size:16px;font-weight:500}
+.node text.icon{font-size:28px}
+.node.active rect{stroke:var(--accent);stroke-width:3;filter:drop-shadow(0 0 10px var(--glow))}
+.node.ok rect{stroke:var(--res);stroke-width:3}
+.node.bad rect{stroke:var(--err);stroke-width:3}
+.node.dim{opacity:.35}
+.badge rect{rx:9}
+.badge text{font-size:14px;font-weight:700;fill:#fff}
+.pkt circle{stroke:#fff;stroke-width:2}
+.pkt text{font-size:17px;font-weight:700;paint-order:stroke;stroke:var(--bg);stroke-width:4px;fill:var(--fg)}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+.card h3{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+.say{font-size:16px;min-height:5.5em}
+.kv{width:100%;border-collapse:collapse;font-size:13px}
+.kv td{padding:3px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.kv td:first-child{color:var(--mut);white-space:nowrap}
+.kv tr.changed td{color:var(--evt);font-weight:600}
+.log{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;max-height:220px;overflow:auto;margin:0;padding:0;list-style:none}
+.log li{padding:2px 0;border-bottom:1px dashed var(--line)}
+.log .req{color:var(--req)}.log .res{color:var(--res)}.log .event{color:var(--evt)}.log .error{color:var(--err)}
+footer{display:flex;gap:10px;align-items:center;padding:10px 18px;background:var(--panel);border-top:1px solid var(--line);flex-wrap:wrap}
+.progress{flex:1;height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;min-width:120px;cursor:pointer}
+.progress div{height:100%;width:0;background:var(--accent);transition:width .3s}
+.count{color:var(--mut);font-size:13px;min-width:90px;text-align:right}
+.legend{display:flex;gap:12px;font-size:12px;color:var(--mut)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+kbd{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px}
+
+</style>
+</head>
+<body>
+<header>
+  <div><h1 id="title"></h1><div class="sub" id="subtitle"></div></div>
+  <div class="grow"></div>
+  <div class="legend" aria-hidden="true">
+    <span><i style="background:var(--req)"></i>request</span><span><i style="background:var(--res)"></i>response</span>
+    <span><i style="background:var(--evt)"></i>event</span><span><i style="background:var(--err)"></i>failure</span>
+  </div>
+  <button class="btn" id="narrate" aria-pressed="false" title="Narration on/off (N)">🔇 Narration off</button>
+  <div class="seg" role="group" aria-label="Theme">
+    <button data-set-theme="light">☀ Light</button><button data-set-theme="medium">◐ Medium</button><button data-set-theme="dark">☾ Dark</button>
+  </div>
+  <a class="btn" href="../README.html" title="Back to the design document">⟵ Design</a>
+</header>
+<main>
+  <aside class="left"><div id="scenarios" role="list" aria-label="Scenarios"></div></aside>
+  <section class="stage" id="stage"></section>
+  <aside class="right">
+    <div class="card"><h3>Narration</h3><div class="say" id="say" aria-live="polite"></div></div>
+    <div class="card"><h3 id="stateTitle">State</h3><table class="kv"><tbody id="state"></tbody></table></div>
+    <div class="card"><h3>Message log</h3><ul class="log" id="log"></ul></div>
+  </aside>
+</main>
+<footer>
+  <button class="btn" id="restart" title="Restart scenario">⟲</button>
+  <button class="btn" id="prev" title="Previous step (←)">◀</button>
+  <button class="btn" id="play" title="Play / pause (space)">▶ Play</button>
+  <button class="btn" id="next" title="Next step (→)">▶|</button>
+  <div class="progress" id="progress" title="Jump to a step"><div id="bar"></div></div>
+  <span class="count" id="count"></span>
+  <label class="sub">Speed <select id="speed"><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
+  <label class="sub"><input type="checkbox" id="autoNext" checked> continue to next scenario</label>
+  <span class="sub"><kbd>space</kbd> play · <kbd>←</kbd><kbd>→</kbd> step · <kbd>N</kbd> narration · <kbd>T</kbd> theme</span>
+</footer>
+<script>
+window.WALKTHROUGH = {"title": "order-service", "subtitle": "The checkout saga: reserve, pay, confirm, or undo", "nodes": [{"id": "cust", "label": "Customer", "kind": "client", "tech": "browser / app", "x": 130, "y": 90}, {"id": "gw", "label": "api-gateway", "kind": "edge", "tech": "JWT · rate limit", "x": 130, "y": 290}, {"id": "ord", "label": "order-service", "kind": "service", "tech": "checkout saga", "x": 470, "y": 290}, {"id": "db", "label": "PostgreSQL", "kind": "db", "tech": "orders · outbox", "x": 470, "y": 500}, {"id": "cart", "label": "cart-service", "kind": "service", "tech": "priced snapshot", "x": 820, "y": 90}, {"id": "inv", "label": "inventory", "kind": "service", "tech": "reserve · commit", "x": 820, "y": 290}, {"id": "pay", "label": "payment", "kind": "service", "tech": "authorise · capture", "x": 820, "y": 500}, {"id": "kafka", "label": "Kafka", "kind": "queue", "tech": "order.events", "x": 130, "y": 500}, {"id": "rec", "label": "Recovery job", "kind": "job", "tech": "ShedLock · 15 s", "x": 470, "y": 90}], "edges": [{"from": "cust", "to": "gw"}, {"from": "gw", "to": "ord"}, {"from": "ord", "to": "cart"}, {"from": "ord", "to": "inv"}, {"from": "ord", "to": "pay"}, {"from": "ord", "to": "db"}, {"from": "db", "to": "kafka", "dashed": true}, {"from": "rec", "to": "ord"}], "scenarios": [{"id": "happy", "title": "Checkout that succeeds", "summary": "Reserve, authorise, commit, capture, confirm", "steps": [{"say": "Ada presses Buy. The app sends the order with an idempotency key, so a retried request can never create a second order.", "active": ["cust", "gw"], "packets": [{"from": "cust", "to": "gw", "label": "POST /orders · key k1", "kind": "req"}]}, {"say": "The gateway checks her token and forwards the request. order-service has never seen key k1, so this is a new checkout.", "active": ["gw", "ord"], "packets": [{"from": "gw", "to": "ord", "label": "place(Ada, k1)", "kind": "req"}]}, {"say": "It fetches her cart with current prices. The order is priced by the server, never by the browser.", "active": ["ord", "cart"], "packets": [{"from": "ord", "to": "cart", "label": "checkout snapshot", "kind": "req"}, {"from": "cart", "to": "ord", "label": "2 × Trail Runner, 179.80 €", "kind": "res"}]}, {"say": "The order is stored as PENDING, together with the key and an OrderPlaced event, in one transaction.", "active": ["ord", "db"], "packets": [{"from": "ord", "to": "db", "label": "INSERT order + key + outbox", "kind": "req"}], "state": {"title": "Order", "rows": {"status": "PENDING", "saga step": "STARTED", "total": "179.80 €"}}}, {"say": "Step one: reserve the stock.", "active": ["ord", "inv"], "packets": [{"from": "ord", "to": "inv", "label": "reserve", "kind": "req"}, {"from": "inv", "to": "ord", "label": "RESERVED", "kind": "res"}], "state": {"title": "Order", "rows": {"status": "PENDING", "saga step": "STOCK_RESERVED", "total": "179.80 €"}}}, {"say": "Step two: authorise 179.80 euros. The payment provider holds the money but does not take it yet.", "active": ["ord", "pay"], "packets": [{"from": "ord", "to": "pay", "label": "authorize 179.80 €", "kind": "req"}, {"from": "pay", "to": "ord", "label": "AUTHORIZED", "kind": "res"}], "state": {"title": "Order", "rows": {"status": "PENDING", "saga step": "PAYMENT_AUTHORIZED", "total": "179.80 €"}}}, {"say": "Step three: commit the reservation, so the shoes are sold. Step four: capture the money.", "active": ["ord", "inv", "pay"], "packets": [{"from": "ord", "to": "inv", "label": "commit", "kind": "req"}, {"from": "ord", "to": "pay", "label": "capture", "kind": "req"}], "state": {"title": "Order", "rows": {"status": "PENDING", "saga step": "PAYMENT_CAPTURED", "total": "179.80 €"}}}, {"say": "The order becomes CONFIRMED, and OrderConfirmed is written to the outbox in the same transaction.", "ok": ["ord", "db"], "packets": [{"from": "ord", "to": "db", "label": "CONFIRMED + OrderConfirmed", "kind": "req"}], "state": {"title": "Order", "rows": {"status": "CONFIRMED", "saga step": "COMPLETED", "total": "179.80 €"}}}, {"say": "Ada gets 201 Created. A moment later the relay publishes the event: her cart is cleared, an email goes out, and analytics counts the sale.", "ok": ["cust", "kafka"], "packets": [{"from": "ord", "to": "gw", "label": "201 Created", "kind": "res"}, {"from": "db", "to": "kafka", "label": "OrderConfirmed", "kind": "event"}]}]}, {"id": "replay", "title": "Double-click: same key, same order", "summary": "Idempotency key", "steps": [{"say": "Ada's network drops the answer, and the app retries with the same idempotency key k1.", "active": ["cust", "gw"], "packets": [{"from": "cust", "to": "gw", "label": "POST /orders · key k1 (again)", "kind": "req"}]}, {"say": "order-service finds key k1 already stored for Ada.", "active": ["ord", "db"], "packets": [{"from": "ord", "to": "db", "label": "SELECT idempotency_keys", "kind": "req"}], "badges": [{"node": "ord", "text": "seen before", "tone": "warn"}]}, {"say": "It returns the existing order as it is. Cart, inventory and payment are not called at all, so nothing can happen twice.", "ok": ["ord"], "dim": ["cart", "inv", "pay"], "packets": [{"from": "ord", "to": "gw", "label": "200 OK (same order)", "kind": "res"}]}]}, {"id": "oos", "title": "Out of stock", "summary": "Nothing to undo", "steps": [{"say": "Ben checks out the last pair of a limited sneaker, but someone was faster.", "active": ["ord", "inv"], "packets": [{"from": "ord", "to": "inv", "label": "reserve", "kind": "req"}]}, {"say": "Inventory reserves nothing and says which SKU is short.", "bad": ["inv"], "packets": [{"from": "inv", "to": "ord", "label": "409 OUT_OF_STOCK", "kind": "error"}]}, {"say": "Nothing was reserved and no money was touched, so the order is simply cancelled with reason OUT_OF_STOCK.", "active": ["ord", "db"], "packets": [{"from": "ord", "to": "db", "label": "CANCELLED + OrderCancelled", "kind": "req"}], "state": {"title": "Order", "rows": {"status": "CANCELLED", "reason": "OUT_OF_STOCK"}}}, {"say": "Ben gets 409 with a clear problem description and the order id.", "bad": ["cust"], "packets": [{"from": "ord", "to": "gw", "label": "409 OUT_OF_STOCK", "kind": "error"}]}]}, {"id": "declined", "title": "Card declined", "summary": "Release the stock", "steps": [{"say": "Stock is reserved for Cara's order. Now the saga asks payment to authorise her card.", "active": ["ord", "pay"], "packets": [{"from": "ord", "to": "pay", "label": "authorize", "kind": "req"}], "state": {"title": "Order", "rows": {"saga step": "STOCK_RESERVED"}}}, {"say": "The bank declines the card.", "bad": ["pay"], "packets": [{"from": "pay", "to": "ord", "label": "402 DECLINED", "kind": "error"}]}, {"say": "Compensation: the saga releases the reserved stock so other customers can buy it.", "active": ["ord", "inv"], "packets": [{"from": "ord", "to": "inv", "label": "release", "kind": "req"}], "state": {"title": "Order", "rows": {"saga step": "COMPENSATING"}}}, {"say": "The order is cancelled with reason PAYMENT_DECLINED, and Cara gets 402.", "packets": [{"from": "ord", "to": "db", "label": "CANCELLED", "kind": "req"}, {"from": "ord", "to": "gw", "label": "402 PAYMENT_DECLINED", "kind": "error"}], "state": {"title": "Order", "rows": {"status": "CANCELLED", "saga step": "COMPENSATED", "reason": "PAYMENT_DECLINED"}}}]}, {"id": "unknown", "title": "Payment too slow", "summary": "Unknown outcome: void it", "steps": [{"say": "The payment provider is slow. After two seconds order-service stops waiting.", "active": ["ord", "pay"], "packets": [{"from": "ord", "to": "pay", "label": "authorize", "kind": "req"}], "badges": [{"node": "pay", "text": "> 2 s", "tone": "warn"}]}, {"say": "Did the provider take the money or not? Nobody knows yet, so the saga assumes it might have.", "bad": ["pay"], "packets": [{"from": "pay", "to": "ord", "label": "504 UNKNOWN", "kind": "error"}]}, {"say": "It asks payment-service to void the authorisation. If the provider answers late with a success, payment-service voids it right away.", "active": ["ord", "pay"], "packets": [{"from": "ord", "to": "pay", "label": "void", "kind": "req"}]}, {"say": "Stock is released and the order is cancelled. Dan sees a clear message that he will not be charged.", "packets": [{"from": "ord", "to": "inv", "label": "release", "kind": "req"}, {"from": "ord", "to": "gw", "label": "504 PAYMENT_UNKNOWN", "kind": "error"}], "state": {"title": "Order", "rows": {"status": "CANCELLED", "reason": "PAYMENT_UNKNOWN"}}}]}, {"id": "outage-after-auth", "title": "Outage after authorisation", "summary": "Move forward, finish later", "steps": [{"say": "Eve's payment is authorised. Then inventory times out when the saga tries to commit the stock.", "active": ["ord", "inv"], "bad": ["inv"], "packets": [{"from": "ord", "to": "inv", "label": "commit", "kind": "req"}, {"from": "inv", "to": "ord", "label": "timeout", "kind": "error"}], "state": {"title": "Order", "rows": {"status": "PENDING", "saga step": "PAYMENT_AUTHORIZED"}}}, {"say": "Money is already held and the stock is reserved, so cancelling now would be the wrong answer. The order stays PENDING and Eve gets 202: we are finishing your order.", "active": ["ord"], "packets": [{"from": "ord", "to": "gw", "label": "202 Accepted", "kind": "res"}]}, {"say": "Fifteen seconds later the recovery job, running on one replica only, finds the order waiting.", "active": ["rec", "ord"], "packets": [{"from": "rec", "to": "ord", "label": "resume stuck orders", "kind": "req"}]}, {"say": "Inventory is back. Recovery commits the stock, captures the payment and confirms the order, exactly where it stopped.", "ok": ["ord", "inv", "pay"], "packets": [{"from": "ord", "to": "inv", "label": "commit", "kind": "req"}, {"from": "ord", "to": "pay", "label": "capture", "kind": "req"}], "state": {"title": "Order", "rows": {"status": "CONFIRMED", "saga step": "COMPLETED"}}}]}, {"id": "crash", "title": "Crash in the middle", "summary": "Recovery moves back", "steps": [{"say": "order-service reserved stock for Finn and then the pod was killed before it could call payment.", "bad": ["ord"], "state": {"title": "Order", "rows": {"status": "PENDING", "saga step": "STOCK_RESERVED"}}}, {"say": "Thirty seconds later the recovery job finds the order still at STOCK_RESERVED.", "active": ["rec", "ord", "db"], "packets": [{"from": "rec", "to": "ord", "label": "resume", "kind": "req"}, {"from": "ord", "to": "db", "label": "SELECT stuck orders", "kind": "req"}]}, {"say": "No money was taken yet, so the safe direction is backwards: void any authorisation and release the stock.", "active": ["ord", "pay", "inv"], "packets": [{"from": "ord", "to": "pay", "label": "void", "kind": "req"}, {"from": "ord", "to": "inv", "label": "release", "kind": "req"}]}, {"say": "The order is cancelled as CHECKOUT_ABANDONED and an event tells the customer. Nothing is left hanging.", "ok": ["ord"], "state": {"title": "Order", "rows": {"status": "CANCELLED", "reason": "CHECKOUT_ABANDONED"}}, "packets": [{"from": "db", "to": "kafka", "label": "OrderCancelled", "kind": "event"}]}]}, {"id": "cancel", "title": "Customer cancels a confirmed order", "summary": "Refund, then return stock", "steps": [{"say": "Gus changes his mind and cancels a confirmed order.", "active": ["cust", "gw", "ord"], "packets": [{"from": "cust", "to": "gw", "label": "POST /orders/7/cancel", "kind": "req"}, {"from": "gw", "to": "ord", "label": "cancel", "kind": "req"}]}, {"say": "Only the owner or staff may do this. The order moves to CANCELLING, and that step is saved first.", "active": ["ord", "db"], "packets": [{"from": "ord", "to": "db", "label": "CANCELLING", "kind": "req"}], "state": {"title": "Order", "rows": {"status": "CANCELLING", "saga step": "REFUNDING"}}}, {"say": "The payment is refunded and the sold stock is returned to inventory.", "active": ["pay", "inv"], "packets": [{"from": "ord", "to": "pay", "label": "refund", "kind": "req"}, {"from": "ord", "to": "inv", "label": "return stock", "kind": "req"}]}, {"say": "The order is cancelled and OrderCancelled is published. If the refund had failed, the order would stay CANCELLING and recovery would retry it.", "ok": ["ord"], "packets": [{"from": "db", "to": "kafka", "label": "OrderCancelled", "kind": "event"}], "state": {"title": "Order", "rows": {"status": "CANCELLED", "reason": "CUSTOMER_REQUEST"}}}]}]};
+</script>
+<script>
+/*
+ * Walkthrough engine: animates a system diagram step by step.
+ * Data (window.WALKTHROUGH) = { title, subtitle, nodes[], edges[], scenarios[] }
+ *   node:     { id, label, kind, tech, x, y }          kind: client | edge | service | db | cache | queue | search | external | job
+ *   edge:     { from, to, dashed }
+ *   scenario: { id, title, summary, steps[] }
+ *   step:     { say, active[], ok[], bad[], dim[], packets[{from, to, label, kind}], state{title, rows{}}, log, badges[{node, text, tone}] }
+ *             packet kind: req | res | event | error
+ * Narration uses the Web Speech API (a female voice, preferring "Amy"); it is optional and remembered per browser.
+ */
+(function () {
+  'use strict';
+  const W = window.WALKTHROUGH;
+  const $ = s => document.querySelector(s);
+  const NS = 'http://www.w3.org/2000/svg';
+  const ICONS = { client: '👤', edge: '🛡', service: '⚙', db: '🛢', cache: '⚡', queue: '📨', search: '🔎', external: '🌐', job: '⏱', analytics: '📊', storage: '🗂' };
+  const NODE_W = 228, NODE_H = 78;
+  const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
+
+  const state = { scenario: 0, step: -1, playing: false, speed: +(store('wt-speed') || 1), narrate: store('wt-narrate') === 'on', timer: null, anim: [], prevRows: {} };
+  const nodesById = Object.fromEntries(W.nodes.map(n => [n.id, n]));
+
+  // ---------- diagram ----------
+  const svg = document.createElementNS(NS, 'svg');
+  const maxX = Math.max(...W.nodes.map(n => n.x)) + NODE_W / 2 + 20, maxY = Math.max(...W.nodes.map(n => n.y)) + NODE_H / 2 + 30;
+  svg.setAttribute('viewBox', `0 0 ${maxX} ${maxY}`);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', W.title + ' architecture diagram');
+  const gEdges = el('g'), gNodes = el('g'), gPkts = el('g');
+  svg.append(gEdges, gNodes, gPkts);
+  $('#stage').append(svg);
+
+  function el(tag, attrs = {}, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  const edgeEls = {};
+  for (const e of W.edges || []) {
+    const a = nodesById[e.from], b = nodesById[e.to];
+    if (!a || !b) { console.error('edge with unknown node', e); continue; }
+    const line = el('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'edge' + (e.dashed ? ' dashed' : '') });
+    gEdges.append(line);
+    edgeEls[e.from + '>' + e.to] = edgeEls[e.to + '>' + e.from] = line;
+  }
+  const nodeEls = {};
+  for (const n of W.nodes) {
+    const g = el('g', { class: 'node', transform: `translate(${n.x - NODE_W / 2},${n.y - NODE_H / 2})` });
+    g.append(el('rect', { width: NODE_W, height: NODE_H, rx: n.kind === 'db' || n.kind === 'cache' ? 18 : 12 }));
+    g.append(el("text", { x: 16, y: 48, class: "icon" }, ICONS[n.kind] || "■"));
+    g.append(el("text", { x: 56, y: 34 }, n.label));
+    if (n.tech) g.append(el("text", { x: 56, y: 57, class: "tech" }, n.tech));
+    const title = el('title', {}, `${n.label}${n.tech ? ' — ' + n.tech : ''}`);
+    g.append(title);
+    gNodes.append(g);
+    nodeEls[n.id] = g;
+  }
+
+  // ---------- scenario list ----------
+  W.scenarios.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.className = 'scn';
+    b.innerHTML = `${i + 1}. ${esc(s.title)}<small>${esc(s.summary || '')}</small>`;
+    b.onclick = () => { pause(); select(i); };
+    $('#scenarios').append(b);
+  });
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+  // ---------- rendering a step ----------
+  function scenario() { return W.scenarios[state.scenario]; }
+
+  function select(i) {
+    state.scenario = i;
+    state.step = -1;
+    state.prevRows = {};
+    document.querySelectorAll('.scn').forEach((b, j) => b.classList.toggle('on', j === i));
+    $('#log').innerHTML = '';
+    show(0);
+  }
+
+  function show(i) {
+    const steps = scenario().steps;
+    i = Math.max(0, Math.min(steps.length - 1, i));
+    if (i < state.step) {           // going back: rebuild the log up to this step
+      $('#log').innerHTML = '';
+      state.prevRows = {};
+      for (let k = 0; k < i; k++) appendLog(steps[k]);
+    }
+    state.step = i;
+    const st = steps[i];
+    clearAnimations();
+    for (const [id, g] of Object.entries(nodeEls)) {
+      g.classList.toggle('active', (st.active || []).includes(id));
+      g.classList.toggle('ok', (st.ok || []).includes(id));
+      g.classList.toggle('bad', (st.bad || []).includes(id));
+      g.classList.toggle('dim', (st.dim || []).includes(id));
+      g.querySelectorAll('.badge').forEach(b => b.remove());
+    }
+    Object.values(edgeEls).forEach(l => l.classList.remove('hot'));
+    for (const b of st.badges || []) badge(b);
+    $('#say').textContent = st.say;
+    renderState(currentState(steps, i));
+    appendLog(st);
+    $('#count').textContent = `Step ${i + 1} / ${steps.length}`;
+    $('#bar').style.width = `${((i + 1) / steps.length) * 100}%`;
+    animatePackets(st.packets || []);
+    speak(st.say);
+    if (state.playing) schedule();
+  }
+
+  function badge({ node, text, tone }) {
+    const g = nodeEls[node];
+    if (!g) return;
+    const color = { ok: 'var(--res)', bad: 'var(--err)', warn: 'var(--evt)' }[tone] || 'var(--accent)';
+    const w = Math.max(34, text.length * 8.5 + 18);
+    const b = el('g', { class: 'badge', transform: `translate(${NODE_W - w + 8},-10)` });
+    b.append(el('rect', { width: w, height: 24, rx: 12, style: `fill:${color}` }), el('text', { x: w / 2, y: 17, 'text-anchor': 'middle' }, text));
+    g.append(b);
+  }
+
+  // the most recent state at or before step i, so the panel keeps showing the latest known values
+  function currentState(steps, i) {
+    for (let k = i; k >= 0; k--) if (steps[k].state) return steps[k].state;
+    return null;
+  }
+
+  function renderState(s) {
+    const box = $('#state'), card = box.closest('.card');
+    if (!s) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    $('#stateTitle').textContent = s.title || 'State';
+    box.innerHTML = Object.entries(s.rows || {}).map(([k, v]) => {
+      const changed = state.prevRows[k] !== undefined && state.prevRows[k] !== String(v);
+      return `<tr class="${changed ? 'changed' : ''}"><td>${esc(k)}</td><td>${esc(v)}</td></tr>`;
+    }).join('');
+    state.prevRows = Object.fromEntries(Object.entries(s.rows || {}).map(([k, v]) => [k, String(v)]));
+  }
+
+  function appendLog(st) {
+    const lines = [];
+    for (const p of st.packets || []) lines.push([p.kind || 'req', `${nodesById[p.from]?.label} → ${nodesById[p.to]?.label}: ${p.label}`]);
+    if (st.log) lines.push(['', st.log]);
+    for (const [cls, text] of lines) {
+      const li = document.createElement('li');
+      li.className = cls;
+      li.textContent = text;
+      $('#log').append(li);
+    }
+    $('#log').scrollTop = $('#log').scrollHeight;
+  }
+
+  // ---------- packets ----------
+  function clearAnimations() { state.anim.forEach(cancelAnimationFrame); state.anim = []; gPkts.innerHTML = ''; }
+
+  function animatePackets(packets) {
+    const dur = 900 / state.speed;
+    packets.forEach((p, k) => {
+      const a = nodesById[p.from], b = nodesById[p.to];
+      if (!a || !b) { console.error('packet with unknown node', p); return; }
+      const line = edgeEls[p.from + '>' + p.to];
+      if (line) line.classList.add('hot');
+      const color = { req: 'var(--req)', res: 'var(--res)', event: 'var(--evt)', error: 'var(--err)' }[p.kind || 'req'];
+      const g = el('g', { class: 'pkt', opacity: 0 });
+      g.append(el('circle', { r: 10, style: `fill:${color}` }), el('text', { x: 14, y: -12 }, p.label));
+      gPkts.append(g);
+      const start = performance.now() + k * dur * 0.6;
+      const frame = now => {
+        const t = Math.min(1, Math.max(0, (now - start) / dur));
+        const e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        g.setAttribute('transform', `translate(${a.x + (b.x - a.x) * e},${a.y + (b.y - a.y) * e})`);
+        g.setAttribute('opacity', now < start ? 0 : 1);
+        if (t < 1) state.anim.push(requestAnimationFrame(frame));
+      };
+      state.anim.push(requestAnimationFrame(frame));
+    });
+  }
+
+  // ---------- narration ----------
+  let voice = null;
+  function pickVoice() {
+    const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang));
+    const female = /(amy|samantha|karen|serena|victoria|moira|tessa|fiona|zira|aria|jenny|libby|sonia|natasha|hazel|susan|female)/i;
+    voice = vs.find(v => /amy/i.test(v.name)) || vs.find(v => female.test(v.name)) || vs[0] || null;
+  }
+  if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+  let speaking = false;
+  function speak(text) {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    speaking = false;
+    if (!state.narrate) return;
+    const u = new SpeechSynthesisUtterance(text);
+    if (voice) u.voice = voice;
+    u.rate = Math.min(1.6, 0.95 * state.speed);
+    u.onend = () => { speaking = false; if (state.playing) schedule(true); };
+    speaking = true;
+    speechSynthesis.speak(u);
+  }
+
+  function setNarration(on) {
+    state.narrate = on;
+    store('wt-narrate', on ? 'on' : 'off');
+    const b = $('#narrate');
+    b.classList.toggle('on', on);
+    b.textContent = on ? '🔊 Narration on' : '🔇 Narration off';
+    b.setAttribute('aria-pressed', on);
+    if (on) speak($('#say').textContent); else if ('speechSynthesis' in window) speechSynthesis.cancel();
+  }
+
+  // ---------- playback ----------
+  function schedule(afterSpeech) {
+    clearTimeout(state.timer);
+    if (state.narrate && speaking && !afterSpeech) return;     // wait for the sentence to finish
+    const delay = state.narrate ? 600 : Math.max(1800, 2600 / state.speed);
+    state.timer = setTimeout(next, delay);
+  }
+
+  function next() {
+    const steps = scenario().steps;
+    if (state.step < steps.length - 1) show(state.step + 1);
+    else if (state.scenario < W.scenarios.length - 1 && $('#autoNext').checked) select(state.scenario + 1);
+    else pause();
+  }
+
+  function play() { state.playing = true; $('#play').textContent = '⏸ Pause'; schedule(); }
+  function pause() { state.playing = false; clearTimeout(state.timer); $('#play').textContent = '▶ Play'; }
+
+  $('#play').onclick = () => (state.playing ? pause() : play());
+  $('#prev').onclick = () => { pause(); show(state.step - 1); };
+  $('#next').onclick = () => { pause(); show(state.step + 1); };
+  $('#restart').onclick = () => { pause(); select(state.scenario); };
+  $('#narrate').onclick = () => setNarration(!state.narrate);
+  $('#speed').value = String(state.speed);
+  $('#speed').onchange = e => { state.speed = +e.target.value; store('wt-speed', state.speed); };
+  $('#progress').onclick = e => {
+    const r = e.currentTarget.getBoundingClientRect();
+    pause();
+    show(Math.floor(((e.clientX - r.left) / r.width) * scenario().steps.length));
+  };
+
+  // ---------- themes ----------
+  function setTheme(t) {
+    document.documentElement.dataset.theme = t;
+    store('sd-theme', t);
+    document.querySelectorAll('[data-set-theme]').forEach(b => b.classList.toggle('on', b.dataset.setTheme === t));
+  }
+  document.querySelectorAll('[data-set-theme]').forEach(b => (b.onclick = () => setTheme(b.dataset.setTheme)));
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+    if (e.key === ' ') { e.preventDefault(); state.playing ? pause() : play(); }
+    else if (e.key === 'ArrowRight') { pause(); show(state.step + 1); }
+    else if (e.key === 'ArrowLeft') { pause(); show(state.step - 1); }
+    else if (e.key.toLowerCase() === 'n') setNarration(!state.narrate);
+    else if (e.key.toLowerCase() === 't') {
+      const order = ['light', 'medium', 'dark'];
+      setTheme(order[(order.indexOf(document.documentElement.dataset.theme) + 1) % 3]);
+    }
+  });
+
+  // ---------- start ----------
+  $('#title').textContent = W.title;
+  $('#subtitle').textContent = W.subtitle || '';
+  document.title = W.title + ' — walkthrough';
+  setTheme(store('sd-theme') || 'dark');
+  setNarration(state.narrate);
+  const hash = location.hash.replace('#', '');
+  const start = Math.max(0, W.scenarios.findIndex(s => s.id === hash));
+  select(start);
+
+  // test hook: lets automated checks walk every step
+  window.__walkthrough = { scenarios: W.scenarios.length, steps: i => W.scenarios[i].steps.length, select, show };
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>order-service: low-level design</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="order-service-low-level-design">order-service: low-level design<a class="headerlink" href="#order-service-low-level-design" title="Permanent link">#</a></h1>
+<p>Part of the <a href="../../../design/README.html">e-commerce system design</a>. Animated version: <a href="walkthrough/index.html">walkthrough</a>.</p>
+<h2 id="1-responsibilities">1. Responsibilities<a class="headerlink" href="#1-responsibilities" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Does</th>
+<th>Does not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Turn a priced cart into an order and run the checkout saga</td>
+<td>Price products (catalog) or keep carts (cart)</td>
+</tr>
+<tr>
+<td>Guarantee one order per idempotency key</td>
+<td>Hold stock (inventory) or talk to the payment provider (payment)</td>
+</tr>
+<tr>
+<td>Compensate every failure: release, void, return, refund</td>
+<td>Send emails (notification reacts to its events)</td>
+</tr>
+<tr>
+<td>Cancel confirmed orders on request</td>
+<td>Ship orders (future fulfilment service)</td>
+</tr>
+<tr>
+<td>Finish interrupted sagas</td>
+<td></td>
+</tr>
+<tr>
+<td>Serve order history</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-guarantees">2. Guarantees<a class="headerlink" href="#2-guarantees" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>One order per request</strong></td>
+<td><code>idempotency_keys (customer_id, key)</code> primary key; a repeat returns the stored order with no downstream calls</td>
+</tr>
+<tr>
+<td><strong>No charge without an order, no order without a charge</strong></td>
+<td>Saga with explicit compensations; payment is captured only after stock is committed</td>
+</tr>
+<tr>
+<td><strong>No lost progress</strong></td>
+<td>Each step is persisted (<code>saga_step</code>) before the next call; the recovery job resumes from it</td>
+</tr>
+<tr>
+<td><strong>Never charged for a cancelled order</strong></td>
+<td>An unknown payment outcome is voided, and payment-service voids a late authorisation</td>
+</tr>
+<tr>
+<td><strong>Events if and only if the change commits</strong></td>
+<td>Events go into the outbox in the same transaction as the order</td>
+</tr>
+<tr>
+<td><strong>No lost updates</strong></td>
+<td>Optimistic locking on <code>version</code></td>
+</tr>
+<tr>
+<td><strong>Fast lookups at any size</strong></td>
+<td>Monthly partitions; the order id (UUIDv7) gives the partition directly</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-module-diagram">3. Module diagram<a class="headerlink" href="#3-module-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Module diagram diagram" src="diagrams/order-service--module-diagram.light.svg" data-light="diagrams/order-service--module-diagram.light.svg" data-dark="diagrams/order-service--module-diagram.dark.svg" loading="lazy"></figure></p>
+<p>Dependencies point inwards. <code>domain</code> uses only <code>java.*</code>; <code>application</code> uses only <code>domain</code>; adapters never depend on each other.
+<code>HexagonalArchitectureTest</code> enforces all three rules.</p>
+<h2 id="4-interaction-diagram">4. Interaction diagram<a class="headerlink" href="#4-interaction-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Interaction diagram diagram" src="diagrams/order-service--interaction-diagram.light.svg" data-light="diagrams/order-service--interaction-diagram.light.svg" data-dark="diagrams/order-service--interaction-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="5-class-diagram">5. Class diagram<a class="headerlink" href="#5-class-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Class diagram diagram" src="diagrams/order-service--class-diagram.light.svg" data-light="diagrams/order-service--class-diagram.light.svg" data-dark="diagrams/order-service--class-diagram.dark.svg" loading="lazy"></figure></p>
+<p>The results are <strong>sealed</strong> types, so every <code>switch</code> in the saga is exhaustive: adding an outcome without handling it fails to compile.</p>
+<h2 id="6-checkout-sequence">6. Checkout: sequence<a class="headerlink" href="#6-checkout-sequence" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Checkout: sequence diagram" src="diagrams/order-service--checkout-sequence.light.svg" data-light="diagrams/order-service--checkout-sequence.light.svg" data-dark="diagrams/order-service--checkout-sequence.dark.svg" loading="lazy"></figure></p>
+<p>The failure paths are drawn in the system <a href="../../../design/05-sequence-diagrams.html">sequence diagrams</a> (§5.6 to §5.9).</p>
+<table>
+<thead>
+<tr>
+<th>Outcome</th>
+<th>HTTP</th>
+<th>What was undone</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CONFIRMED</td>
+<td>201 (200 on replay)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>IN_PROGRESS</td>
+<td>202 + <code>Location</code></td>
+<td>Nothing: money is authorised, recovery finishes the order</td>
+</tr>
+<tr>
+<td>OUT_OF_STOCK</td>
+<td>409</td>
+<td>Nothing was reserved</td>
+</tr>
+<tr>
+<td>PAYMENT_DECLINED</td>
+<td>402</td>
+<td>Stock released</td>
+</tr>
+<tr>
+<td>PAYMENT_UNKNOWN</td>
+<td>504</td>
+<td>Payment voided, stock released</td>
+</tr>
+<tr>
+<td>DEPENDENCY_UNAVAILABLE</td>
+<td>503 + <code>Retry-After</code></td>
+<td>Stock released (best effort)</td>
+</tr>
+<tr>
+<td>FAILED</td>
+<td>502</td>
+<td>Payment voided, stock returned</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-state-diagrams">7. State diagrams<a class="headerlink" href="#7-state-diagrams" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="State diagrams diagram" src="diagrams/order-service--state-diagrams.light.svg" data-light="diagrams/order-service--state-diagrams.light.svg" data-dark="diagrams/order-service--state-diagrams.dark.svg" loading="lazy"></figure></p>
+<p>Saga steps: <code>STARTED → STOCK_RESERVED → PAYMENT_AUTHORIZED → STOCK_COMMITTED → PAYMENT_CAPTURED → COMPLETED</code>, with
+<code>COMPENSATING → COMPENSATED</code> on failure and <code>REFUNDING</code> while cancelling.</p>
+<table>
+<thead>
+<tr>
+<th>Recovery from step</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>STARTED, STOCK_RESERVED, COMPENSATING</td>
+<td>Void any authorisation, release stock, cancel (<code>CHECKOUT_ABANDONED</code>)</td>
+</tr>
+<tr>
+<td>PAYMENT_AUTHORIZED, STOCK_COMMITTED, PAYMENT_CAPTURED</td>
+<td>Continue forward: commit, capture, confirm</td>
+</tr>
+<tr>
+<td>REFUNDING</td>
+<td>Refund, return stock, cancel</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-data-model">8. Data model<a class="headerlink" href="#8-data-model" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Data model diagram" src="diagrams/order-service--data-model.light.svg" data-light="diagrams/order-service--data-model.light.svg" data-dark="diagrams/order-service--data-model.dark.svg" loading="lazy"></figure></p>
+<p>The DDL, including <code>ensure_order_partitions(months_ahead)</code>, is in
+<a href="../src/main/resources/db/migration/V1__order_schema.sql"><code>V1__order_schema.sql</code></a>.</p>
+<p>Indexes:
+* <code>(customer_id, created_at desc, id desc)</code> for keyset-paginated history.
+* A partial index on <code>updated_at</code> for in-flight orders, used by recovery.
+* A partial index on unpublished outbox rows.</p>
+<h2 id="9-background-work">9. Background work<a class="headerlink" href="#9-background-work" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Runs</th>
+<th>Interval</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Outbox relay</td>
+<td>every replica (<code>SKIP LOCKED</code>)</td>
+<td>100 ms</td>
+<td>Publishes order events to <code>order.events</code>, keyed by order id</td>
+</tr>
+<tr>
+<td>Saga recovery</td>
+<td>one replica (ShedLock)</td>
+<td>15 s</td>
+<td>Resumes orders <code>PENDING</code> or <code>CANCELLING</code> for more than 30 s</td>
+</tr>
+<tr>
+<td>Partition maintenance</td>
+<td>one replica (ShedLock), and at start-up</td>
+<td>daily 02:07</td>
+<td>Creates monthly partitions three months ahead</td>
+</tr>
+<tr>
+<td>Outbox purge</td>
+<td>one replica</td>
+<td>daily</td>
+<td>Deletes published rows older than 7 days</td>
+</tr>
+</tbody>
+</table>
+<h2 id="10-scaling-and-performance">10. Scaling and performance<a class="headerlink" href="#10-scaling-and-performance" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Pods:</strong> stateless, 3–20 replicas on CPU. Each has 30 pooled connections behind PgBouncer.</li>
+<li><strong>Virtual threads:</strong> a checkout spends most of its time waiting on three downstream calls, so a pod handles thousands of
+  concurrent checkouts.</li>
+<li><strong>Writes per checkout:</strong> about 7 short transactions (insert, 4 step updates, confirm, outbox), each a few milliseconds. No
+  transaction spans a network call.</li>
+<li><strong>Partitioning:</strong> keeps indexes small and makes archiving a cheap <code>DETACH PARTITION</code>. Beyond one primary, Citus can shard
+  orders by <code>customer_id</code> (SPEC §13.1).</li>
+</ul>
+<h2 id="11-failure-handling">11. Failure handling<a class="headerlink" href="#11-failure-handling" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cart-service down</td>
+<td>503 <code>DEPENDENCY_UNAVAILABLE</code>; no order created</td>
+</tr>
+<tr>
+<td>inventory-service down at reserve</td>
+<td>Release attempted, order cancelled, 503</td>
+</tr>
+<tr>
+<td>payment-service slow (&gt; 2 s)</td>
+<td>Treated as unknown: void requested, stock released, 504, customer not charged</td>
+</tr>
+<tr>
+<td>inventory or payment down after authorisation</td>
+<td>Order stays <code>PENDING</code>, 202 returned; recovery completes it within about 30 s once the dependency is back</td>
+</tr>
+<tr>
+<td>Crash at any step</td>
+<td>Recovery resumes from the recorded step</td>
+</tr>
+<tr>
+<td>Two requests with the same key</td>
+<td>The second sees the key (or loses the insert race) and returns the first order</td>
+</tr>
+</tbody>
+</table>
+<h2 id="12-tests">12. Tests<a class="headerlink" href="#12-tests" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Kind</th>
+<th>Proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OrderTest</code></td>
+<td>domain</td>
+<td>Totals, events, idempotent cancel, cancellation rules, money rules</td>
+</tr>
+<tr>
+<td><code>CheckoutSagaTest</code></td>
+<td>application with test doubles</td>
+<td>Happy path, idempotent replay, out of stock, declined, unknown, outages before and after authorisation, expired reservation, failed capture, recovery, customer cancellation, ownership, millisecond ids</td>
+</tr>
+<tr>
+<td><code>UuidV7Test</code></td>
+<td>adapter unit</td>
+<td>Version, variant, embedded time, ordering</td>
+</tr>
+<tr>
+<td><code>HexagonalArchitectureTest</code></td>
+<td>ArchUnit</td>
+<td>Layering and adapter independence</td>
+</tr>
+<tr>
+<td><code>OrderContainersIT</code></td>
+<td>PostgreSQL + Kafka + real HTTP</td>
+<td>End-to-end checkout, monthly partition used, replay, 402 and 409 mappings, events on Kafka, private paginated history, cancellation, validation</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

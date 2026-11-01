@@ -1,0 +1,28 @@
+sequenceDiagram
+    autonumber
+    participant C as Customer (via gateway)
+    participant OC as OrderController
+    participant S as CheckoutSaga
+    participant R as OrderRepository
+    participant CA as cart-service
+    participant I as inventory-service
+    participant P as payment-service
+    C->>OC: POST /orders (Idempotency-Key, JWT)
+    OC->>S: place(customer, email, key, token)
+    S->>R: findByIdempotencyKey
+    R-->>S: none
+    S->>CA: checkout snapshot
+    CA-->>S: priced lines
+    S->>R: insert order PENDING + key + OrderPlaced (one transaction)
+    S->>I: reserve
+    I-->>S: Reserved
+    S->>R: step STOCK_RESERVED
+    S->>P: authorize (2 s)
+    P-->>S: Approved
+    S->>R: step PAYMENT_AUTHORIZED
+    S->>I: commit
+    S->>R: step STOCK_COMMITTED
+    S->>P: capture
+    S->>R: CONFIRMED + OrderConfirmed (one transaction)
+    S-->>OC: CONFIRMED
+    OC-->>C: 201 Created

@@ -1,0 +1,71 @@
+classDiagram
+    direction LR
+    class CheckoutSaga {
+      +place(PlaceOrderCommand) CheckoutResult
+      +resume(Order)
+      +cancelByCustomer(UUID orderId, UUID requestedBy, boolean staff) Order
+      -runForward(Order, String token) CheckoutResult
+      -continueAfterAuthorization(Order) CheckoutResult
+      -compensateBeforeCapture(Order, CancelReason, boolean void)
+      -finishCancellation(Order) Order
+    }
+    class CheckoutResult {
+      <<record>>
+      +Order order
+      +Outcome outcome
+      +String detail
+      +boolean replay
+    }
+    class Outcome {
+      <<enumeration>>
+      CONFIRMED
+      IN_PROGRESS
+      OUT_OF_STOCK
+      PAYMENT_DECLINED
+      PAYMENT_UNKNOWN
+      DEPENDENCY_UNAVAILABLE
+      FAILED
+    }
+    class Order {
+      <<aggregate root>>
+      +place(id, createdAt, customerId, email, lines) Order$
+      +recordStep(SagaStep, Instant)
+      +confirm(Instant)
+      +cancel(CancelReason, Instant)
+      +requestCancellation(Instant)
+      +pullEvents() List~OrderEvent~
+    }
+    class InventoryPort {
+      <<port>>
+      +reserve(UUID, List~OrderLine~) Reservation
+      +commit(UUID) Step
+      +release(UUID) Step
+      +returnStock(UUID) Step
+    }
+    class PaymentPort {
+      <<port>>
+      +authorize(UUID, Money, String) Result
+      +capture(UUID) Result
+      +voidAuthorization(UUID) Result
+      +refund(UUID) Result
+    }
+    class Result {
+      <<sealed>>
+      Approved
+      Declined(reason)
+      Unknown(reason)
+      Unavailable(reason)
+    }
+    class Reservation {
+      <<sealed>>
+      Reserved
+      OutOfStock(sku)
+      Unavailable(reason)
+    }
+    CheckoutSaga --> InventoryPort
+    CheckoutSaga --> PaymentPort
+    CheckoutSaga ..> Order
+    CheckoutSaga ..> CheckoutResult
+    CheckoutResult --> Outcome
+    PaymentPort ..> Result
+    InventoryPort ..> Reservation

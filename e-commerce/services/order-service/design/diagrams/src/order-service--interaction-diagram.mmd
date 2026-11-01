@@ -1,0 +1,13 @@
+flowchart LR
+    GW[api-gateway] -- "POST /api/v1/orders<br/>GET /api/v1/orders[/id]<br/>POST /api/v1/orders/id/cancel" --> ORD((order-service))
+    ORD -- "1 GET /internal/carts/{c}/checkout-snapshot" --> CART[cart-service]
+    ORD -- "2 POST /internal/reservations<br/>4 …/commit · release · return" --> INV[inventory-service]
+    ORD -- "3 POST /internal/payments/authorize<br/>5 …/capture · void · refund" --> PAY[payment-service]
+    ORD -- "orders, lines, keys, outbox" --> DB[(PostgreSQL orders)]
+    ORD -- "OrderPlaced · OrderConfirmed · OrderCancelled" --> K{{Kafka order.events}}
+    K --> CART2[cart-service<br/>clears cart]
+    K --> INV2[inventory-service<br/>safety-net release]
+    K --> REV[review-service<br/>verified purchases]
+    K --> RECO[recommendation-service]
+    K --> NOTIF[notification-service<br/>emails]
+    K --> AN[analytics]
