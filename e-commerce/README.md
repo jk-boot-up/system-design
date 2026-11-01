@@ -36,9 +36,10 @@ e-commerce/
 ├─ deploy/
 │  ├─ compose/                   local stack: data stores, brokers, Keycloak, observability, all services
 │  └─ k8s/overlays/              dev / staging / prod overlays composing every service's k8s base
-└─ tests/
-   ├─ e2e/                       end-to-end tests against the running stack
-   └─ performance/               Gatling simulations with p99 budgets
+├─ tests/
+│  ├─ e2e/                       end-to-end tests against the running stack
+│  └─ performance/               Gatling simulations with p99 budgets
+└─ tools/                        this system's documentation pipeline (diagrams → SVG, Markdown → HTML)
 ```
 
 ## Services
@@ -67,8 +68,17 @@ cd services/notification-service && go test ./...                # Go
 cd services/recommendation-service && pip install -e '.[dev]' && pytest   # Python
 ```
 
+## Documentation
+
+Every Markdown file has an HTML counterpart with light, medium and dark themes. Diagrams are SVG images (light and dark) rendered
+from the editable sources in each `docs/diagrams/src` folder.
+
+```bash
+tools/docs.sh                 # extract new diagram sources, render changed diagrams, regenerate HTML
+```
+
 ## Run everything locally
 
 ```bash
-cd deploy/compose && docker compose up -d     # data stores, brokers, Keycloak, observability and all services
+cd deploy/compose && docker compose up -d     # project name "e-commerce"; host ports 8080–8099 for services, see deploy/compose/README.md
 ```

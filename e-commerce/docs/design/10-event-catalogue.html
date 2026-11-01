@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10. Event catalogue</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">E-commerce platform</a>
+  <span class="src">10-event-catalogue.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="10-event-catalogue">10. Event catalogue<a class="headerlink" href="#10-event-catalogue" title="Permanent link">#</a></h1>
+<h2 id="envelope">Envelope<a class="headerlink" href="#envelope" title="Permanent link">#</a></h2>
+<p>Every event, in every topic and every language, uses the same envelope:</p>
+<pre class="highlight"><code class="language-json">{
+  "eventId": "0193a1b2-…",          // UUIDv7, unique; consumers dedupe on it
+  "type": "order.OrderConfirmed",    // &lt;context&gt;.&lt;EventName&gt;
+  "version": 1,                      // schema version of the payload
+  "occurredAt": "2026-11-01T10:15:31.204Z",
+  "aggregateId": "0193a1b0-…",       // also the Kafka record key
+  "traceparent": "00-4bf92f…-00f067…-01",
+  "payload": { }
+}</code></pre>
+<ul>
+<li><strong>Kafka headers</strong> repeat <code>eventId</code>, <code>type</code> and <code>traceparent</code>, so tools can filter without parsing the JSON.</li>
+<li><strong>Schemas:</strong> each producer owns its JSON Schemas in <code>services/&lt;producer&gt;/contracts/events/&lt;type&gt;.v&lt;version&gt;.json</code>.</li>
+<li><strong>Consumers</strong> keep their own copy of the schemas they read in <code>services/&lt;consumer&gt;/contracts/consumed/</code> and test against it.</li>
+</ul>
+<h2 id="topics">Topics<a class="headerlink" href="#topics" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Producer</th>
+<th>Partitions / RF</th>
+<th>Key</th>
+<th>Retention</th>
+<th>Consumers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>catalog.events</code></td>
+<td>catalog-service</td>
+<td>12 / 3</td>
+<td>product id</td>
+<td>7 days (+ compacted mirror <code>catalog.products</code>)</td>
+<td>search-service</td>
+</tr>
+<tr>
+<td><code>inventory.events</code></td>
+<td>inventory-service</td>
+<td>12 / 3</td>
+<td>SKU</td>
+<td>7 days</td>
+<td>search-service</td>
+</tr>
+<tr>
+<td><code>order.events</code></td>
+<td>order-service</td>
+<td>12 / 3</td>
+<td>order id</td>
+<td>7 days</td>
+<td>cart, review, recommendation, notification, inventory (cancellations), analytics</td>
+</tr>
+<tr>
+<td><code>payment.events</code></td>
+<td>payment-service</td>
+<td>12 / 3</td>
+<td>order id</td>
+<td>7 days</td>
+<td>analytics</td>
+</tr>
+<tr>
+<td><code>review.events</code></td>
+<td>review-service</td>
+<td>6 / 3</td>
+<td>SKU</td>
+<td>7 days</td>
+<td>(future: catalog rating cache)</td>
+</tr>
+<tr>
+<td><code>&lt;topic&gt;.dlq</code></td>
+<td>any consumer</td>
+<td>3 / 3</td>
+<td>original key</td>
+<td>30 days</td>
+<td>operators (replay tool)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="events">Events<a class="headerlink" href="#events" title="Permanent link">#</a></h2>
+<h3 id="catalogproductchanged-v1">catalog.ProductChanged (v1)<a class="headerlink" href="#catalogproductchanged-v1" title="Permanent link">#</a></h3>
+<p>Published on every create, update, activation, archive or image change. It carries the full product (event-carried state transfer),
+so consumers never call catalog-service back.</p>
+<pre class="highlight"><code class="language-json">{ "productId": "0193…", "sku": "SKU-1001", "name": "Trail Runner 2", "description": "…",
+  "categorySlug": "running-shoes", "brand": "Acme", "price": {"amount": "89.90", "currency": "EUR"},
+  "attributes": {"size": "42"}, "status": "ACTIVE", "imageKeys": ["products/0193…/a.webp"], "catalogVersion": 3 }</code></pre>
+<h3 id="inventorystockchanged-v1">inventory.StockChanged (v1)<a class="headerlink" href="#inventorystockchanged-v1" title="Permanent link">#</a></h3>
+<p>Published when available stock for a SKU changes: reserve, release, expire, return or restock. It is coalesced: at most one per SKU per
+transaction.</p>
+<pre class="highlight"><code class="language-json">{ "sku": "SKU-1001", "available": 17, "inStock": true }</code></pre>
+<h3 id="orderorderplaced-v1">order.OrderPlaced (v1)<a class="headerlink" href="#orderorderplaced-v1" title="Permanent link">#</a></h3>
+<pre class="highlight"><code class="language-json">{ "orderId": "0193…", "customerId": "0193…", "total": {"amount": "179.80", "currency": "EUR"},
+  "lines": [{"sku": "SKU-1001", "quantity": 2, "unitPrice": {"amount": "89.90", "currency": "EUR"}}] }</code></pre>
+<h3 id="orderorderconfirmed-v1">order.OrderConfirmed (v1)<a class="headerlink" href="#orderorderconfirmed-v1" title="Permanent link">#</a></h3>
+<pre class="highlight"><code class="language-json">{ "orderId": "0193…", "customerId": "0193…", "customerEmail": "ada@example.com",
+  "total": {"amount": "179.80", "currency": "EUR"},
+  "lines": [{"sku": "SKU-1001", "productName": "Trail Runner 2", "quantity": 2, "unitPrice": {"amount": "89.90", "currency": "EUR"}}] }</code></pre>
+<h3 id="orderordercancelled-v1">order.OrderCancelled (v1)<a class="headerlink" href="#orderordercancelled-v1" title="Permanent link">#</a></h3>
+<pre class="highlight"><code class="language-json">{ "orderId": "0193…", "customerId": "0193…", "customerEmail": "ada@example.com",
+  "reason": "PAYMENT_DECLINED", "total": {"amount": "179.80", "currency": "EUR"} }</code></pre>
+<h3 id="paymentpaymentcaptured-paymentfailed-paymentrefunded-v1">payment.PaymentCaptured / PaymentFailed / PaymentRefunded (v1)<a class="headerlink" href="#paymentpaymentcaptured-paymentfailed-paymentrefunded-v1" title="Permanent link">#</a></h3>
+<pre class="highlight"><code class="language-json">{ "paymentId": "0193…", "orderId": "0193…", "amount": {"amount": "179.80", "currency": "EUR"},
+  "status": "CAPTURED", "reason": null }</code></pre>
+<h3 id="reviewreviewposted-v1">review.ReviewPosted (v1)<a class="headerlink" href="#reviewreviewposted-v1" title="Permanent link">#</a></h3>
+<pre class="highlight"><code class="language-json">{ "sku": "SKU-1001", "reviewId": "0193…", "rating": 5, "verified": true }</code></pre>
+<h2 id="who-consumes-what">Who consumes what<a class="headerlink" href="#who-consumes-what" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Who consumes what diagram" src="../diagrams/event-catalogue--who-consumes-what.light.svg" data-light="../diagrams/event-catalogue--who-consumes-what.light.svg" data-dark="../diagrams/event-catalogue--who-consumes-what.dark.svg" loading="lazy"></figure></p>
+<h2 id="evolution-rules">Evolution rules<a class="headerlink" href="#evolution-rules" title="Permanent link">#</a></h2>
+<ol>
+<li><strong>Additive within a version:</strong> new optional fields only. Consumers must ignore unknown fields (tolerant reader).</li>
+<li><strong>Breaking change:</strong> publish <code>version: 2</code> beside version 1 until every consumer has moved, then retire version 1.</li>
+<li><strong>Order:</strong> ordering is guaranteed per key (aggregate) only. Consumers never assume order across aggregates.</li>
+<li><strong>Duplicates:</strong> delivery is at-least-once. Every consumer is idempotent on <code>eventId</code>.</li>
+<li><strong>Freshness of state:</strong> for state-carrying events, consumers keep the highest <code>catalogVersion</code> (or aggregate version) they have seen and drop older ones.</li>
+</ol>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

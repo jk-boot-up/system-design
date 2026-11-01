@@ -37,7 +37,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </head>
 <body>
 <header>
-  <a class="home" href="../README.html">System design</a>
+  <a class="home" href="README.html">E-commerce platform</a>
   <span class="src">README.md</span>
   <div class="themes" role="group" aria-label="Theme">
     <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
@@ -97,9 +97,10 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 ├─ deploy/
 │  ├─ compose/                   local stack: data stores, brokers, Keycloak, observability, all services
 │  └─ k8s/overlays/              dev / staging / prod overlays composing every service's k8s base
-└─ tests/
-   ├─ e2e/                       end-to-end tests against the running stack
-   └─ performance/               Gatling simulations with p99 budgets</code></pre>
+├─ tests/
+│  ├─ e2e/                       end-to-end tests against the running stack
+│  └─ performance/               Gatling simulations with p99 budgets
+└─ tools/                        this system's documentation pipeline (diagrams → SVG, Markdown → HTML)</code></pre>
 <h2 id="services">Services<a class="headerlink" href="#services" title="Permanent link">#</a></h2>
 <table>
 <thead>
@@ -184,8 +185,12 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 <pre class="highlight"><code class="language-bash">cd services/order-service &amp;&amp; ./gradlew build                     # Java
 cd services/notification-service &amp;&amp; go test ./...                # Go
 cd services/recommendation-service &amp;&amp; pip install -e '.[dev]' &amp;&amp; pytest   # Python</code></pre>
+<h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">#</a></h2>
+<p>Every Markdown file has an HTML counterpart with light, medium and dark themes. Diagrams are SVG images (light and dark) rendered
+from the editable sources in each <code>docs/diagrams/src</code> folder.</p>
+<pre class="highlight"><code class="language-bash">tools/docs.sh                 # extract new diagram sources, render changed diagrams, regenerate HTML</code></pre>
 <h2 id="run-everything-locally">Run everything locally<a class="headerlink" href="#run-everything-locally" title="Permanent link">#</a></h2>
-<pre class="highlight"><code class="language-bash">cd deploy/compose &amp;&amp; docker compose up -d     # data stores, brokers, Keycloak, observability and all services</code></pre>
+<pre class="highlight"><code class="language-bash">cd deploy/compose &amp;&amp; docker compose up -d     # project name "e-commerce"; host ports 8080–8099 for services, see deploy/compose/README.md</code></pre>
 </main>
 <script>
 function setTheme(t) {

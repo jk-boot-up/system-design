@@ -7,7 +7,7 @@ variant when the reader uses a dark colour scheme. <docs> is the nearest enclosi
 "docs", or a "docs" folder next to the Markdown file, so every project keeps its own diagrams.
 Run tools/diagrams (npm run render) afterwards to produce the images.
 
-Usage: python3 tools/extract_diagrams.py
+Usage: python3 tools/extract_diagrams.py [path ...]   (default: the whole system folder)
 """
 import os
 import re
@@ -73,8 +73,10 @@ def process(md_path: Path) -> int:
 
 
 def main() -> int:
+    targets = [Path(a).resolve() for a in sys.argv[1:]] or [ROOT]
     total = 0
-    for path in sorted(ROOT.rglob("*.md")):
+    files = sorted({p for t in targets for p in ([t] if t.is_file() else t.rglob("*.md"))})
+    for path in files:
         if any(p in SKIP_DIRS for p in path.relative_to(ROOT).parts):
             continue
         total += process(path)

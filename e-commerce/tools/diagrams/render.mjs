@@ -1,4 +1,4 @@
-// Renders every **/docs/diagrams/src/<name>.mmd in the repository to ../<name>.light.svg and ../<name>.dark.svg.
+// Renders every **/docs/diagrams/src/<name>.mmd in this system to ../<name>.light.svg and ../<name>.dark.svg.
 // Only diagrams whose source is newer than their images are re-rendered (pass --all to force).
 //
 //   cd tools/diagrams && npm install && npm run render
@@ -16,6 +16,8 @@ import svgoConfig from './svgo.config.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, '../..');
 const force = process.argv.includes('--all');
+// optional paths limit rendering to those folders (e.g. one system)
+const roots = process.argv.slice(2).filter(a => !a.startsWith('--')).map(a => resolve(process.cwd(), a));
 
 const themes = {
   light: { theme: 'default', themeVariables: { fontFamily: 'Inter, Segoe UI, Roboto, sans-serif' } },
@@ -37,6 +39,7 @@ const mtime = async p => { try { return (await stat(p)).mtimeMs; } catch { retur
 
 // every docs/diagrams/src folder in the repository, skipping dependency and build folders
 async function findSourceDirs(dir, found = []) {
+  if (!(await stat(dir)).isDirectory()) return found;
   for (const e of await readdir(dir, { withFileTypes: true })) {
     if (!e.isDirectory() || ['node_modules', '.git', 'build', '.gradle', '.venv'].includes(e.name)) continue;
     const p = join(dir, e.name);
@@ -47,7 +50,7 @@ async function findSourceDirs(dir, found = []) {
 }
 
 const sources = [];
-for (const srcDir of await findSourceDirs(repo))
+for (const srcDir of (await Promise.all((roots.length ? roots : [repo]).map(r => findSourceDirs(r)))).flat())
   for (const f of (await readdir(srcDir)).filter(f => f.endsWith('.mmd')).sort()) sources.push({ srcDir, file: f });
 const todo = [];
 for (const { srcDir, file } of sources) {

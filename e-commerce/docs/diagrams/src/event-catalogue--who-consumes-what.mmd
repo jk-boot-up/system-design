@@ -1,0 +1,10 @@
+flowchart LR
+    cat[catalog-service] -->|ProductChanged| srch[search-service]
+    inv[inventory-service] -->|StockChanged| srch
+    ord[order-service] -->|OrderConfirmed| cart[cart-service]
+    ord -->|OrderConfirmed| rev[review-service]
+    ord -->|OrderConfirmed| reco[recommendation-service]
+    ord -->|OrderConfirmed, OrderCancelled| notif[notification-service]
+    ord -->|OrderCancelled| inv
+    ord -->|all order events| an[analytics]
+    pay[payment-service] -->|all payment events| an

@@ -5,83 +5,45 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>System Design</title>
 <style>
-:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
-[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
-[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
-header a.home{color:var(--fg);font-weight:700;text-decoration:none}
-header .src{color:var(--mut);font-size:13px}
-.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
-.themes button.on{background:var(--accent);color:#fff}
-main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
-h1,h2,h3{line-height:1.25}
-h1{font-size:2rem;margin-top:0}
-h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
-a{color:var(--accent)}
-a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
-h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
-table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
-th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
-code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
-pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
-pre code{background:none;padding:0}
-figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
-figure.diagram img{max-width:100%;height:auto}
-blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
-hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header b{font-size:17px}.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1000px;margin:0 auto;padding:28px 24px 80px}a{color:var(--accent)}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line)}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:var(--panel2);color:var(--mut);font-size:13px;text-transform:uppercase}
+.card{display:block;padding:18px 20px;margin:14px 0;background:var(--panel);border:1px solid var(--line);border-radius:14px;text-decoration:none;color:var(--fg)}
+.card:hover{border-color:var(--accent)}.card h3{margin:0 0 6px;color:var(--accent)}.card p{margin:0;color:var(--mut)}
+code{background:var(--panel2);padding:.1em .35em;border-radius:5px}
 </style>
 </head>
 <body>
-<header>
-  <a class="home" href="README.html">System design</a>
-  <span class="src">README.md</span>
-  <div class="themes" role="group" aria-label="Theme">
-    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
-  </div>
-</header>
+<header><b>System Design</b><div class="themes"><button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button></div></header>
 <main>
-<h1 id="system-design">System Design<a class="headerlink" href="#system-design" title="Permanent link">#</a></h1>
-<p>Production-grade system designs, each with a specification, full design documents, animated walkthroughs and a working reference
-implementation.</p>
+<h1>System Design</h1>
+<p>Production-grade system designs. Each system has a specification, full design documents, animated walkthroughs and a working reference implementation.</p>
+<a class="card" href="e-commerce/README.html"><h3>E-commerce platform</h3><p>Online store: catalogue, search, cart, checkout saga, inventory, payments, reviews, recommendations, notifications, analytics.</p></a>
+<p>More systems (for example video streaming or ride hailing) will be added as sibling folders.</p>
+<h2>How systems stay independent</h2>
 <table>
-<thead>
-<tr>
-<th>System</th>
-<th>What it is</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="e-commerce/README.html">E-commerce platform</a></td>
-<td>Online store: catalogue, search, cart, checkout saga, inventory, payments, reviews, recommendations, notifications, analytics</td>
-</tr>
-</tbody>
+<tr><th>Concern</th><th>Rule</th></tr>
+<tr><td>Files</td><td>Everything for a system lives in its folder: documents, services, deployment, tests and documentation tooling. Nothing refers to another system's folder.</td></tr>
+<tr><td>Builds</td><td>Each service inside a system builds on its own (its own Gradle wrapper, Go module or Python project). There is no root build.</td></tr>
+<tr><td>Documentation</td><td>Each system renders its own diagrams and HTML pages with its own <code>tools/</code>, scoped to its own folder.</td></tr>
+<tr><td>CI</td><td>Workflows are named <code>&lt;system&gt;-&lt;project&gt;.yml</code> and triggered only by <code>paths: &lt;system&gt;/&lt;project&gt;/**</code>.</td></tr>
+<tr><td>Local runtime</td><td>Each system's Docker Compose file sets <code>name: &lt;system&gt;</code>, so containers, networks and volumes never collide. Each system documents its host-port range in its README.</td></tr>
+<tr><td>Kubernetes</td><td>Namespaces are prefixed with the system name (<code>e-commerce-shop</code>, <code>e-commerce-platform</code>, …).</td></tr>
+<tr><td>Code</td><td>Package and module names include the system (<code>com.jkbootup.ecommerce.*</code>), so artefacts from different systems never clash.</td></tr>
 </table>
-<h2 id="repository-conventions">Repository conventions<a class="headerlink" href="#repository-conventions" title="Permanent link">#</a></h2>
-<ul>
-<li><strong>One folder per system.</strong> Everything that belongs to a system — its documents, services, deployment and tests — lives inside it.</li>
-<li><strong>Independent projects.</strong> Inside a system every service is a standalone project with its own build, dependencies, documents,
-  container image and pipeline. Services share no code; they agree only on contracts (APIs and event schemas).</li>
-<li><strong>Documents in two forms.</strong> Every Markdown file has an HTML counterpart beside it with light, medium and dark themes. Diagrams are
-  SVG images (light and dark variants) rendered from editable sources in each <code>docs/diagrams/src</code> folder.</li>
-<li><strong>Tooling.</strong> <code>tools/</code> holds the documentation pipeline only; no system depends on it to build or run.</li>
-</ul>
-<pre class="highlight"><code class="language-bash">tools/docs.sh      # extract new diagram sources, render changed diagrams to SVG, regenerate all HTML pages</code></pre>
+<p>The only shared files at this level are this index and the generic <code>.gitignore</code>.</p>
 </main>
 <script>
-function setTheme(t) {
-  document.documentElement.dataset.theme = t;
-  try { localStorage.setItem("sd-theme", t); } catch (e) {}
-  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
-  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
-}
-document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
-let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
-setTheme(saved);
+function setTheme(t){document.documentElement.dataset.theme=t;try{localStorage.setItem("sd-theme",t)}catch(e){}document.querySelectorAll(".themes button").forEach(b=>b.classList.toggle("on",b.dataset.theme===t))}
+document.querySelectorAll(".themes button").forEach(b=>b.addEventListener("click",()=>setTheme(b.dataset.theme)));
+let s="dark";try{s=localStorage.getItem("sd-theme")||s}catch(e){}setTheme(s);
 </script>
 </body>
 </html>

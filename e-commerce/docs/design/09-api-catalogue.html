@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>9. API catalogue</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">E-commerce platform</a>
+  <span class="src">09-api-catalogue.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="9-api-catalogue">9. API catalogue<a class="headerlink" href="#9-api-catalogue" title="Permanent link">#</a></h1>
+<h2 id="conventions">Conventions<a class="headerlink" href="#conventions" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Base path</strong></td>
+<td><code>/api/v1/…</code> public (through the gateway); <code>/internal/…</code> service-to-service (never routed by the gateway)</td>
+</tr>
+<tr>
+<td><strong>Format</strong></td>
+<td>JSON, UTF-8, camelCase fields, ISO-8601 UTC timestamps</td>
+</tr>
+<tr>
+<td><strong>Money</strong></td>
+<td><code>{"amount": "19.99", "currency": "EUR"}</code>. The amount is a string, so no floating-point rounding is possible</td>
+</tr>
+<tr>
+<td><strong>Errors</strong></td>
+<td>RFC 9457 <code>application/problem+json</code> with <code>type</code>, <code>title</code>, <code>status</code>, <code>detail</code>, <code>instance</code>, plus <code>code</code> and <code>traceId</code></td>
+</tr>
+<tr>
+<td><strong>Pagination</strong></td>
+<td>Cursor-based: <code>?limit=20&amp;cursor=…</code> → <code>{"items": […], "nextCursor": "…" or null}</code></td>
+</tr>
+<tr>
+<td><strong>Idempotency</strong></td>
+<td><code>Idempotency-Key</code> header (1–64 chars) required on <code>POST /orders</code>. A replay returns the first response</td>
+</tr>
+<tr>
+<td><strong>Concurrency</strong></td>
+<td><code>ETag</code> on admin resources; updates need <code>If-Match</code>, otherwise 428; on mismatch 412</td>
+</tr>
+<tr>
+<td><strong>Auth</strong></td>
+<td><code>Authorization: Bearer &lt;JWT&gt;</code>; guests get an opaque <code>X-Guest-Id</code> for carts</td>
+</tr>
+<tr>
+<td><strong>Tracing</strong></td>
+<td><code>traceparent</code> is accepted and propagated; <code>X-Request-Id</code> is echoed back</td>
+</tr>
+</tbody>
+</table>
+<p>The OpenAPI documents live with each service: <code>services/&lt;service&gt;/contracts/openapi.yaml</code>.</p>
+<h2 id="public-apis-through-api-gateway">Public APIs (through api-gateway)<a class="headerlink" href="#public-apis-through-api-gateway" title="Permanent link">#</a></h2>
+<h3 id="catalogue-catalog-service">Catalogue (catalog-service)<a class="headerlink" href="#catalogue-catalog-service" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Request</th>
+<th>Response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/products/{id}</code></td>
+<td>public</td>
+<td></td>
+<td><code>200 Product</code> · <code>404</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/categories</code></td>
+<td>public</td>
+<td></td>
+<td><code>200 [Category]</code> (tree)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/admin/products</code></td>
+<td>staff</td>
+<td><code>ProductCreate</code></td>
+<td><code>201 Product</code> + <code>ETag</code></td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/v1/admin/products/{id}</code></td>
+<td>staff</td>
+<td><code>ProductUpdate</code> + <code>If-Match</code></td>
+<td><code>200 Product</code> · <code>412</code> · <code>428</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/admin/products/{id}/images</code></td>
+<td>staff</td>
+<td><code>{contentType, sizeBytes}</code></td>
+<td><code>201 {uploadUrl, objectKey, expiresAt}</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/admin/products/{id}/images/{objectKey}/confirm</code></td>
+<td>staff</td>
+<td></td>
+<td><code>200 Product</code> · <code>422</code> if the object is missing</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/admin/categories</code></td>
+<td>staff</td>
+<td><code>{slug, name, parentId?}</code></td>
+<td><code>201 Category</code></td>
+</tr>
+</tbody>
+</table>
+<pre class="highlight"><code class="language-json">// Product
+{ "id": "0193…", "sku": "SKU-1001", "name": "Trail Runner 2", "description": "…",
+  "categoryId": "0193…", "brand": "Acme", "price": {"amount": "89.90", "currency": "EUR"},
+  "attributes": {"size": "42", "colour": "blue"}, "status": "ACTIVE",
+  "images": [{"url": "https://cdn…/products/…/1.webp", "position": 1}], "version": 3 }</code></pre>
+<h3 id="search-search-service">Search (search-service)<a class="headerlink" href="#search-search-service" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Query</th>
+<th>Response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/search</code></td>
+<td>public</td>
+<td><code>q, category, brand (repeatable), minPrice, maxPrice, inStock, sort=relevance|price_asc|price_desc|newest, limit, cursor</code></td>
+<td><code>200 {items:[ProductHit], facets:{brand:[{value,count}], category:[…]}, total, nextCursor}</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="cart-cart-service">Cart (cart-service)<a class="headerlink" href="#cart-cart-service" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Request</th>
+<th>Response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/cart</code></td>
+<td>customer or <code>X-Guest-Id</code></td>
+<td></td>
+<td><code>200 Cart</code></td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/v1/cart/items/{sku}</code></td>
+<td>customer or guest</td>
+<td><code>{quantity: 0..99}</code> (0 removes)</td>
+<td><code>200 Cart</code></td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/v1/cart</code></td>
+<td>customer or guest</td>
+<td></td>
+<td><code>204</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/cart/merge</code></td>
+<td>customer</td>
+<td><code>{guestId}</code></td>
+<td><code>200 Cart</code> (guest cart merged into the account cart)</td>
+</tr>
+</tbody>
+</table>
+<pre class="highlight"><code class="language-json">// Cart
+{ "owner": "c:0193…", "lines": [ {"sku": "SKU-1001", "name": "Trail Runner 2", "quantity": 2,
+  "unitPrice": {"amount": "89.90", "currency": "EUR"}, "lineTotal": {"amount": "179.80", "currency": "EUR"},
+  "available": true} ], "total": {"amount": "179.80", "currency": "EUR"}, "pricing": "CURRENT" }
+// pricing = "PENDING" when catalog-service could not be reached (degraded mode)</code></pre>
+<h3 id="orders-order-service">Orders (order-service)<a class="headerlink" href="#orders-order-service" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Request</th>
+<th>Response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/orders</code></td>
+<td>customer + <code>Idempotency-Key</code></td>
+<td><code>{paymentToken}</code></td>
+<td><code>201 Order</code> · <code>402 PAYMENT_DECLINED</code> · <code>409 OUT_OF_STOCK</code> · <code>422 CART_NOT_READY</code> · <code>503 DEPENDENCY_UNAVAILABLE</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/orders</code></td>
+<td>customer</td>
+<td><code>limit, cursor</code></td>
+<td><code>200 {items:[OrderSummary], nextCursor}</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/orders/{id}</code></td>
+<td>customer (owner) or staff</td>
+<td></td>
+<td><code>200 Order</code> · <code>404</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/orders/{id}/cancel</code></td>
+<td>customer (owner) or staff</td>
+<td></td>
+<td><code>200 Order</code> · <code>409 NOT_CANCELLABLE</code></td>
+</tr>
+</tbody>
+</table>
+<pre class="highlight"><code class="language-json">// Order
+{ "id": "0193…", "status": "CONFIRMED", "cancelReason": null, "createdAt": "2026-11-01T10:15:30Z",
+  "lines": [{"sku": "SKU-1001", "productName": "Trail Runner 2", "quantity": 2, "unitPrice": {"amount": "89.90", "currency": "EUR"}}],
+  "total": {"amount": "179.80", "currency": "EUR"} }</code></pre>
+<h3 id="reviews-review-service">Reviews (review-service)<a class="headerlink" href="#reviews-review-service" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Request</th>
+<th>Response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/products/{sku}/reviews</code></td>
+<td>public</td>
+<td><code>limit, cursor</code></td>
+<td><code>200 {summary:{count, average}, items:[Review], nextCursor}</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/products/{sku}/reviews</code></td>
+<td>customer</td>
+<td><code>{rating 1..5, title ≤ 120, body ≤ 4000}</code></td>
+<td><code>201 Review</code> · <code>409 ALREADY_REVIEWED</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="recommendations-recommendation-service">Recommendations (recommendation-service)<a class="headerlink" href="#recommendations-recommendation-service" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/products/{sku}/recommendations?limit=10</code></td>
+<td>public</td>
+<td><code>200 {sku, items:[{sku, score}]}</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="internal-apis-service-to-service-mtls">Internal APIs (service to service, mTLS)<a class="headerlink" href="#internal-apis-service-to-service-mtls" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Method</th>
+<th>Path</th>
+<th>Caller</th>
+<th>Request → Response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>catalog</td>
+<td>POST</td>
+<td><code>/internal/products/prices</code></td>
+<td>cart</td>
+<td><code>{skus:[…]}</code> → <code>{items:[{sku, name, price, status}]}</code></td>
+</tr>
+<tr>
+<td>cart</td>
+<td>GET</td>
+<td><code>/internal/carts/{customerId}/checkout-snapshot</code></td>
+<td>order</td>
+<td>→ <code>{lines:[{sku, name, quantity, unitPrice, available}], total}</code></td>
+</tr>
+<tr>
+<td>inventory</td>
+<td>POST</td>
+<td><code>/internal/reservations</code></td>
+<td>order</td>
+<td><code>{orderId, lines:[{sku, quantity}]}</code> → <code>200 RESERVED</code> · <code>409 {code: OUT_OF_STOCK, sku}</code></td>
+</tr>
+<tr>
+<td>inventory</td>
+<td>POST</td>
+<td><code>/internal/reservations/{orderId}/commit</code></td>
+<td>order</td>
+<td>→ <code>200</code> (idempotent)</td>
+</tr>
+<tr>
+<td>inventory</td>
+<td>POST</td>
+<td><code>/internal/reservations/{orderId}/release</code></td>
+<td>order</td>
+<td>→ <code>200</code> (idempotent)</td>
+</tr>
+<tr>
+<td>inventory</td>
+<td>POST</td>
+<td><code>/internal/reservations/{orderId}/return</code></td>
+<td>order</td>
+<td>→ <code>200</code> (idempotent)</td>
+</tr>
+<tr>
+<td>inventory</td>
+<td>PUT</td>
+<td><code>/internal/stock/{sku}</code></td>
+<td>staff tools</td>
+<td><code>{available}</code> → <code>200</code></td>
+</tr>
+<tr>
+<td>payment</td>
+<td>POST</td>
+<td><code>/internal/payments/authorize</code></td>
+<td>order</td>
+<td><code>{orderId, amount, paymentToken}</code> → <code>200 AUTHORIZED</code> · <code>402 DECLINED</code> · <code>504 UNKNOWN</code></td>
+</tr>
+<tr>
+<td>payment</td>
+<td>POST</td>
+<td><code>/internal/payments/{orderId}/capture</code></td>
+<td>order</td>
+<td>→ <code>200 CAPTURED</code> · <code>409</code></td>
+</tr>
+<tr>
+<td>payment</td>
+<td>POST</td>
+<td><code>/internal/payments/{orderId}/void</code></td>
+<td>order</td>
+<td>→ <code>200 VOIDED or VOID_REQUESTED</code></td>
+</tr>
+<tr>
+<td>payment</td>
+<td>POST</td>
+<td><code>/internal/payments/{orderId}/refund</code></td>
+<td>order</td>
+<td>→ <code>200 REFUNDED</code></td>
+</tr>
+</tbody>
+</table>
+<p>Every internal command is <strong>idempotent by design</strong>: repeating a call with the same <code>orderId</code> returns the current result and never
+applies the effect twice.</p>
+<h2 id="error-codes">Error codes<a class="headerlink" href="#error-codes" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>HTTP</th>
+<th><code>code</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td><code>VALIDATION_FAILED</code></td>
+<td>Field errors in <code>errors: [{field, message}]</code></td>
+</tr>
+<tr>
+<td>401</td>
+<td><code>UNAUTHENTICATED</code></td>
+<td>Missing or invalid token</td>
+</tr>
+<tr>
+<td>403</td>
+<td><code>FORBIDDEN</code></td>
+<td>Authenticated but not allowed (e.g. not the owner)</td>
+</tr>
+<tr>
+<td>404</td>
+<td><code>NOT_FOUND</code></td>
+<td>Unknown resource</td>
+</tr>
+<tr>
+<td>409</td>
+<td><code>OUT_OF_STOCK</code>, <code>NOT_CANCELLABLE</code>, <code>ALREADY_REVIEWED</code>, <code>ILLEGAL_STATE</code></td>
+<td>Business conflict</td>
+</tr>
+<tr>
+<td>402</td>
+<td><code>PAYMENT_DECLINED</code></td>
+<td>Provider declined</td>
+</tr>
+<tr>
+<td>412 / 428</td>
+<td><code>VERSION_MISMATCH</code> / <code>PRECONDITION_REQUIRED</code></td>
+<td>Optimistic locking</td>
+</tr>
+<tr>
+<td>422</td>
+<td><code>CART_NOT_READY</code>, <code>UPLOAD_MISSING</code></td>
+<td>Semantically invalid request</td>
+</tr>
+<tr>
+<td>429</td>
+<td><code>RATE_LIMITED</code></td>
+<td>With <code>Retry-After</code></td>
+</tr>
+<tr>
+<td>503</td>
+<td><code>DEPENDENCY_UNAVAILABLE</code></td>
+<td>Circuit open or timeout; retry later</td>
+</tr>
+<tr>
+<td>504</td>
+<td><code>PAYMENT_UNKNOWN</code></td>
+<td>Payment outcome not known in time; the order was cancelled safely</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

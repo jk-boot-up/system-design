@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Render every Markdown file in the repository to an HTML file next to it.
+"""Render every Markdown file of this system to an HTML file next to it.
 
 * Diagram <picture> elements become images that follow the page theme (light or dark SVG).
 * Links to .md files are rewritten to .html.
 * Each page has the light / medium / dark theme switch used across the project.
 
-Usage: python3 tools/md2html.py            (from the repository root)
+Usage: python3 tools/md2html.py [path ...]   (default: the whole system folder)
 Needs: pip install -r tools/requirements-docs.txt
 """
 import html
@@ -54,7 +54,7 @@ def render(md_path: Path) -> Path:
     title_match = re.search(r"^#\s+(.+)$", text, re.M)
     title = title_match.group(1).strip() if title_match else md_path.stem
     depth = len(md_path.relative_to(ROOT).parts) - 1
-    home = "../" * depth + "README.html"
+    home = "../" * depth + "README.html"     # the system's own README
     out = md_path.with_suffix(".html")
     out.write_text(
         TEMPLATE.replace("__TITLE__", html.escape(title)).replace("__HOME__", home)
@@ -65,8 +65,9 @@ def render(md_path: Path) -> Path:
 
 
 def main() -> int:
+    targets = [Path(a).resolve() for a in sys.argv[1:]] or [ROOT]
     count = 0
-    for path in sorted(ROOT.rglob("*.md")):
+    for path in sorted({p for t in targets for p in ([t] if t.is_file() else t.rglob("*.md"))}):
         if any(part in SKIP_DIRS for part in path.relative_to(ROOT).parts):
             continue
         render(path)
