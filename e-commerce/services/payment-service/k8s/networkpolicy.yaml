@@ -1,0 +1,19 @@
+# Only order-service may call payment-service. Egress: its database, Kafka, and the payment provider (FQDN allow-list at the egress gateway).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payment-service
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: order-service } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-platform } }
+      ports: [ { port: 8086 } ]
+  egress:
+    - to: [ { podSelector: { matchLabels: { app.kubernetes.io/name: pgbouncer-payments } } } ]
+    - to: [ { namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-platform } } } ]
+    - to: [ { namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: egress-gateway } } } ]
+      ports: [ { port: 443 } ]
+    - ports: [ { port: 53, protocol: UDP }, { port: 53, protocol: TCP } ]

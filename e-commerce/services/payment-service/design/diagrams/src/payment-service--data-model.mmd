@@ -1,0 +1,23 @@
+erDiagram
+    PAYMENTS ||--o{ PAYMENT_ATTEMPTS : "audited by"
+    PAYMENTS {
+        uuid id PK
+        uuid order_id UK
+        numeric amount
+        char currency
+        text status
+        text payment_token
+        text provider_ref
+        text failure_reason
+        boolean void_requested
+        bigint version
+    }
+    PAYMENT_ATTEMPTS {
+        uuid id PK
+        uuid payment_id FK
+        text operation
+        text outcome
+        text provider_ref
+        text detail
+        timestamptz created_at
+    }

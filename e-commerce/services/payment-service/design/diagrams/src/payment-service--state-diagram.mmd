@@ -1,0 +1,11 @@
+stateDiagram-v2
+    [*] --> AUTHORIZING
+    [*] --> VOIDED: void before any authorisation
+    AUTHORIZING --> AUTHORIZED
+    AUTHORIZING --> DECLINED
+    AUTHORIZING --> UNKNOWN: no answer in time
+    UNKNOWN --> AUTHORIZED: reconciled
+    UNKNOWN --> DECLINED: provider never saw it
+    AUTHORIZED --> VOIDED: void (or void requested)
+    AUTHORIZED --> CAPTURED: only if no void requested
+    CAPTURED --> REFUNDED

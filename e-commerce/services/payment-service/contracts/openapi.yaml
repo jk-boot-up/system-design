@@ -1,0 +1,53 @@
+openapi: 3.1.0
+info:
+  title: payment-service internal API
+  version: 1.0.0
+  description: >
+    Used only by order-service's checkout saga. Every call is keyed by order id and idempotent. The status code encodes the
+    outcome of authorise: 200 authorised, 402 declined, 504 unknown (reconciled later), 409 voided before authorisation.
+paths:
+  /internal/payments/authorize:
+    post:
+      operationId: authorize
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, amount, paymentToken]
+              properties:
+                orderId: { type: string, format: uuid }
+                amount: { $ref: '#/components/schemas/Money' }
+                paymentToken: { type: string, maxLength: 200, description: 'Provider token; test tokens tok_ok, tok_decline, tok_timeout' }
+      responses:
+        '200': { description: Authorised (or the current state on repeat), content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }
+        '402': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '504': { $ref: '#/components/responses/Problem' }
+  /internal/payments/{orderId}/capture:
+    post: { operationId: capture, parameters: [ { $ref: '#/components/parameters/OrderId' } ], responses: { '200': { $ref: '#/components/responses/Payment' }, '402': { $ref: '#/components/responses/Problem' }, '409': { $ref: '#/components/responses/Problem' }, '503': { $ref: '#/components/responses/Problem' } } }
+  /internal/payments/{orderId}/void:
+    post: { operationId: void, description: 'Voids an authorisation; for an in-flight or not-yet-started one, records a void request that wins', parameters: [ { $ref: '#/components/parameters/OrderId' } ], responses: { '200': { $ref: '#/components/responses/Payment' }, '409': { $ref: '#/components/responses/Problem' } } }
+  /internal/payments/{orderId}/refund:
+    post: { operationId: refund, parameters: [ { $ref: '#/components/parameters/OrderId' } ], responses: { '200': { $ref: '#/components/responses/Payment' }, '409': { $ref: '#/components/responses/Problem' }, '503': { $ref: '#/components/responses/Problem' } } }
+  /internal/payments/{orderId}:
+    get: { operationId: getPayment, parameters: [ { $ref: '#/components/parameters/OrderId' } ], responses: { '200': { $ref: '#/components/responses/Payment' }, '404': { $ref: '#/components/responses/Problem' } } }
+components:
+  parameters:
+    OrderId: { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Payment: { description: Payment, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }
+    Problem: { description: Problem details, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  schemas:
+    Money: { type: object, required: [amount, currency], properties: { amount: { type: string, pattern: '^\d{1,15}(\.\d{1,2})?$' }, currency: { type: string, minLength: 3, maxLength: 3 } } }
+    Payment:
+      type: object
+      properties:
+        paymentId: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        status: { type: string, enum: [AUTHORIZING, AUTHORIZED, CAPTURED, DECLINED, UNKNOWN, VOIDED, REFUNDED] }
+        providerRef: { type: [string, 'null'] }
+        reason: { type: [string, 'null'] }
+        voidRequested: { type: boolean }
+    Problem: { type: object, properties: { title: { type: string }, status: { type: integer }, detail: { type: string }, code: { type: string }, payment: { $ref: '#/components/schemas/Payment' } } }

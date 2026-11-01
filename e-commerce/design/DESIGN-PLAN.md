@@ -66,7 +66,7 @@ Each service also has its own `README.md` (build, run, configure, operate) and `
 |---|---|---|---|---|
 | inventory-service | Java | ✅ | ✅ | ✅ |
 | order-service | Java | ✅ | ✅ | ✅ |
-| payment-service | Java | ⏳ | ⏳ | ⏳ |
+| payment-service | Java | ✅ | ✅ | ✅ |
 | cart-service | Java | ⏳ | ⏳ | ⏳ |
 | catalog-service | Java | ⏳ | ⏳ | ⏳ |
 | search-service | Java | ⏳ | ⏳ | ⏳ |

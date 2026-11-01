@@ -1,0 +1,539 @@
+{
+ "title": "payment-service",
+ "subtitle": "One payment per order, never a double charge",
+ "nodes": [
+  {
+   "id": "ord",
+   "label": "order-service",
+   "kind": "service",
+   "tech": "checkout saga",
+   "x": 130,
+   "y": 120
+  },
+  {
+   "id": "pay",
+   "label": "payment-service",
+   "kind": "service",
+   "tech": "Java 25",
+   "x": 470,
+   "y": 120
+  },
+  {
+   "id": "psp",
+   "label": "Payment provider",
+   "kind": "external",
+   "tech": "idempotency key",
+   "x": 820,
+   "y": 120
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL",
+   "kind": "db",
+   "tech": "payments · attempts",
+   "x": 470,
+   "y": 340
+  },
+  {
+   "id": "rec",
+   "label": "Reconciler",
+   "kind": "job",
+   "tech": "ShedLock · 20 s",
+   "x": 820,
+   "y": 340
+  },
+  {
+   "id": "kafka",
+   "label": "Kafka",
+   "kind": "queue",
+   "tech": "payment.events",
+   "x": 130,
+   "y": 340
+  }
+ ],
+ "edges": [
+  {
+   "from": "ord",
+   "to": "pay"
+  },
+  {
+   "from": "pay",
+   "to": "psp"
+  },
+  {
+   "from": "pay",
+   "to": "db"
+  },
+  {
+   "from": "rec",
+   "to": "pay"
+  },
+  {
+   "from": "rec",
+   "to": "psp"
+  },
+  {
+   "from": "db",
+   "to": "kafka",
+   "dashed": true
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "happy",
+   "title": "Authorise and capture",
+   "summary": "Intent first, then the provider",
+   "steps": [
+    {
+     "say": "order-service asks to authorise 179.80 euros for order 7.",
+     "active": [
+      "ord",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "authorize(order 7)",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Before calling the provider, payment-service commits its intent: a payment row in state AUTHORIZING. If the pod dies now, the row tells the reconciler what to check.",
+     "active": [
+      "pay",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "db",
+       "label": "INSERT AUTHORIZING",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Payment for order 7",
+      "rows": {
+       "status": "AUTHORIZING",
+       "void requested": "no"
+      }
+     }
+    },
+    {
+     "say": "Only then is the provider called, with the order id as idempotency key and a 1.5-second deadline. No database transaction stays open while it waits.",
+     "active": [
+      "pay",
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "psp",
+       "label": "authorize · key = order 7",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Approved. The status and an audit row are written.",
+     "ok": [
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "psp",
+       "to": "pay",
+       "label": "Approved ref sim_42",
+       "kind": "res"
+      },
+      {
+       "from": "pay",
+       "to": "db",
+       "label": "AUTHORIZED + attempt",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Payment for order 7",
+      "rows": {
+       "status": "AUTHORIZED",
+       "provider ref": "sim_42"
+      }
+     }
+    },
+    {
+     "say": "Later the saga captures the money. A PaymentCaptured event goes into the outbox and on to analytics.",
+     "ok": [
+      "pay",
+      "kafka"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "capture",
+       "kind": "req"
+      },
+      {
+       "from": "pay",
+       "to": "psp",
+       "label": "capture",
+       "kind": "req"
+      },
+      {
+       "from": "db",
+       "to": "kafka",
+       "label": "PaymentCaptured",
+       "kind": "event"
+      }
+     ],
+     "state": {
+      "title": "Payment for order 7",
+      "rows": {
+       "status": "CAPTURED",
+       "provider ref": "sim_42"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "repeat",
+   "title": "Retried request: charged once",
+   "summary": "One payment per order",
+   "steps": [
+    {
+     "say": "order-service's first authorise answer got lost, so it sends the same request again.",
+     "active": [
+      "ord",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "authorize(order 7) again",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The order already has a payment: the unique order id finds it.",
+     "active": [
+      "pay",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "db",
+       "label": "SELECT … FOR UPDATE",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "db",
+       "text": "exists",
+       "tone": "warn"
+      }
+     ]
+    },
+    {
+     "say": "Its current state is returned. The provider is not called again, so there is no second charge.",
+     "ok": [
+      "pay"
+     ],
+     "dim": [
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "ord",
+       "label": "200 AUTHORIZED",
+       "kind": "res"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "declined",
+   "title": "Declined card",
+   "summary": "402 and an event",
+   "steps": [
+    {
+     "say": "Another customer pays with a card that has no funds.",
+     "active": [
+      "pay",
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "psp",
+       "label": "authorize",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The provider declines.",
+     "bad": [
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "psp",
+       "to": "pay",
+       "label": "Declined: insufficient funds",
+       "kind": "error"
+      }
+     ]
+    },
+    {
+     "say": "The payment becomes DECLINED, an attempt is logged, and PaymentFailed goes into the outbox.",
+     "packets": [
+      {
+       "from": "pay",
+       "to": "db",
+       "label": "DECLINED + attempt + event",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Payment for order 7",
+      "rows": {
+       "status": "DECLINED",
+       "reason": "INSUFFICIENT_FUNDS"
+      }
+     }
+    },
+    {
+     "say": "order-service gets 402 and releases the stock.",
+     "bad": [
+      "ord"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "ord",
+       "label": "402 PAYMENT_DECLINED",
+       "kind": "error"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "late",
+   "title": "Too slow, then a late success",
+   "summary": "Never charged for a cancelled order",
+   "steps": [
+    {
+     "say": "The provider is overloaded. After 1.5 seconds payment-service stops waiting, but the request is still running at the provider.",
+     "active": [
+      "pay",
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "psp",
+       "label": "authorize",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "psp",
+       "text": "slow",
+       "tone": "warn"
+      }
+     ]
+    },
+    {
+     "say": "The outcome is unknown. The payment is marked UNKNOWN and order-service gets 504.",
+     "bad": [
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "ord",
+       "label": "504 PAYMENT_UNKNOWN",
+       "kind": "error"
+      }
+     ],
+     "state": {
+      "title": "Payment for order 7",
+      "rows": {
+       "status": "UNKNOWN",
+       "void requested": "no"
+      }
+     }
+    },
+    {
+     "say": "order-service cancels the order and asks for a void. The authorisation is not confirmed yet, so the void is stored as a request.",
+     "active": [
+      "ord",
+      "pay",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "void",
+       "kind": "req"
+      },
+      {
+       "from": "pay",
+       "to": "db",
+       "label": "void_requested = true",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Payment for order 7",
+      "rows": {
+       "status": "UNKNOWN",
+       "void requested": "yes"
+      }
+     }
+    },
+    {
+     "say": "Meanwhile the provider finishes and approves. Without more care, the customer's money would now be held for an order that does not exist.",
+     "bad": [
+      "psp"
+     ],
+     "badges": [
+      {
+       "node": "psp",
+       "text": "approved late",
+       "tone": "bad"
+      }
+     ]
+    },
+    {
+     "say": "The reconciler finds the unsettled payment and asks the provider what happened, using the same order id.",
+     "active": [
+      "rec",
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "rec",
+       "to": "psp",
+       "label": "lookup(order 7)",
+       "kind": "req"
+      },
+      {
+       "from": "psp",
+       "to": "rec",
+       "label": "Approved",
+       "kind": "res"
+      }
+     ]
+    },
+    {
+     "say": "Because a void was requested, it voids the authorisation immediately. The audit trail shows all three steps, and the customer is never charged.",
+     "ok": [
+      "pay",
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "rec",
+       "to": "pay",
+       "label": "settle",
+       "kind": "req"
+      },
+      {
+       "from": "pay",
+       "to": "psp",
+       "label": "void",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Payment for order 7",
+      "rows": {
+       "status": "VOIDED",
+       "attempts": "AUTHORIZE:TIMEOUT · RECONCILE:SUCCESS · VOID:SUCCESS"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "void-first",
+   "title": "Void before authorise",
+   "summary": "The void wins",
+   "steps": [
+    {
+     "say": "Rarely, the saga's void arrives before its authorise, for example after a crash and recovery.",
+     "active": [
+      "ord",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "void(order 9)",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "There is no payment yet, so payment-service stores a VOIDED tombstone for order 9.",
+     "active": [
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "db",
+       "label": "INSERT VOIDED tombstone",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Payment for order 9",
+      "rows": {
+       "status": "VOIDED",
+       "void requested": "yes"
+      }
+     }
+    },
+    {
+     "say": "When the authorise finally arrives it finds the tombstone and refuses. The provider is never called.",
+     "ok": [
+      "pay"
+     ],
+     "dim": [
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "authorize(order 9)",
+       "kind": "req"
+      },
+      {
+       "from": "pay",
+       "to": "ord",
+       "label": "409 PAYMENT_VOIDED",
+       "kind": "error"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

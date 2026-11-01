@@ -1,0 +1,48 @@
+classDiagram
+    class Payment {
+      <<aggregate root>>
+      -UUID id
+      -UUID orderId
+      -Money amount
+      -String paymentToken
+      -PaymentStatus status
+      -String providerRef
+      -boolean voidRequested
+      +authorizing(...) Payment$
+      +voidedBeforeAuthorization(...) Payment$
+      +authorized(ref, now)
+      +declined(reason, now)
+      +unknown(reason, now)
+      +captured(now)
+      +voided(now)
+      +refunded(now)
+      +requestVoid(now)
+    }
+    class PaymentService {
+      +authorize(orderId, Money, token) Payment
+      +capture(orderId) Payment
+      +voidAuthorization(orderId) Payment
+      +refund(orderId) Payment
+      +reconcile(orderId) Payment
+    }
+    class PaymentReconciler {
+      +reconcileBatch(int limit) int
+    }
+    class PaymentProvider {
+      <<port>>
+      +authorize(key, Money, token) Outcome
+      +capture(key, ref) Outcome
+      +voidAuthorization(key, ref) Outcome
+      +refund(key, ref, Money) Outcome
+      +lookup(key) Optional~Outcome~
+    }
+    class Outcome {
+      <<sealed>>
+      Approved(providerRef)
+      Declined(reason)
+      Unknown(reason)
+    }
+    PaymentService --> PaymentProvider
+    PaymentService ..> Payment
+    PaymentReconciler --> PaymentService
+    PaymentProvider ..> Outcome

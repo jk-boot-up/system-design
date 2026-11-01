@@ -1,0 +1,21 @@
+sequenceDiagram
+    autonumber
+    participant O as order-service
+    participant S as PaymentService
+    participant DB as PostgreSQL
+    participant PSP as Provider
+    O->>S: authorize(order 7, 179.80, tok)
+    S->>DB: tx 1: lock payment by order — none → INSERT AUTHORIZING
+    S->>PSP: authorize(key = order 7) [deadline 1.5 s]
+    alt approved
+        PSP-->>S: Approved(ref)
+        S->>DB: tx 2: AUTHORIZED + attempt (void first if a void was requested meanwhile)
+        S-->>O: 200 AUTHORIZED
+    else declined
+        PSP-->>S: Declined
+        S->>DB: tx 2: DECLINED + attempt + PaymentFailed
+        S-->>O: 402 PAYMENT_DECLINED
+    else no answer in time
+        S->>DB: tx 2: UNKNOWN + attempt
+        S-->>O: 504 PAYMENT_UNKNOWN
+    end

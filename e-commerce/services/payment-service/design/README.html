@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>payment-service: low-level design</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="payment-service-low-level-design">payment-service: low-level design<a class="headerlink" href="#payment-service-low-level-design" title="Permanent link">#</a></h1>
+<p>Part of the <a href="../../../design/README.html">e-commerce system design</a>. Animated version: <a href="walkthrough/index.html">walkthrough</a>.</p>
+<h2 id="1-responsibilities">1. Responsibilities<a class="headerlink" href="#1-responsibilities" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Does</th>
+<th>Does not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Authorise, capture, void and refund through the provider</td>
+<td>Decide whether an order proceeds (order-service)</td>
+</tr>
+<tr>
+<td>Keep exactly one payment per order</td>
+<td>See card numbers: the browser tokenises them with the provider (PCI DSS SAQ A)</td>
+</tr>
+<tr>
+<td>Settle unknown outcomes and void late successes</td>
+<td>Talk to customers</td>
+</tr>
+<tr>
+<td>Keep an append-only audit trail</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-guarantees">2. Guarantees<a class="headerlink" href="#2-guarantees" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>One payment per order</strong></td>
+<td><code>payments.order_id UNIQUE</code>; a repeated authorise returns the existing payment</td>
+</tr>
+<tr>
+<td><strong>No double charge</strong></td>
+<td>Every provider call carries the order id as idempotency key</td>
+</tr>
+<tr>
+<td><strong>No charge for a cancelled order</strong></td>
+<td>A void request is stored even before or during authorisation. A late success is voided at once, or by the reconciler. A payment with a void request can never be captured</td>
+</tr>
+<tr>
+<td><strong>Nothing settled in the dark</strong></td>
+<td>The intent (<code>AUTHORIZING</code>) is committed before calling the provider, so a crash leaves a row for the reconciler</td>
+</tr>
+<tr>
+<td><strong>Full audit</strong></td>
+<td>Every provider interaction is a row in <code>payment_attempts</code>; rows are never updated</td>
+</tr>
+<tr>
+<td><strong>Events if and only if committed</strong></td>
+<td>Outbox in the same transaction</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-module-diagram">3. Module diagram<a class="headerlink" href="#3-module-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Module diagram diagram" src="diagrams/payment-service--module-diagram.light.svg" data-light="diagrams/payment-service--module-diagram.light.svg" data-dark="diagrams/payment-service--module-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="4-interaction-diagram">4. Interaction diagram<a class="headerlink" href="#4-interaction-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Interaction diagram diagram" src="diagrams/payment-service--interaction-diagram.light.svg" data-light="diagrams/payment-service--interaction-diagram.light.svg" data-dark="diagrams/payment-service--interaction-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="5-class-diagram">5. Class diagram<a class="headerlink" href="#5-class-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Class diagram diagram" src="diagrams/payment-service--class-diagram.light.svg" data-light="diagrams/payment-service--class-diagram.light.svg" data-dark="diagrams/payment-service--class-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="6-sequences">6. Sequences<a class="headerlink" href="#6-sequences" title="Permanent link">#</a></h2>
+<h3 id="authorise-with-the-provider-outside-the-transaction">Authorise (with the provider outside the transaction)<a class="headerlink" href="#authorise-with-the-provider-outside-the-transaction" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Authorise (with the provider outside the transaction) diagram" src="diagrams/payment-service--authorise-with-the-provider-outside-the-transact.light.svg" data-light="diagrams/payment-service--authorise-with-the-provider-outside-the-transact.light.svg" data-dark="diagrams/payment-service--authorise-with-the-provider-outside-the-transact.dark.svg" loading="lazy"></figure></p>
+<h3 id="late-success-after-a-timeout">Late success after a timeout<a class="headerlink" href="#late-success-after-a-timeout" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Late success after a timeout diagram" src="diagrams/payment-service--late-success-after-a-timeout.light.svg" data-light="diagrams/payment-service--late-success-after-a-timeout.light.svg" data-dark="diagrams/payment-service--late-success-after-a-timeout.dark.svg" loading="lazy"></figure></p>
+<h2 id="7-state-diagram">7. State diagram<a class="headerlink" href="#7-state-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="State diagram diagram" src="diagrams/payment-service--state-diagram.light.svg" data-light="diagrams/payment-service--state-diagram.light.svg" data-dark="diagrams/payment-service--state-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="8-data-model">8. Data model<a class="headerlink" href="#8-data-model" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Data model diagram" src="diagrams/payment-service--data-model.light.svg" data-light="diagrams/payment-service--data-model.light.svg" data-dark="diagrams/payment-service--data-model.dark.svg" loading="lazy"></figure></p>
+<p>DDL: <a href="../src/main/resources/db/migration/V1__payment_schema.sql"><code>V1__payment_schema.sql</code></a>. A check constraint allows empty
+amount, currency and token only for a void recorded before any authorisation.</p>
+<h2 id="9-background-work">9. Background work<a class="headerlink" href="#9-background-work" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Runs</th>
+<th>Interval</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reconciler</td>
+<td>one replica (ShedLock)</td>
+<td>20 s</td>
+<td>Settles <code>AUTHORIZING</code> / <code>UNKNOWN</code> payments older than 30 s by asking the provider; voids late successes; retries failed voids</td>
+</tr>
+<tr>
+<td>Outbox relay</td>
+<td>every replica</td>
+<td>100 ms</td>
+<td>Publishes <code>payment.events</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="10-scaling-and-performance">10. Scaling and performance<a class="headerlink" href="#10-scaling-and-performance" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Provider-bound:</strong> a call waits up to 1.5 s, but no database connection or transaction is held meanwhile. Virtual threads make
+  waiting cheap, so 2–10 replicas cover the 500 checkouts/s peak.</li>
+<li><strong>Short transactions:</strong> two per authorise and one per capture, void or refund.</li>
+<li><strong>Partial index:</strong> unsettled payments are indexed separately, so the reconciler stays cheap at any table size.</li>
+</ul>
+<h2 id="11-failure-handling">11. Failure handling<a class="headerlink" href="#11-failure-handling" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Provider slow or down</td>
+<td>504 <code>PAYMENT_UNKNOWN</code> within 1.5 s; order-service voids; the reconciler settles later</td>
+</tr>
+<tr>
+<td>Provider down during void</td>
+<td>Void request kept, attempt logged; the reconciler retries until voided</td>
+</tr>
+<tr>
+<td>Crash after inserting <code>AUTHORIZING</code></td>
+<td>The reconciler asks the provider: found → authorised (or voided); not found → declined</td>
+</tr>
+<tr>
+<td>Duplicate authorise</td>
+<td>Returns the stored payment; the provider is called once</td>
+</tr>
+<tr>
+<td>Capture after a void request</td>
+<td>Rejected (<code>VOID_REQUESTED</code>), never sent to the provider</td>
+</tr>
+</tbody>
+</table>
+<h2 id="12-tests">12. Tests<a class="headerlink" href="#12-tests" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Kind</th>
+<th>Proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PaymentTest</code></td>
+<td>domain</td>
+<td>Lifecycle, void blocks capture, illegal transitions, input checks</td>
+</tr>
+<tr>
+<td><code>PaymentServiceTest</code></td>
+<td>application with the real simulated provider</td>
+<td>Authorise, capture, refund; one charge on repeat; decline; <strong>late success after timeout is voided</strong>; void before authorise blocks it; never-seen authorisation declined; captured payments refunded, not voided</td>
+</tr>
+<tr>
+<td><code>HexagonalArchitectureTest</code></td>
+<td>ArchUnit</td>
+<td>Layering and adapter independence</td>
+</tr>
+<tr>
+<td><code>PaymentContainersIT</code></td>
+<td>PostgreSQL + Kafka</td>
+<td>HTTP status codes per outcome, validation, late success voided with full audit trail, capture and refund idempotent and published</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

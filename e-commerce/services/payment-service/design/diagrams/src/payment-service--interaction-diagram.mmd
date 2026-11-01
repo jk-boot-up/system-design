@@ -1,0 +1,7 @@
+flowchart LR
+    ORD[order-service<br/>checkout saga] -- "authorize · capture · void · refund<br/>(key = order id)" --> PAY((payment-service))
+    PAY -- "same operations<br/>Idempotency-Key = order id<br/>deadline 1.5 s" --> PSP[Payment provider]
+    PAY -- "payments · attempts · outbox" --> DB[(PostgreSQL payments)]
+    PAY -- "PaymentCaptured · PaymentFailed · PaymentRefunded" --> K{{Kafka payment.events}}
+    K --> AN[analytics]
+    BROWSER[Customer browser] -. "card details → token<br/>(never reaches the platform)" .-> PSP

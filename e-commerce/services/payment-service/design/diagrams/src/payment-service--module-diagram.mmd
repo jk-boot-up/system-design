@@ -1,0 +1,43 @@
+flowchart TB
+    subgraph web[adapter.web]
+        PC[PaymentController]
+        PH[ProblemHandler]
+    end
+    subgraph app[application]
+        PS[PaymentService]
+        RC[PaymentReconciler]
+        subgraph ports[port]
+            PR[[PaymentRepository]]
+            PP[[PaymentProvider<br/>strategy]]
+            PE[[PaymentEvents]]
+            TX[[Transactions]]
+        end
+    end
+    subgraph dom[domain]
+        P[Payment aggregate]
+        PST[PaymentStatus]
+        M[Money]
+    end
+    subgraph prov[adapter.provider]
+        SIM[SimulatedPaymentProvider]
+        REAL[RealProviderAdapter<br/>future: anti-corruption layer]
+    end
+    subgraph per[adapter.persistence]
+        JR[JdbcPaymentRepository]
+        OPE[OutboxPaymentEvents]
+        OW[OutboxWriter]
+    end
+    subgraph msg[adapter.messaging]
+        REL[OutboxRelay]
+    end
+    subgraph sch[adapter.scheduling]
+        JOB[ReconcilerJob]
+    end
+    PC --> PS
+    JOB --> RC --> PS
+    PS --> dom
+    PS --> PR & PP & PE & TX
+    PR -.-> JR
+    PP -.-> SIM
+    PP -.-> REAL
+    PE -.-> OPE --> OW

@@ -79,14 +79,14 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>Services (11)</td>
-<td>███░░░░░░░ 25%</td>
-<td>inventory-service, order-service complete</td>
-<td>payment-service, then cart, catalog, search, review, gateway, notification, recommendation, analytics</td>
+<td>████░░░░░░ 35%</td>
+<td>inventory-service, order-service, payment-service complete</td>
+<td>cart-service, then catalog, search, review, gateway, notification, recommendation, analytics</td>
 </tr>
 <tr>
 <td>Walkthroughs</td>
-<td>██░░░░░░░░ 20%</td>
-<td>inventory-service, order-service (8 scenarios each)</td>
+<td>███░░░░░░░ 30%</td>
+<td>inventory-service, order-service, payment-service</td>
 <td>Each new service, system walkthrough</td>
 </tr>
 <tr>
@@ -140,13 +140,13 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>payment-service</td>
-<td>⏳</td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
+<td>✅</td>
+<td>✅ 17 passing (incl. PostgreSQL + Kafka)</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>cart-service</td>
@@ -233,6 +233,10 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <h2 id="recently-completed">Recently completed<a class="headerlink" href="#recently-completed" title="Permanent link">#</a></h2>
 <ul>
 <li>
+<p>payment-service: one payment per order, provider calls outside transactions, void requests that always win, reconciler that
+  voids late provider successes (proved with a real late-success race), append-only audit trail.</p>
+</li>
+<li>
 <p>order-service: checkout saga with every compensation path, idempotency keys, crash recovery, monthly partitions with id-based
   pruning, JWT-secured API, circuit breakers and retries; container tests caught and fixed a millisecond/microsecond mismatch
   between order ids and partition keys.</p>
@@ -247,7 +251,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>payment-service: payment aggregate, simulated provider, idempotent authorise / capture / void / refund, reconciler.</li>
+<li>cart-service: Redis carts for guests and customers, re-pricing through catalog with a degraded fallback, checkout snapshot, cart clearing on OrderConfirmed.</li>
 <li>System, module and service diagrams (design document 11).</li>
 </ul>
 <h2 id="risks-and-notes">Risks and notes<a class="headerlink" href="#risks-and-notes" title="Permanent link">#</a></h2>

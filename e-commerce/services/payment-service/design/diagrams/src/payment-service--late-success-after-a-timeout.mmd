@@ -1,0 +1,17 @@
+sequenceDiagram
+    autonumber
+    participant O as order-service
+    participant S as payment-service
+    participant PSP as Provider
+    participant R as Reconciler (every 20 s)
+    O->>S: authorize
+    S->>PSP: authorize
+    S-->>O: 504 UNKNOWN (deadline passed)
+    O->>S: void
+    S->>S: void_requested = true (status stays UNKNOWN)
+    PSP->>PSP: …authorises late
+    R->>PSP: lookup(order 7)
+    PSP-->>R: Approved(ref)
+    R->>S: AUTHORIZED, then void at once (void requested)
+    S->>PSP: void(order 7)
+    S->>S: VOIDED · attempts AUTHORIZE:TIMEOUT, RECONCILE:SUCCESS, VOID:SUCCESS
