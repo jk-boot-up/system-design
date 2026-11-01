@@ -1,0 +1,13 @@
+[versions]
+java = "25"
+spring-boot = "4.0.9"
+shedlock = "7.10.1"
+archunit = "1.5.1"
+
+[libraries]
+shedlock-spring = { module = "net.javacrumbs.shedlock:shedlock-spring", version.ref = "shedlock" }
+shedlock-jdbc = { module = "net.javacrumbs.shedlock:shedlock-provider-jdbc-template", version.ref = "shedlock" }
+archunit = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
