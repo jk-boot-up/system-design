@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart-service
+spec:
+  replicas: 3
+  strategy:
+    rollingUpdate: { maxSurge: 25%, maxUnavailable: 0 }
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8083"
+    spec:
+      serviceAccountName: cart-service
+      terminationGracePeriodSeconds: 40
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: cart-service } }
+      containers:
+        - name: app
+          image: e-commerce/cart-service:0.1.0
+          ports: [ { name: http, containerPort: 8083 } ]
+          envFrom: [ { configMapRef: { name: cart-service } } ]
+          resources:
+            requests: { cpu: 500m, memory: 768Mi }
+            limits: { memory: 768Mi }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 10
+            failureThreshold: 6
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 2
+            failureThreshold: 60
+          lifecycle:
+            preStop: { sleep: { seconds: 10 } }
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts: [ { name: tmp, mountPath: /tmp } ]
+      volumes: [ { name: tmp, emptyDir: {} } ]

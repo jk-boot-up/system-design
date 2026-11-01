@@ -1,0 +1,10 @@
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant C as cart-service
+    participant R as Redis
+    B->>C: POST /api/v1/cart/merge {guestId} (JWT)
+    C->>R: HGETALL cart:c:Ada, HGETALL cart:g:guest
+    C->>C: add quantities, cap at 99
+    C->>R: DEL + HSET cart:c:Ada, EXPIRE · DEL cart:g:guest
+    C-->>B: 200 merged cart

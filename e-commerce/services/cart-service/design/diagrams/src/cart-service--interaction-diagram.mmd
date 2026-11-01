@@ -1,0 +1,6 @@
+flowchart LR
+    GW[api-gateway] -- "GET/PUT/DELETE /api/v1/cart …<br/>POST /api/v1/cart/merge" --> CART((cart-service))
+    ORD[order-service] -- "GET /internal/carts/{c}/checkout-snapshot" --> CART
+    CART -- "POST /internal/products/prices {skus}" --> CAT[catalog-service]
+    CART -- "cart:c:… / cart:g:… hashes<br/>cart:seen:… keys" --> R[(Redis)]
+    K{{Kafka order.events}} -- "OrderConfirmed" --> CART

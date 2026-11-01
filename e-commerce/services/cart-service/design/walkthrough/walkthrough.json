@@ -1,0 +1,380 @@
+{
+ "title": "cart-service",
+ "subtitle": "Carts in Redis, always current prices",
+ "nodes": [
+  {
+   "id": "cust",
+   "label": "Shopper",
+   "kind": "client",
+   "tech": "guest or signed in",
+   "x": 130,
+   "y": 120
+  },
+  {
+   "id": "cart",
+   "label": "cart-service",
+   "kind": "service",
+   "tech": "Java 25",
+   "x": 470,
+   "y": 120
+  },
+  {
+   "id": "redis",
+   "label": "Redis",
+   "kind": "cache",
+   "tech": "cart hashes",
+   "x": 470,
+   "y": 340
+  },
+  {
+   "id": "cat",
+   "label": "catalog-service",
+   "kind": "service",
+   "tech": "current prices",
+   "x": 820,
+   "y": 120
+  },
+  {
+   "id": "ord",
+   "label": "order-service",
+   "kind": "service",
+   "tech": "checkout",
+   "x": 820,
+   "y": 340
+  },
+  {
+   "id": "kafka",
+   "label": "Kafka",
+   "kind": "queue",
+   "tech": "order.events",
+   "x": 130,
+   "y": 340
+  }
+ ],
+ "edges": [
+  {
+   "from": "cust",
+   "to": "cart"
+  },
+  {
+   "from": "cart",
+   "to": "redis"
+  },
+  {
+   "from": "cart",
+   "to": "cat"
+  },
+  {
+   "from": "ord",
+   "to": "cart"
+  },
+  {
+   "from": "kafka",
+   "to": "cart",
+   "dashed": true
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "add",
+   "title": "Add to cart as a guest",
+   "summary": "Stored in Redis, priced on read",
+   "steps": [
+    {
+     "say": "A visitor who is not signed in adds two pairs of trail shoes. The browser sends its anonymous guest id.",
+     "active": [
+      "cust",
+      "cart"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "cart",
+       "label": "PUT SKU-1001 × 2 (guest g7)",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The cart is a Redis hash. One small script writes the line and resets the 30-day expiry, so a key can never live forever.",
+     "active": [
+      "cart",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "cart",
+       "to": "redis",
+       "label": "HSET + EXPIRE (one script)",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "cart:g:g7",
+      "rows": {
+       "SKU-1001": 2,
+       "expires in": "30 days"
+      }
+     }
+    },
+    {
+     "say": "Prices are never stored with the cart, because they would go stale. The cart asks the catalogue for the current price; the answer is cached for 30 seconds.",
+     "active": [
+      "cart",
+      "cat"
+     ],
+     "packets": [
+      {
+       "from": "cart",
+       "to": "cat",
+       "label": "prices [SKU-1001]",
+       "kind": "req"
+      },
+      {
+       "from": "cat",
+       "to": "cart",
+       "label": "89.90 € · active",
+       "kind": "res"
+      }
+     ]
+    },
+    {
+     "say": "The shopper sees two pairs at 89.90 euros: 179.80 in total, ready for checkout.",
+     "ok": [
+      "cust"
+     ],
+     "packets": [
+      {
+       "from": "cart",
+       "to": "cust",
+       "label": "total 179.80 € · CURRENT",
+       "kind": "res"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "merge",
+   "title": "Sign in: carts merge",
+   "summary": "Nothing is lost",
+   "steps": [
+    {
+     "say": "The visitor signs in as Ada. Ada already had one pair in her own cart from last week.",
+     "active": [
+      "cust",
+      "cart"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "cart",
+       "label": "POST /merge (JWT, guest g7)",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Carts",
+      "rows": {
+       "cart:g:g7": "SKU-1001 × 2",
+       "cart:c:ada": "SKU-1001 × 1"
+      }
+     }
+    },
+    {
+     "say": "Both carts are read and the quantities are added, capped at 99 per line.",
+     "active": [
+      "cart",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "cart",
+       "to": "redis",
+       "label": "HGETALL both",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Ada's cart now has three pairs, and the guest cart is deleted.",
+     "ok": [
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "cart",
+       "to": "redis",
+       "label": "write merged · DEL guest",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Carts",
+      "rows": {
+       "cart:g:g7": "—",
+       "cart:c:ada": "SKU-1001 × 3"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "degraded",
+   "title": "Catalogue down: degraded, not broken",
+   "summary": "Show the cart, block checkout",
+   "steps": [
+    {
+     "say": "The catalogue service is having trouble and price requests time out.",
+     "bad": [
+      "cat"
+     ],
+     "packets": [
+      {
+       "from": "cart",
+       "to": "cat",
+       "label": "prices",
+       "kind": "req"
+      },
+      {
+       "from": "cat",
+       "to": "cart",
+       "label": "timeout",
+       "kind": "error"
+      }
+     ]
+    },
+    {
+     "say": "After repeated failures the circuit breaker opens, so the cart stops waiting for the catalogue at all.",
+     "active": [
+      "cart"
+     ],
+     "badges": [
+      {
+       "node": "cart",
+       "text": "breaker open",
+       "tone": "warn"
+      }
+     ]
+    },
+    {
+     "say": "Ada still sees her cart and can change quantities. Prices show as pending, and the checkout button is disabled.",
+     "active": [
+      "cust"
+     ],
+     "packets": [
+      {
+       "from": "cart",
+       "to": "cust",
+       "label": "pricing PENDING",
+       "kind": "res"
+      }
+     ]
+    },
+    {
+     "say": "If order-service asks for a checkout snapshot now, the cart answers 503 rather than risk selling at a stale price.",
+     "bad": [
+      "ord"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "cart",
+       "label": "checkout snapshot",
+       "kind": "req"
+      },
+      {
+       "from": "cart",
+       "to": "ord",
+       "label": "503 PRICING_UNAVAILABLE",
+       "kind": "error"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "checkout",
+   "title": "Checkout snapshot, then emptied",
+   "summary": "Event-driven clean-up",
+   "steps": [
+    {
+     "say": "The catalogue is healthy again. Ada checks out, and order-service asks for her priced cart.",
+     "active": [
+      "ord",
+      "cart"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "cart",
+       "label": "checkout snapshot",
+       "kind": "req"
+      },
+      {
+       "from": "cart",
+       "to": "ord",
+       "label": "3 × 89.90 €",
+       "kind": "res"
+      }
+     ]
+    },
+    {
+     "say": "The order is confirmed and order-service publishes OrderConfirmed.",
+     "active": [
+      "kafka"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "cart",
+       "label": "OrderConfirmed (e9)",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "The cart records event e9 as seen and deletes Ada's cart.",
+     "ok": [
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "cart",
+       "to": "redis",
+       "label": "SET seen e9 NX · DEL cart:c:ada",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "cart:c:ada",
+      "rows": {
+       "status": "emptied"
+      }
+     }
+    },
+    {
+     "say": "If the same event arrives again, it is ignored, so a new cart Ada starts afterwards is safe.",
+     "active": [
+      "cart"
+     ],
+     "badges": [
+      {
+       "node": "cart",
+       "text": "duplicate skipped",
+       "tone": "ok"
+      }
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "cart",
+       "label": "OrderConfirmed (e9 again)",
+       "kind": "event"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

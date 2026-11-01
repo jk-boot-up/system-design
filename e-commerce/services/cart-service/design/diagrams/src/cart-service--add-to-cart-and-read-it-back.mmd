@@ -1,0 +1,12 @@
+sequenceDiagram
+    autonumber
+    participant B as Browser (guest)
+    participant C as cart-service
+    participant R as Redis
+    participant CAT as catalog-service
+    B->>C: PUT /api/v1/cart/items/SKU-1001 {quantity: 2} (X-Guest-Id)
+    C->>C: validate SKU and quantity (domain)
+    C->>R: EVAL set-line: HSET cart:g:… SKU-1001 2 · EXPIRE 30d
+    C->>CAT: prices [SKU-1001] (cache miss, 300 ms)
+    CAT-->>C: Trail Runner 89.90 € ACTIVE
+    C-->>B: 200 {lines, total 179.80 €, pricing CURRENT, checkoutReady}

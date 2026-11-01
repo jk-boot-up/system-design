@@ -12,8 +12,8 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Specification and plans | ██████████ 100% | SPEC, PLAN, design plan, implementation plan, prerequisites | Keep in step with changes |
 | System design documents | ███████░░░ 70% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, 11 ADRs | System/module/service diagrams; security, observability, capacity, runbooks |
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
-| Services (11) | ████░░░░░░ 35% | inventory-service, order-service, payment-service complete | cart-service, then catalog, search, review, gateway, notification, recommendation, analytics |
-| Walkthroughs | ███░░░░░░░ 30% | inventory-service, order-service, payment-service | Each new service, system walkthrough |
+| Services (11) | █████░░░░░ 45% | inventory, order, payment, cart complete | catalog-service, then search, review, gateway, notification, recommendation, analytics |
+| Walkthroughs | ████░░░░░░ 40% | inventory, order, payment, cart | Each new service, system walkthrough |
 | Local stack and Kubernetes overlays | ░░░░░░░░░░ 0% | inventory-service `k8s/` base | Compose stack, overlays |
 | End-to-end and performance tests | ░░░░░░░░░░ 0% | — | After checkout works end to end |
 
@@ -24,7 +24,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | inventory-service | ✅ | ✅ 19 passing (incl. PostgreSQL + Kafka containers) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | order-service | ✅ | ✅ 29 passing (incl. PostgreSQL + Kafka + HTTP) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | payment-service | ✅ | ✅ 17 passing (incl. PostgreSQL + Kafka) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| cart-service | ⏳ | | | | | | |
+| cart-service | ✅ | ✅ 16 passing (incl. Redis + Kafka) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | catalog-service | ⏳ | | | | | | |
 | search-service | ⏳ | | | | | | |
 | review-service | ⏳ | | | | | | |
@@ -34,6 +34,9 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | analytics (ClickHouse) | ⏳ | | | | | | |
 
 ## Recently completed
+
+* cart-service: Redis carts with atomic line + expiry writes, guest merge on sign-in, prices re-read from the catalogue with a
+  degraded "pricing pending" mode, checkout snapshot that refuses stale prices, cart emptied once per confirmed order.
 
 * payment-service: one payment per order, provider calls outside transactions, void requests that always win, reconciler that
   voids late provider successes (proved with a real late-success race), append-only audit trail.
@@ -50,7 +53,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* cart-service: Redis carts for guests and customers, re-pricing through catalog with a degraded fallback, checkout snapshot, cart clearing on OrderConfirmed.
+* catalog-service: products and categories (PostgreSQL + JSONB), ETag concurrency, Redis cache-aside, presigned MinIO uploads, ProductChanged outbox.
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

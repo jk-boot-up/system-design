@@ -1,0 +1,37 @@
+flowchart TB
+    subgraph web[adapter.web]
+        CC[CartController<br/>customer or guest]
+        IC[InternalCartController<br/>checkout snapshot]
+        V[CartView]
+    end
+    subgraph app[application]
+        CS[CartService]
+        subgraph ports[port]
+            CR[[CartRepository]]
+            PP[[PricingPort]]
+            PE[[ProcessedEvents]]
+        end
+    end
+    subgraph dom[domain]
+        C[Cart]
+        O[CartOwner]
+        PC[PricedCart]
+        M[Money]
+    end
+    subgraph redis[adapter.redis]
+        RR[RedisCartRepository<br/>Lua: HSET/HDEL + EXPIRE]
+        RP[RedisProcessedEvents<br/>SET NX EX]
+    end
+    subgraph client[adapter.client]
+        CPC[CatalogPricingClient<br/>Caffeine 30 s + breaker]
+    end
+    subgraph msg[adapter.messaging]
+        OCL[OrderConfirmedListener]
+    end
+    CC & IC --> CS
+    OCL --> CS
+    CS --> dom
+    CS --> CR & PP & PE
+    CR -.-> RR
+    PE -.-> RP
+    PP -.-> CPC

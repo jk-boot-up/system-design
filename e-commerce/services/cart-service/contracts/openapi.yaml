@@ -1,0 +1,49 @@
+openapi: 3.1.0
+info:
+  title: cart-service API
+  version: 1.0.0
+  description: >
+    Public cart API (through the gateway) and the internal checkout snapshot for order-service. A cart belongs to a customer
+    (JWT subject) or a guest (X-Guest-Id header). Lines are priced from the catalogue on every read; when the catalogue is
+    unreachable `pricing` is PENDING and checkout is blocked.
+paths:
+  /api/v1/cart:
+    get: { operationId: getCart, parameters: [ { $ref: '#/components/parameters/Guest' } ], responses: { '200': { $ref: '#/components/responses/Cart' }, '400': { $ref: '#/components/responses/Problem' } } }
+    delete: { operationId: clearCart, parameters: [ { $ref: '#/components/parameters/Guest' } ], responses: { '204': { description: Cleared } } }
+  /api/v1/cart/items/{sku}:
+    put:
+      operationId: setQuantity
+      parameters: [ { $ref: '#/components/parameters/Guest' }, { name: sku, in: path, required: true, schema: { type: string } } ]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [quantity], properties: { quantity: { type: integer, minimum: 0, maximum: 99, description: '0 removes the line' } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Cart' }, '400': { $ref: '#/components/responses/Problem' }, '409': { $ref: '#/components/responses/Problem' } }
+  /api/v1/cart/merge:
+    post:
+      operationId: mergeGuestCart
+      security: [ { bearer: [] } ]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [guestId], properties: { guestId: { type: string, format: uuid } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Cart' }, '401': { $ref: '#/components/responses/Problem' } }
+  /internal/carts/{customerId}/checkout-snapshot:
+    get:
+      operationId: checkoutSnapshot
+      parameters: [ { name: customerId, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '503': { description: 'PRICING_UNAVAILABLE: prices cannot be confirmed (Retry-After)', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+components:
+  securitySchemes: { bearer: { type: http, scheme: bearer, bearerFormat: JWT } }
+  parameters:
+    Guest: { name: X-Guest-Id, in: header, required: false, schema: { type: string, format: uuid }, description: 'Required when no customer token is sent' }
+  responses:
+    Cart: { description: Priced cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } }
+    Problem: { description: Problem details, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  schemas:
+    Money: { type: object, properties: { amount: { type: string }, currency: { type: string } } }
+    Cart:
+      type: object
+      properties:
+        owner: { type: string, example: 'c:0193…' }
+        lines: { type: array, items: { type: object, properties: { sku: { type: string }, name: { type: string }, quantity: { type: integer }, unitPrice: { $ref: '#/components/schemas/Money' }, lineTotal: { $ref: '#/components/schemas/Money' }, available: { type: boolean } } } }
+        total: { $ref: '#/components/schemas/Money' }
+        pricing: { type: string, enum: [CURRENT, PENDING] }
+        checkoutReady: { type: boolean }
+    Problem: { type: object, properties: { title: { type: string }, status: { type: integer }, detail: { type: string }, code: { type: string } } }
