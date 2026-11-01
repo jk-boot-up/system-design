@@ -1,0 +1,21 @@
+# Only the gateway may call order-service. order-service may call cart, inventory and payment, its database, Kafka and Keycloak.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: order-service
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: api-gateway } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-platform } }
+      ports: [ { port: 8085 } ]
+  egress:
+    - to:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: cart-service } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: inventory-service } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: payment-service } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: pgbouncer-orders } }
+    - to: [ { namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-platform } } } ]
+    - ports: [ { port: 53, protocol: UDP }, { port: 53, protocol: TCP } ]

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jkbootup.dev/e-commerce/events/order.OrderCancelled.v1.json",
+  "title": "order.OrderCancelled v1",
+  "description": "Published on topic order.events, key = order id.",
+  "type": "object",
+  "required": [
+    "eventId",
+    "type",
+    "version",
+    "occurredAt",
+    "aggregateId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "type": {
+      "const": "order.OrderCancelled"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "aggregateId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "traceparent": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "customerEmail",
+        "customerId",
+        "orderId",
+        "reason",
+        "total"
+      ],
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "customerId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "customerEmail": {
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "OUT_OF_STOCK",
+            "INVENTORY_UNAVAILABLE",
+            "PAYMENT_DECLINED",
+            "PAYMENT_UNKNOWN",
+            "CAPTURE_FAILED",
+            "RESERVATION_EXPIRED",
+            "CHECKOUT_ABANDONED",
+            "CUSTOMER_REQUEST"
+          ]
+        },
+        "total": {
+          "type": "object",
+          "required": [
+            "amount",
+            "currency"
+          ],
+          "properties": {
+            "amount": {
+              "type": "string"
+            },
+            "currency": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3
+            }
+          }
+        }
+      }
+    }
+  }
+}

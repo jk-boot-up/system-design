@@ -1,0 +1,92 @@
+openapi: 3.1.0
+info:
+  title: order-service public API
+  version: 1.0.0
+  description: >
+    Place, read and cancel orders. Called through the API gateway with a customer JWT (subject = customer id, `email` claim).
+    Errors are RFC 9457 problem details with a stable `code`; failed checkouts also carry the order's id and status.
+servers:
+  - url: https://shop.example/api/v1
+security:
+  - bearer: []
+paths:
+  /orders:
+    post:
+      summary: Place an order from the customer's cart (checkout saga)
+      operationId: placeOrder
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{1,64}$' },
+            description: 'Repeat the same key to retry safely: the first result is returned again' }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [paymentToken], properties: { paymentToken: { type: string, maxLength: 200 } } } } }
+      responses:
+        '201': { description: Confirmed, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '200': { description: Replay of an earlier request with the same key, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '202': { description: Payment authorised; finishing in the background (poll the Location), content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '402': { $ref: '#/components/responses/CheckoutProblem' }
+        '409': { $ref: '#/components/responses/CheckoutProblem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/CheckoutProblem' }
+        '504': { $ref: '#/components/responses/CheckoutProblem' }
+    get:
+      summary: The customer's orders, newest first
+      operationId: listOrders
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: One page
+          content:
+            application/json:
+              schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Order' } }, nextCursor: { type: [string, 'null'] } } }
+  /orders/{id}:
+    get:
+      summary: One order (owner or staff)
+      operationId: getOrder
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses:
+        '200': { description: The order, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /orders/{id}/cancel:
+    post:
+      summary: Cancel a confirmed order (refund and return stock)
+      operationId: cancelOrder
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses:
+        '200': { description: Cancelled, or CANCELLING while the refund completes, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Problem:
+      description: Problem details
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    CheckoutProblem:
+      description: 'Checkout did not complete: OUT_OF_STOCK (409), PAYMENT_DECLINED (402), DEPENDENCY_UNAVAILABLE (503, Retry-After), PAYMENT_UNKNOWN (504)'
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+  schemas:
+    Money: { type: object, required: [amount, currency], properties: { amount: { type: string, example: '179.80' }, currency: { type: string, example: EUR } } }
+    Order:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [PENDING, CONFIRMED, CANCELLING, CANCELLED, SHIPPED, DELIVERED] }
+        cancelReason: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        lines:
+          type: array
+          items: { type: object, properties: { sku: { type: string }, productName: { type: string }, quantity: { type: integer }, unitPrice: { $ref: '#/components/schemas/Money' } } }
+        total: { $ref: '#/components/schemas/Money' }
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }
+        order: { type: object, properties: { id: { type: string }, status: { type: string }, cancelReason: { type: string } } }

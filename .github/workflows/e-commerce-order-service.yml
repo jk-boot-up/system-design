@@ -1,0 +1,28 @@
+name: e-commerce / order-service
+
+on:
+  push:
+    paths: ['e-commerce/services/order-service/**', '.github/workflows/e-commerce-order-service.yml']
+  pull_request:
+    paths: ['e-commerce/services/order-service/**', '.github/workflows/e-commerce-order-service.yml']
+
+defaults:
+  run:
+    working-directory: e-commerce/services/order-service
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '25' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit, architecture and container tests
+        run: ./gradlew build -PwithContainers
+      - name: Container image
+        run: docker build -t e-commerce/order-service:${{ github.sha }} .
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: order-service-test-reports, path: e-commerce/services/order-service/build/reports }
