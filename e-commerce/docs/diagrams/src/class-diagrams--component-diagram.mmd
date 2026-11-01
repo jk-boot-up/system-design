@@ -1,0 +1,28 @@
+flowchart LR
+    subgraph gateway[api-gateway]
+        RF[RouteConfig] --- JWT[JwtAuthFilter] --- RL[RateLimitFilter] --- FB[FallbackController]
+    end
+    subgraph order[order-service]
+        OC[OrderController] --> PO[PlaceOrderUseCase]
+        OC --> CO[CancelOrderUseCase]
+        PO --> CS[CheckoutSaga]
+        CS --> OR[(OrderRepository)]
+        CS --> IP[[InventoryPort]]
+        CS --> PP[[PaymentPort]]
+        CS --> CP[[CartPort]]
+        OR --> OB[OutboxWriter]
+        REC[SagaRecoveryJob] --> CS
+        RELAY[OutboxRelay] --> KP[[EventPublisher]]
+    end
+    subgraph inventory[inventory-service]
+        RC[ReservationController] --> RS[ReservationService] --> SR[(StockRepository)]
+        EXP[ReservationExpiryJob] --> RS
+    end
+    subgraph payment[payment-service]
+        PC[PaymentController] --> PS[PaymentService] --> PR[(PaymentRepository)]
+        PS --> PG[[PaymentProvider]]
+        RCN[PaymentReconciler] --> PS
+    end
+    IP -. HTTP .-> RC
+    PP -. HTTP .-> PC
+    gateway -. HTTP .-> OC

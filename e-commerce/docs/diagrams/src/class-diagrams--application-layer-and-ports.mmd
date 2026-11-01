@@ -1,0 +1,66 @@
+classDiagram
+    direction TB
+    class PlaceOrderUseCase {
+      <<interface>>
+      +place(PlaceOrderCommand) PlaceOrderResult
+    }
+    class CheckoutSaga {
+      <<service, process manager>>
+      -OrderRepository orders
+      -CartPort cart
+      -InventoryPort inventory
+      -PaymentPort payment
+      -TransactionRunner tx
+      +place(PlaceOrderCommand) PlaceOrderResult
+      +resume(Order) void
+      -compensate(Order, CancelReason) void
+    }
+    class OrderRepository {
+      <<port>>
+      +findById(UUID) Optional~Order~
+      +findByIdempotencyKey(UUID customerId, String key) Optional~Order~
+      +insert(Order, String idempotencyKey)
+      +update(Order)
+      +findStuck(Duration olderThan, int limit) List~Order~
+      +findByCustomer(UUID, Cursor, int) Page~Order~
+    }
+    class CartPort {
+      <<port>>
+      +checkoutSnapshot(UUID customerId) CartSnapshot
+    }
+    class InventoryPort {
+      <<port>>
+      +reserve(UUID orderId, List~OrderLine~) ReservationResult
+      +commit(UUID orderId)
+      +release(UUID orderId)
+      +returnStock(UUID orderId)
+    }
+    class PaymentPort {
+      <<port>>
+      +authorize(UUID orderId, Money, String token) PaymentResult
+      +capture(UUID orderId) PaymentResult
+      +voidAuthorization(UUID orderId)
+      +refund(UUID orderId) PaymentResult
+    }
+    class ReservationResult {
+      <<sealed interface>>
+    }
+    class Reserved { <<record>> }
+    class OutOfStock { <<record>> +String sku }
+    class Unavailable { <<record>> }
+    PlaceOrderUseCase <|.. CheckoutSaga
+    CheckoutSaga --> OrderRepository
+    CheckoutSaga --> CartPort
+    CheckoutSaga --> InventoryPort
+    CheckoutSaga --> PaymentPort
+    ReservationResult <|.. Reserved
+    ReservationResult <|.. OutOfStock
+    ReservationResult <|.. Unavailable
+    class JdbcOrderRepository { <<adapter>> }
+    class InventoryHttpClient { <<adapter, Resilience4j>> }
+    class PaymentHttpClient { <<adapter, Resilience4j>> }
+    class CartHttpClient { <<adapter>> }
+    OrderRepository <|.. JdbcOrderRepository
+    InventoryPort <|.. InventoryHttpClient
+    PaymentPort <|.. PaymentHttpClient
+    CartPort <|.. CartHttpClient

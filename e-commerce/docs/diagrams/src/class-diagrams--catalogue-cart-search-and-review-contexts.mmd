@@ -1,0 +1,62 @@
+classDiagram
+    class Product {
+      <<aggregate root - catalog>>
+      -UUID id
+      -Sku sku
+      -String name
+      -String description
+      -UUID categoryId
+      -String brand
+      -Money price
+      -Map~String,String~ attributes
+      -ProductStatus status
+      -List~ProductImage~ images
+      -long version
+      +changePrice(Money)
+      +activate()
+      +archive()
+      +addImage(ProductImage)
+    }
+    class Category { <<entity>> -UUID id -UUID parentId -String slug -String name }
+    class Cart {
+      <<aggregate root - cart>>
+      -CartOwner owner
+      -Map~Sku,Quantity~ items
+      +setQuantity(Sku, int)
+      +mergeFrom(Cart)
+      +isEmpty() boolean
+    }
+    class CartOwner { <<value object>> +kind CUSTOMER|GUEST +UUID id +key() String }
+    class ProductDocument {
+      <<read model - search>>
+      id, sku, name, description, category, brand,
+      price, currency, attributes, inStock, available,
+      status, updatedAt, catalogVersion
+    }
+    class SearchQuery {
+      <<builder>>
+      +text(String)
+      +filter(SearchFilter)
+      +sort(SortOrder)
+      +after(Cursor)
+      +build() SearchQuery
+    }
+    class SearchFilter {
+      <<specification>>
+      +and(SearchFilter) SearchFilter
+    }
+    class Review {
+      <<entity - review>>
+      -Sku sku
+      -UUID reviewId
+      -UUID customerId
+      -int rating
+      -String title
+      -String body
+      -boolean verified
+      -Instant createdAt
+    }
+    class RatingSummary { <<read model>> +long count +long total +average() double }
+    Product --> Category
+    Cart --> CartOwner
+    SearchQuery --> SearchFilter

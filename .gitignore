@@ -1,26 +1,48 @@
-# build output
+# ---------- build output (never committed) ----------
+# Java / Gradle
 build/
 out/
 target/
-bin/
 .gradle/
 .kotlin/
 *.class
-# tooling
-node_modules/
+*.jar
+!**/gradle/wrapper/gradle-wrapper.jar
+*.war
+*.ear
+hs_err_pid*
+# Go
+bin/
+dist/
+*.exe
+*.test
+*.out
+coverage.txt
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+.eggs/
 .venv/
 venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
+# Node (documentation tooling)
+node_modules/
+# Test and tool reports
 coverage/
-# IDE / OS
+reports/
+*.log
+gatling-results/
+
+# ---------- local environment ----------
+.env
+.env.*
+*.local.yaml
 .idea/
 *.iml
 .vscode/
 .DS_Store
-# local secrets
-.env
-*.local.yaml

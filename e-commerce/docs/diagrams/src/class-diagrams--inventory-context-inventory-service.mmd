@@ -1,0 +1,57 @@
+classDiagram
+    class StockItem {
+      <<aggregate root>>
+      -Sku sku
+      -String warehouse
+      -int available
+      -int reserved
+      -long version
+      +canReserve(Quantity) boolean
+    }
+    class Reservation {
+      <<entity>>
+      -UUID orderId
+      -Sku sku
+      -Quantity quantity
+      -ReservationStatus status
+      -Instant expiresAt
+      +commit()
+      +release()
+      +expire(Instant now)
+      +returnToStock()
+    }
+    class ReservationStatus {
+      <<enumeration>>
+      RESERVED
+      COMMITTED
+      RELEASED
+      EXPIRED
+      RETURNED
+    }
+    class ReservationService {
+      <<application service>>
+      +reserve(UUID orderId, List~Line~) ReserveOutcome
+      +commit(UUID orderId)
+      +release(UUID orderId)
+      +returnStock(UUID orderId)
+      +expireDue(Instant now, int limit) int
+    }
+    class StockRepository {
+      <<port>>
+      +tryReserve(Sku, Quantity) boolean
+      +commitReserved(Sku, Quantity)
+      +releaseReserved(Sku, Quantity)
+      +restock(Sku, Quantity)
+      +availability(Sku) int
+    }
+    class ReservationRepository {
+      <<port>>
+      +insertAll(List~Reservation~)
+      +findByOrder(UUID) List~Reservation~
+      +lockDue(Instant, int) List~Reservation~
+      +update(Reservation)
+    }
+    Reservation --> ReservationStatus
+    ReservationService --> StockRepository
+    ReservationService --> ReservationRepository
+    StockItem "1" <-- "*" Reservation : reserves from

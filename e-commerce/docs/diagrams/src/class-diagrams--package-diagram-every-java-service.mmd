@@ -1,0 +1,17 @@
+flowchart TB
+    subgraph svc[com.jkbootup.ecommerce.order]
+        domain[domain<br/>aggregates, value objects, events, policies]
+        application[application<br/>use cases, ports, transactions]
+        adapter_web[adapter.web<br/>controllers, DTOs, problem details]
+        adapter_persistence[adapter.persistence<br/>JDBC repositories, outbox]
+        adapter_messaging[adapter.messaging<br/>Kafka publisher, consumers]
+        adapter_client[adapter.client<br/>HTTP clients, Resilience4j]
+        config[config<br/>Spring wiring]
+    end
+    adapter_web --> application
+    adapter_messaging --> application
+    adapter_persistence --> application
+    adapter_client --> application
+    application --> domain
+    adapter_persistence --> domain
+    config --> adapter_web & adapter_persistence & adapter_messaging & adapter_client & application

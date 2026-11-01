@@ -1,0 +1,30 @@
+classDiagram
+    class OutboxWriter {
+      +append(String topic, String aggregateType, String aggregateId, EventEnvelope)
+    }
+    class OutboxRelay {
+      <<scheduled, every 100 ms>>
+      -int batchSize = 500
+      +relayOnce() int
+    }
+    class EventPublisher {
+      <<port>>
+      +publishAll(List~OutboxRecord~)
+    }
+    class KafkaEventPublisher { <<adapter>> }
+    class EventEnvelope {
+      <<record>>
+      +UUID eventId
+      +String type
+      +int version
+      +Instant occurredAt
+      +String aggregateId
+      +String traceparent
+      +JsonNode payload
+    }
+    class IdempotentHandler {
+      +handleOnce(String consumer, UUID eventId, Runnable effect) boolean
+    }
+    OutboxRelay --> EventPublisher
+    EventPublisher <|.. KafkaEventPublisher
+    OutboxWriter ..> EventEnvelope

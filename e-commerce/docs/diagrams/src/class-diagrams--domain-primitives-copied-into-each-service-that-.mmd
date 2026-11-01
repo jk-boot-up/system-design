@@ -1,0 +1,29 @@
+classDiagram
+    class Money {
+      <<value object>>
+      -BigDecimal amount
+      -Currency currency
+      +of(String amount, String currency) Money$
+      +zero(Currency) Money$
+      +plus(Money) Money
+      +times(int quantity) Money
+      +isPositive() boolean
+    }
+    class Sku {
+      <<value object>>
+      -String value
+      +of(String) Sku$
+    }
+    class Quantity {
+      <<value object>>
+      -int value
+      +of(int) Quantity$
+      +plus(Quantity) Quantity
+    }
+    class Ids {
+      <<utility>>
+      +newId() UUID$
+      +timestampOf(UUID) Instant$
+    }
+    note for Money "scale 2, HALF_EVEN; mixing currencies throws"
+    note for Ids "UUIDv7: 48-bit Unix ms time, then random bits"

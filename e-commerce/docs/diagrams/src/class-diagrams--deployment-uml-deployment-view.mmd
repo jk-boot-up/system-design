@@ -1,0 +1,21 @@
+flowchart TB
+    subgraph node1[«device» Kubernetes worker node]
+        subgraph pod1[«execution environment» pod: order-service]
+            jvm[«artifact» order-service.jar<br/>JRE 25, AppCDS]
+            otel1[«artifact» OTel Java agent]
+        end
+        subgraph pod2[«execution environment» pod: notification-service]
+            gobin[«artifact» notification binary<br/>distroless]
+        end
+    end
+    subgraph node2[«device» storage node]
+        pgdb[«database» PostgreSQL orders]
+    end
+    subgraph node3[«device» broker node]
+        kafkan[«executionEnvironment» Kafka broker]
+        rmqn[«executionEnvironment» RabbitMQ node]
+    end
+    jvm -- «JDBC/TLS» --> pgdb
+    jvm -- «Kafka protocol/TLS» --> kafkan
+    gobin -- «Kafka protocol/TLS» --> kafkan
+    gobin -- «AMQP 0-9-1/TLS» --> rmqn

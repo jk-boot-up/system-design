@@ -1,0 +1,82 @@
+classDiagram
+    direction LR
+    class Order {
+      <<aggregate root>>
+      -UUID id
+      -UUID customerId
+      -String customerEmail
+      -List~OrderLine~ lines
+      -OrderStatus status
+      -SagaStep sagaStep
+      -CancelReason cancelReason
+      -Money total
+      -long version
+      -Instant createdAt
+      -Instant updatedAt
+      -List~DomainEvent~ pendingEvents
+      +place(customerId, email, lines, clock) Order$
+      +recordStep(SagaStep)
+      +confirm()
+      +cancel(CancelReason)
+      +requestCancellation()
+      +completeCancellation()
+      +isCancellable() boolean
+      +pullEvents() List~DomainEvent~
+    }
+    class OrderLine {
+      <<value object>>
+      +int lineNo
+      +Sku sku
+      +String productName
+      +Quantity quantity
+      +Money unitPrice
+      +lineTotal() Money
+    }
+    class OrderStatus {
+      <<enumeration>>
+      PENDING
+      CONFIRMED
+      CANCELLING
+      CANCELLED
+      SHIPPED
+      DELIVERED
+      +canMoveTo(OrderStatus) boolean
+    }
+    class SagaStep {
+      <<enumeration>>
+      STARTED
+      STOCK_RESERVED
+      PAYMENT_AUTHORIZED
+      STOCK_COMMITTED
+      PAYMENT_CAPTURED
+      COMPLETED
+      COMPENSATING
+      COMPENSATED
+      REFUNDING
+    }
+    class CancelReason {
+      <<enumeration>>
+      OUT_OF_STOCK
+      INVENTORY_UNAVAILABLE
+      PAYMENT_DECLINED
+      PAYMENT_UNKNOWN
+      CAPTURE_FAILED
+      CHECKOUT_ABANDONED
+      CUSTOMER_REQUEST
+    }
+    class DomainEvent {
+      <<interface>>
+      +type() String
+      +aggregateId() String
+    }
+    class OrderPlaced { <<record>> }
+    class OrderConfirmed { <<record>> }
+    class OrderCancelled { <<record>> }
+    Order "1" *-- "1..*" OrderLine
+    Order --> OrderStatus
+    Order --> SagaStep
+    Order --> CancelReason
+    Order ..> DomainEvent : records
+    DomainEvent <|.. OrderPlaced
+    DomainEvent <|.. OrderConfirmed
+    DomainEvent <|.. OrderCancelled

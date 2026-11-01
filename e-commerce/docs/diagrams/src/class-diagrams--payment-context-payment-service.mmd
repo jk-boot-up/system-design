@@ -1,0 +1,61 @@
+classDiagram
+    class Payment {
+      <<aggregate root>>
+      -UUID id
+      -UUID orderId
+      -Money amount
+      -PaymentStatus status
+      -String paymentToken
+      -String providerRef
+      -boolean voidRequested
+      -long version
+      +authorizing(orderId, amount, token) Payment$
+      +authorized(String ref)
+      +declined(String reason)
+      +unknown()
+      +captured()
+      +voided()
+      +refunded()
+      +requestVoid()
+    }
+    class PaymentStatus {
+      <<enumeration>>
+      AUTHORIZING
+      AUTHORIZED
+      CAPTURED
+      DECLINED
+      UNKNOWN
+      VOIDED
+      REFUNDED
+    }
+    class PaymentProvider {
+      <<port, strategy>>
+      +authorize(ProviderRequest) ProviderResult
+      +capture(String key, String ref) ProviderResult
+      +voidAuthorization(String key, String ref) ProviderResult
+      +refund(String key, String ref, Money) ProviderResult
+      +lookup(String key) Optional~ProviderResult~
+    }
+    class SimulatedPaymentProvider {
+      <<adapter>>
+      tokens: tok_ok, tok_decline, tok_timeout
+    }
+    class ProviderAntiCorruptionLayer {
+      <<adapter for a real provider>>
+      maps provider codes to ProviderResult
+    }
+    class PaymentService {
+      +authorize(orderId, amount, token) Payment
+      +capture(orderId) Payment
+      +voidAuthorization(orderId) Payment
+      +refund(orderId) Payment
+    }
+    class PaymentReconciler {
+      <<scheduled>>
+      +settleUnknown()
+    }
+    Payment --> PaymentStatus
+    PaymentService --> PaymentProvider
+    PaymentProvider <|.. SimulatedPaymentProvider
+    PaymentProvider <|.. ProviderAntiCorruptionLayer
+    PaymentReconciler --> PaymentService
