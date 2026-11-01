@@ -30,6 +30,7 @@ dependencies {
 
     testImplementation(platform(SpringBootPlugin.BOM_COORDINATES))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testImplementation("org.testcontainers:testcontainers-kafka")
