@@ -105,26 +105,23 @@ that service needs; you can work on one service without installing everything he
 <p>Gradle is <strong>not</strong> a prerequisite: every Java service ships its own Gradle wrapper (<code>./gradlew</code>), which downloads the right Gradle
 version the first time it runs.</p>
 <h3 id="install">Install<a class="headerlink" href="#install" title="Permanent link">#</a></h3>
-<details><summary>macOS (Homebrew)</summary>
-
+<details>
+<summary>macOS (Homebrew)</summary>
 <pre class="highlight"><code class="language-bash">brew install git openjdk@25 go python@3.12 node jq
 brew install --cask docker            # Docker Desktop</code></pre>
 </details>
-
-<details><summary>Ubuntu / Debian</summary>
-
+<details>
+<summary>Ubuntu / Debian</summary>
 <pre class="highlight"><code class="language-bash">sudo apt-get update &amp;&amp; sudo apt-get install -y git curl jq python3.12 python3.12-venv
 # JDK 25: https://adoptium.net/installation/linux  (or: sdk install java 25-tem via SDKMAN)
 # Go:     https://go.dev/doc/install
 # Docker: https://docs.docker.com/engine/install/ubuntu/
 # Node:   https://nodejs.org/en/download/package-manager</code></pre>
 </details>
-
-<details><summary>Windows</summary>
-
-Use WSL 2 with Ubuntu and follow the Ubuntu steps, plus Docker Desktop with the WSL 2 backend.
+<details>
+<summary>Windows</summary>
+<p>Use WSL 2 with Ubuntu and follow the Ubuntu steps, plus Docker Desktop with the WSL 2 backend.</p>
 </details>
-
 <h2 id="2-machine-resources">2. Machine resources<a class="headerlink" href="#2-machine-resources" title="Permanent link">#</a></h2>
 <table>
 <thead>

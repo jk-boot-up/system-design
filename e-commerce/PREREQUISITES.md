@@ -20,7 +20,7 @@ version the first time it runs.
 
 ### Install
 
-<details><summary>macOS (Homebrew)</summary>
+<details markdown="1"><summary>macOS (Homebrew)</summary>
 
 ```bash
 brew install git openjdk@25 go python@3.12 node jq
@@ -28,7 +28,7 @@ brew install --cask docker            # Docker Desktop
 ```
 </details>
 
-<details><summary>Ubuntu / Debian</summary>
+<details markdown="1"><summary>Ubuntu / Debian</summary>
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git curl jq python3.12 python3.12-venv
@@ -39,7 +39,7 @@ sudo apt-get update && sudo apt-get install -y git curl jq python3.12 python3.12
 ```
 </details>
 
-<details><summary>Windows</summary>
+<details markdown="1"><summary>Windows</summary>
 
 Use WSL 2 with Ubuntu and follow the Ubuntu steps, plus Docker Desktop with the WSL 2 backend.
 </details>
