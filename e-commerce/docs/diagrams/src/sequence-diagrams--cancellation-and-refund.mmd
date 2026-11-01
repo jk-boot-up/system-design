@@ -1,0 +1,15 @@
+sequenceDiagram
+    autonumber
+    actor C as Customer
+    participant O as order-service
+    participant P as payment-service
+    participant I as inventory-service
+    C->>O: POST /api/v1/orders/{id}/cancel
+    O->>O: load order, check owner and policy (CONFIRMED and not shipped)
+    O->>O: status CANCELLING (saga step REFUNDING)
+    O->>P: POST /internal/payments/{orderId}/refund
+    P-->>O: 200 REFUNDED
+    O->>I: POST /internal/reservations/{orderId}/return
+    I-->>O: 200 (stock added back)
+    O->>O: CANCELLED (CUSTOMER_REQUEST), outbox OrderCancelled
+    O-->>C: 200 {status: CANCELLED}

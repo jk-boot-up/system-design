@@ -1,0 +1,36 @@
+flowchart TB
+    GW[api-gateway<br/>routing · JWT · rate limits]
+    subgraph Sync[Synchronous request path]
+        CAT[catalog-service]
+        SRCH[search-service]
+        CART[cart-service]
+        ORD[order-service<br/>saga orchestrator]
+        INV[inventory-service]
+        PAY[payment-service]
+    end
+    NOTIF[notification-service]
+    K[(Kafka)]
+    PGC[(PostgreSQL<br/>catalog)]
+    PGO[(PostgreSQL<br/>orders)]
+    PGI[(PostgreSQL<br/>inventory)]
+    PGP[(PostgreSQL<br/>payments)]
+    R[(Redis)]
+    OS[(OpenSearch)]
+
+    GW --> CAT & SRCH & CART & ORD
+    CAT --- PGC
+    SRCH --- OS
+    CART --- R
+    ORD --- PGO
+    INV --- PGI
+    PAY --- PGP
+    CART -->|price + stock check| CAT
+    ORD -->|reserve / release| INV
+    ORD -->|authorise / capture / refund| PAY
+    CAT -. ProductChanged .-> K
+    ORD -. Order events .-> K
+    INV -. Stock events .-> K
+    PAY -. Payment events .-> K
+    K -. ProductChanged .-> SRCH
+    K -. Order/Payment events .-> NOTIF
+    K -. StockChanged .-> SRCH

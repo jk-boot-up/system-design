@@ -1,0 +1,22 @@
+flowchart LR
+    subgraph adapters_in[Driving adapters]
+        rest[REST controllers]
+        consumer[Kafka consumers]
+        job[Scheduled jobs]
+    end
+    subgraph app[Application]
+        uc[Use cases<br/>one transaction each]
+        portsin[Inbound ports]
+        portsout[Outbound ports]
+    end
+    subgraph dom[Domain - pure Java]
+        agg[Aggregates, value objects,<br/>domain events, policies]
+    end
+    subgraph adapters_out[Driven adapters]
+        db[Persistence<br/>JDBC, Cassandra, Redis, OpenSearch]
+        clients[HTTP clients<br/>with Resilience4j]
+        outbox[Outbox writer]
+    end
+    rest & consumer & job --> portsin --> uc --> agg
+    uc --> portsout
+    portsout -. implemented by .-> db & clients & outbox

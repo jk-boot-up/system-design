@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1. High-level design</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">System design</a>
+  <span class="src">01-high-level-design.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="1-high-level-design">1. High-level design<a class="headerlink" href="#1-high-level-design" title="Permanent link">#</a></h1>
+<h2 id="11-system-context-c4-level-1">1.1 System context (C4 level 1)<a class="headerlink" href="#11-system-context-c4-level-1" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="System context (C4 level 1) diagram" src="../diagrams/high-level-design--system-context-c4-level-1.light.svg" data-light="../diagrams/high-level-design--system-context-c4-level-1.light.svg" data-dark="../diagrams/high-level-design--system-context-c4-level-1.dark.svg" loading="lazy"></figure></p>
+<p>The platform never sees card numbers; the browser tokenises them directly with the payment provider. That keeps the platform in
+PCI DSS SAQ A scope.</p>
+<h2 id="12-containers-c4-level-2">1.2 Containers (C4 level 2)<a class="headerlink" href="#12-containers-c4-level-2" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Containers (C4 level 2) diagram" src="../diagrams/high-level-design--containers-c4-level-2.light.svg" data-light="../diagrams/high-level-design--containers-c4-level-2.light.svg" data-dark="../diagrams/high-level-design--containers-c4-level-2.dark.svg" loading="lazy"></figure></p>
+<p><strong>Solid arrows are synchronous HTTP calls</strong> (inside the cluster, with mTLS). <strong>Dotted arrows are events</strong> published through the
+transactional outbox and consumed by idempotent consumers.</p>
+<h2 id="13-layers">1.3 Layers<a class="headerlink" href="#13-layers" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Layers diagram" src="../diagrams/high-level-design--layers.light.svg" data-light="../diagrams/high-level-design--layers.light.svg" data-dark="../diagrams/high-level-design--layers.dark.svg" loading="lazy"></figure></p>
+<h2 id="14-inside-every-service-hexagonal-architecture">1.4 Inside every service: hexagonal architecture<a class="headerlink" href="#14-inside-every-service-hexagonal-architecture" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Inside every service: hexagonal architecture diagram" src="../diagrams/high-level-design--inside-every-service-hexagonal-architecture.light.svg" data-light="../diagrams/high-level-design--inside-every-service-hexagonal-architecture.light.svg" data-dark="../diagrams/high-level-design--inside-every-service-hexagonal-architecture.dark.svg" loading="lazy"></figure></p>
+<p>Dependencies point inwards. The <code>domain</code> package imports nothing from Spring or any adapter. ArchUnit tests in every service enforce
+this.</p>
+<h2 id="15-request-path-and-event-path">1.5 Request path and event path<a class="headerlink" href="#15-request-path-and-event-path" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Example</th>
+<th>Mechanism</th>
+<th>Consistency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Read</td>
+<td>Product page, search</td>
+<td>Gateway → service → cache or read model</td>
+<td>Eventually consistent read models (&lt; 1 s typical)</td>
+</tr>
+<tr>
+<td>Command</td>
+<td>Add to cart</td>
+<td>Gateway → cart-service → Redis</td>
+<td>Immediate within the service</td>
+</tr>
+<tr>
+<td>Business transaction</td>
+<td>Checkout</td>
+<td>Gateway → order-service → orchestrated calls to cart, inventory, payment</td>
+<td>Saga with compensations; final state is always consistent</td>
+</tr>
+<tr>
+<td>Propagation</td>
+<td>Search indexing, emails, cart clearing</td>
+<td>Outbox → Kafka → idempotent consumer</td>
+<td>Eventually consistent, at-least-once delivery, effectively-once effect</td>
+</tr>
+</tbody>
+</table>
+<h2 id="16-technology-map">1.6 Technology map<a class="headerlink" href="#16-technology-map" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Technology</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Runtime</td>
+<td>Java 25 (virtual threads), Spring Boot 4.0, Spring Cloud 2025.1; Go 1.24 for notification-service; Python 3.12 + FastAPI for recommendation-service (ADR 0007)</td>
+</tr>
+<tr>
+<td>Build</td>
+<td>One independent build per service: Gradle 9 (Java), Go modules, Python packaging</td>
+</tr>
+<tr>
+<td>Edge</td>
+<td>CDN + WAF (provider choice), Spring Cloud Gateway</td>
+</tr>
+<tr>
+<td>Identity</td>
+<td>Keycloak, OAuth 2.1 / OIDC, JWT access tokens</td>
+</tr>
+<tr>
+<td>Relational</td>
+<td>PostgreSQL 17 + PgBouncer, Flyway</td>
+</tr>
+<tr>
+<td>Key-value</td>
+<td>Redis 8</td>
+</tr>
+<tr>
+<td>Wide-column</td>
+<td>Apache Cassandra 5</td>
+</tr>
+<tr>
+<td>Search</td>
+<td>OpenSearch 3</td>
+</tr>
+<tr>
+<td>Object storage</td>
+<td>MinIO (S3 API)</td>
+</tr>
+<tr>
+<td>Messaging</td>
+<td>Apache Kafka 4 (KRaft) for events; RabbitMQ 4 for email jobs</td>
+</tr>
+<tr>
+<td>Analytics</td>
+<td>ClickHouse (Kafka table engine), Grafana</td>
+</tr>
+<tr>
+<td>Resilience</td>
+<td>Resilience4j through Spring Cloud CircuitBreaker</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>OpenTelemetry, Micrometer, Prometheus, Grafana, Tempo, Loki</td>
+</tr>
+<tr>
+<td>Deployment</td>
+<td>Docker images (layered, AppCDS), Kubernetes + Kustomize</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>JUnit 6, AssertJ, ArchUnit, Testcontainers, Gatling</td>
+</tr>
+</tbody>
+</table>
+<h2 id="17-quality-attributes-and-how-the-design-meets-them">1.7 Quality attributes and how the design meets them<a class="headerlink" href="#17-quality-attributes-and-how-the-design-meets-them" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Quality</th>
+<th>Design response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Scalability</td>
+<td>Stateless services behind HPA; partitioned Kafka; read replicas; Cassandra and OpenSearch scale out; Redis Cluster</td>
+</tr>
+<tr>
+<td>Availability</td>
+<td>Two or more replicas per service across three zones; PodDisruptionBudgets; graceful degradation (browse and search survive checkout outages)</td>
+</tr>
+<tr>
+<td>Performance</td>
+<td>Virtual threads; layered caching; read models; keyset pagination; batching; conditional single-statement updates</td>
+</tr>
+<tr>
+<td>Correctness</td>
+<td>Saga with compensations; idempotency keys; outbox; idempotent consumers; database constraints as a final guard</td>
+</tr>
+<tr>
+<td>Modularity</td>
+<td>One bounded context per service; hexagonal layers; no shared code between services, only contracts</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>OIDC + JWT; ownership checks; mTLS; secrets from a secret store; no card data</td>
+</tr>
+<tr>
+<td>Operability</td>
+<td>Traces, metrics and logs correlated by trace id; SLO burn-rate alerts; runbooks</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

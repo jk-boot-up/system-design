@@ -1,0 +1,15 @@
+sequenceDiagram
+    autonumber
+    participant K as Kafka
+    participant C as Consumer (e.g. inventory: OrderCancelled)
+    participant DB as Service DB
+    K->>C: record (eventId e1)
+    C->>DB: BEGIN#59; INSERT processed_events (consumer, e1) ON CONFLICT DO NOTHING
+    alt inserted (first time)
+        C->>DB: apply effect (release reservation)
+        C->>DB: COMMIT
+    else conflict (duplicate delivery)
+        C->>DB: ROLLBACK (nothing to do)
+    end
+    C->>K: commit offset
+    Note over C,K: On error: retry with backoff (1 s, 2 s, 4 s, 8 s, 16 s), then publish to topic.dlq and commit

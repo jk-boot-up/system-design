@@ -1,0 +1,14 @@
+flowchart LR
+    IN([Request]) --> F1[Request id<br/>X-Request-Id, traceparent]
+    F1 --> F2{Route found?}
+    F2 -- no --> N404[404 problem]
+    F2 -- yes --> F3{Route needs auth?}
+    F3 -- yes --> F4{Valid JWT?}
+    F4 -- no --> N401[401 problem]
+    F4 -- yes --> F5
+    F3 -- no --> F5{Within rate limit?<br/>key = user or IP + route}
+    F5 -- no --> N429[429 + Retry-After]
+    F5 -- yes --> F6{Downstream breaker closed?}
+    F6 -- no --> N503[503 fallback problem]
+    F6 -- yes --> F7[Forward with timeout<br/>strip hop headers]
+    F7 --> OUT([Response + security headers])

@@ -1,0 +1,10 @@
+sequenceDiagram
+    autonumber
+    participant O as order-service
+    participant DB as orders DB
+    participant I as inventory-service
+    O->>I: POST /internal/reservations {orderId, lines}
+    I->>I: BEGIN#59; conditional UPDATE per SKU (sorted)#59; one returns 0 rows → ROLLBACK
+    I-->>O: 409 OUT_OF_STOCK {sku: SKU-2}
+    O->>DB: status CANCELLED, reason OUT_OF_STOCK, outbox OrderCancelled
+    O-->>O: 409 problem+json to the client

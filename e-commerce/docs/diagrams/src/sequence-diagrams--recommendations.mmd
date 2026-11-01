@@ -1,0 +1,12 @@
+sequenceDiagram
+    autonumber
+    participant K as Kafka order.events
+    participant RC as recommendation-service (Python)
+    participant RD as Redis
+    participant GW as api-gateway
+    K->>RC: OrderConfirmed {lines: A, B, C}
+    RC->>RD: SET reco:seen:{eventId} NX EX 14d
+    RC->>RD: pipeline: ZINCRBY reco:also:A 1 B, A→C, B→A, B→C, C→A, C→B#59; ZREMRANGEBYRANK to keep top 200
+    GW->>RC: GET /api/v1/products/A/recommendations
+    RC->>RD: ZREVRANGE reco:also:A 0 9 WITHSCORES
+    RC-->>GW: 200 [B, C, …]

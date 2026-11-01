@@ -1,0 +1,9 @@
+stateDiagram-v2
+    [*] --> RESERVED: reserve() - stock moved available → reserved
+    RESERVED --> COMMITTED: commit() - reserved → sold
+    RESERVED --> RELEASED: release() - reserved → available
+    RESERVED --> EXPIRED: expiry job - reserved → available
+    COMMITTED --> RETURNED: return() - sold → available (cancel after confirm)
+    RELEASED --> [*]
+    EXPIRED --> [*]
+    RETURNED --> [*]

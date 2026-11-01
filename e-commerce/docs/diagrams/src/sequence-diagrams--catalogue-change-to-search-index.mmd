@@ -1,0 +1,17 @@
+sequenceDiagram
+    autonumber
+    actor S as Staff
+    participant CAT as catalog-service
+    participant R as Redis
+    participant K as Kafka
+    participant SR as search-service
+    participant OS as OpenSearch
+    S->>CAT: PUT /api/v1/admin/products/{id} (If-Match: version)
+    CAT->>CAT: optimistic lock check, update, outbox ProductChanged (full snapshot)
+    CAT->>R: DEL product:{id}
+    CAT-->>S: 200 (new ETag)
+    K->>SR: ProductChanged (version n)
+    SR->>OS: index doc id with version n (version_type external)
+    alt an older version arrives later
+        OS-->>SR: 409 version conflict → ignored
+    end

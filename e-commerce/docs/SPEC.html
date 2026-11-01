@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-commerce platform: system design specification</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">System design</a>
+  <span class="src">SPEC.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="e-commerce-platform-system-design-specification">E-commerce platform: system design specification<a class="headerlink" href="#e-commerce-platform-system-design-specification" title="Permanent link">#</a></h1>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Status</td>
+<td>Draft 1</td>
+</tr>
+<tr>
+<td>Scope</td>
+<td>Online store: catalogue, search, cart, checkout, inventory, payments, notifications</td>
+</tr>
+<tr>
+<td>Stack</td>
+<td>Java 25 (main), Go, Python; PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO; Kafka, RabbitMQ; Keycloak; Kubernetes</td>
+</tr>
+</tbody>
+</table>
+<h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">#</a></h2>
+<ol>
+<li><a href="#1-problem-statement">Problem statement</a></li>
+<li><a href="#2-requirements">Requirements</a></li>
+<li><a href="#3-capacity-estimates">Capacity estimates</a></li>
+<li><a href="#4-architecture">Architecture</a></li>
+<li><a href="#5-services">Services</a></li>
+<li><a href="#6-key-flows">Key flows</a></li>
+<li><a href="#7-data-design">Data design</a></li>
+<li><a href="#8-cross-cutting-concerns">Cross-cutting concerns</a></li>
+<li><a href="#9-technology-choices">Technology choices</a></li>
+<li><a href="#10-deployment">Deployment</a></li>
+<li><a href="#11-failure-modes">Failure modes</a></li>
+<li><a href="#12-extensions">Extensions</a></li>
+<li><a href="#13-scalability-modularity-and-performance">Scalability, modularity and performance</a></li>
+<li><a href="#14-polyglot-persistence">Polyglot persistence</a></li>
+<li><a href="#15-design-patterns-applied">Design patterns applied</a></li>
+<li><a href="#16-languages">Languages</a></li>
+</ol>
+<hr />
+<h2 id="1-problem-statement">1. Problem statement<a class="headerlink" href="#1-problem-statement" title="Permanent link">#</a></h2>
+<p>Build the backend of an online store that lets customers:</p>
+<ul>
+<li>browse and search a large catalogue;</li>
+<li>keep a cart;</li>
+<li>check out and pay;</li>
+<li>follow their orders.</li>
+</ul>
+<p>The system must:</p>
+<ul>
+<li>stay responsive at peak traffic, such as a sales event;</li>
+<li>never sell stock it does not have;</li>
+<li>never charge a customer twice for one order;</li>
+<li>keep working in a degraded mode when a dependency fails.</li>
+</ul>
+<h2 id="2-requirements">2. Requirements<a class="headerlink" href="#2-requirements" title="Permanent link">#</a></h2>
+<h3 id="21-functional">2.1 Functional<a class="headerlink" href="#21-functional" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F1</td>
+<td>Customers can browse categories and view product details (price, images, attributes, availability).</td>
+</tr>
+<tr>
+<td>F2</td>
+<td>Customers can run full-text search with filters (category, price range, brand, attributes), sorting and pagination.</td>
+</tr>
+<tr>
+<td>F3</td>
+<td>Guests and signed-in customers keep a cart. A guest cart merges into the account cart on sign-in.</td>
+</tr>
+<tr>
+<td>F4</td>
+<td>Checkout turns a cart into an order. It reserves stock, takes payment and confirms the order, or fails cleanly with nothing charged and nothing held.</td>
+</tr>
+<tr>
+<td>F5</td>
+<td>Customers see their order history and status (<code>PENDING</code>, <code>CONFIRMED</code>, <code>CANCELLED</code>, <code>SHIPPED</code>, <code>DELIVERED</code>).</td>
+</tr>
+<tr>
+<td>F6</td>
+<td>Customers can cancel an order before it ships. Stock is released and the payment is refunded.</td>
+</tr>
+<tr>
+<td>F7</td>
+<td>Staff manage products, categories, prices and stock levels.</td>
+</tr>
+<tr>
+<td>F8</td>
+<td>Customers receive email for order confirmation, cancellation and shipping.</td>
+</tr>
+<tr>
+<td>F9</td>
+<td>Registration and sign-in use OpenID Connect, with roles <code>customer</code> and <code>staff</code>.</td>
+</tr>
+<tr>
+<td>F10</td>
+<td>Customers can rate and review products they bought; product pages show the rating summary and the newest reviews.</td>
+</tr>
+<tr>
+<td>F11</td>
+<td>Staff upload product images directly to object storage; the platform never proxies the image bytes.</td>
+</tr>
+<tr>
+<td>F12</td>
+<td>Product pages show "customers who bought this also bought" recommendations.</td>
+</tr>
+<tr>
+<td>F13</td>
+<td>Staff see sales dashboards (orders, revenue, top products, cancellation reasons) that are at most a minute behind.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-non-functional">2.2 Non-functional<a class="headerlink" href="#22-non-functional" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Quality</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N1</td>
+<td>Availability</td>
+<td>99.95% monthly for browse, search and cart; 99.9% for checkout</td>
+</tr>
+<tr>
+<td>N2</td>
+<td>Latency (p99, server side)</td>
+<td>Product page ≤ 150 ms, search ≤ 300 ms, add to cart ≤ 100 ms, place order ≤ 1.5 s</td>
+</tr>
+<tr>
+<td>N3</td>
+<td>Throughput</td>
+<td>Steady 2,000 read rps, peak 25,000 read rps; peak 500 orders/s during flash sales</td>
+</tr>
+<tr>
+<td>N4</td>
+<td>Consistency</td>
+<td>Stock and payments are strongly consistent within their service; data across services is eventually consistent, typically &lt; 1 s</td>
+</tr>
+<tr>
+<td>N5</td>
+<td>Durability</td>
+<td>No acknowledged order or payment is lost (synchronous replication, RPO ≈ 0); RTO ≤ 15 min</td>
+</tr>
+<tr>
+<td>N6</td>
+<td>Correctness</td>
+<td>No overselling; at most one successful charge per order; every event is processed effectively once</td>
+</tr>
+<tr>
+<td>N7</td>
+<td>Security</td>
+<td>OWASP ASVS L2; TLS everywhere; no card data stored (the provider tokenises it); least-privilege service accounts</td>
+</tr>
+<tr>
+<td>N8</td>
+<td>Scalability</td>
+<td>Each service scales horizontally and is stateless apart from its own datastore</td>
+</tr>
+<tr>
+<td>N9</td>
+<td>Operability</td>
+<td>Traces, metrics and logs for every request; SLO burn-rate alerts; zero-downtime deploys</td>
+</tr>
+<tr>
+<td>N10</td>
+<td>Evolvability</td>
+<td>Services deploy independently; contracts are versioned and backward compatible</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-capacity-estimates">3. Capacity estimates<a class="headerlink" href="#3-capacity-estimates" title="Permanent link">#</a></h2>
+<p>The assumptions are deliberately round numbers. The design must hold at 10× these figures without changing its architecture.</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Monthly active users</td>
+<td>10 M</td>
+</tr>
+<tr>
+<td>Daily active users</td>
+<td>1 M</td>
+</tr>
+<tr>
+<td>Page or API reads per DAU</td>
+<td>25</td>
+</tr>
+<tr>
+<td>Orders per day</td>
+<td>100 k (peak day 1 M)</td>
+</tr>
+<tr>
+<td>Products (SKUs)</td>
+<td>5 M</td>
+</tr>
+<tr>
+<td>Average product document</td>
+<td>5 KB (search) / 2 KB (relational)</td>
+</tr>
+<tr>
+<td>Average order</td>
+<td>2 KB including lines</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Traffic</strong></p>
+<ul>
+<li><strong>Reads:</strong> 25 M per day is about 290 rps on average. With a ×8 daily peak and ×10 for an event, that is up to 25 k rps. Most of it is served from the CDN, Redis and OpenSearch, not from PostgreSQL.</li>
+<li><strong>Writes:</strong></li>
+<li><strong>Orders:</strong> 100 k per day is about 1.2 orders/s on average. A flash sale is designed for 500 orders/s.</li>
+<li><strong>Each order</strong> causes about 10 internal events, so peak Kafka load is about 5 k msg/s. That is far below a single broker's limit; three brokers are for durability.</li>
+<li><strong>Cart writes:</strong> about 10 per order, roughly 5 k/s at peak, handled by Redis.</li>
+</ul>
+<p><strong>Storage (per year)</strong></p>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Size</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Catalogue (PostgreSQL)</td>
+<td>5 M × 2 KB ≈ 10 GB</td>
+</tr>
+<tr>
+<td>Search index</td>
+<td>5 M × 5 KB ≈ 25 GB, × 2 replicas = 50 GB</td>
+</tr>
+<tr>
+<td>Orders</td>
+<td>100 k/day × 2 KB × 365 ≈ 73 GB/year (partitioned by month)</td>
+</tr>
+<tr>
+<td>Payments</td>
+<td>about 30 GB/year</td>
+</tr>
+<tr>
+<td>Kafka</td>
+<td>7-day retention × 5 k msg/s peak × 1 KB; under 100 GB per broker in practice</td>
+</tr>
+<tr>
+<td>Carts (Redis)</td>
+<td>2 M active carts × 2 KB ≈ 4 GB, 30-day expiry</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Connections</strong></p>
+<p>At 500 orders/s with about 5 queries each, the order database runs about 2.5 k queries/s. That is comfortable for one PostgreSQL primary using PgBouncer and about 50 pooled connections. Read replicas serve order history.</p>
+<h2 id="4-architecture">4. Architecture<a class="headerlink" href="#4-architecture" title="Permanent link">#</a></h2>
+<h3 id="41-context">4.1 Context<a class="headerlink" href="#41-context" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Context diagram" src="diagrams/spec--context.light.svg" data-light="diagrams/spec--context.light.svg" data-dark="diagrams/spec--context.dark.svg" loading="lazy"></figure></p>
+<h3 id="42-containers">4.2 Containers<a class="headerlink" href="#42-containers" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Containers diagram" src="diagrams/spec--containers.light.svg" data-light="diagrams/spec--containers.light.svg" data-dark="diagrams/spec--containers.dark.svg" loading="lazy"></figure></p>
+<h3 id="43-architectural-principles">4.3 Architectural principles<a class="headerlink" href="#43-architectural-principles" title="Permanent link">#</a></h3>
+<ol>
+<li><strong>Database per service.</strong> No service reads another service's tables. Data is shared through APIs and events only.</li>
+<li><strong>Synchronous calls for decisions, events for propagation.</strong>
+   * Checkout calls inventory and payment directly, because it needs an answer now.
+   * Everything else (search indexing, notifications, analytics) reacts to events.</li>
+<li><strong>No dual writes.</strong> A service changes its state and records the outgoing event in the same database transaction (<strong>transactional outbox</strong>). A relay publishes the outbox rows to Kafka.</li>
+<li><strong>Idempotency everywhere.</strong>
+   * Commands carry idempotency keys.
+   * Consumers deduplicate by event id.
+   * Calls to the payment provider carry the provider's idempotency key.</li>
+<li><strong>Fail fast and degrade gracefully.</strong>
+   * Every remote call has a timeout.
+   * Circuit breakers protect callers.
+   * Browse and search keep working when checkout dependencies are down.</li>
+<li><strong>Stateless compute.</strong> Pods keep no session state, so any replica can serve any request and autoscaling is safe.</li>
+<li><strong>Hexagonal services.</strong> The domain is free of framework code; adapters are replaceable; ArchUnit enforces the rule.</li>
+</ol>
+<h2 id="5-services">5. Services<a class="headerlink" href="#5-services" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Responsibility</th>
+<th>Store</th>
+<th>Publishes</th>
+<th>Consumes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>api-gateway</strong></td>
+<td>TLS end, routing, JWT validation, rate limiting, request ids, CORS</td>
+<td>Redis (rate-limit buckets)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>catalog-service</strong></td>
+<td>Products, categories, prices, attributes, media; source of truth for product data</td>
+<td>PostgreSQL (+ MinIO for images)</td>
+<td><code>ProductChanged</code>, <code>PriceChanged</code></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>search-service</strong></td>
+<td>Full-text and faceted search; read model of catalogue plus availability</td>
+<td>OpenSearch</td>
+<td></td>
+<td><code>ProductChanged</code>, <code>StockChanged</code></td>
+</tr>
+<tr>
+<td><strong>cart-service</strong></td>
+<td>Carts for guests and customers; re-prices lines on read; checkout snapshot for orders</td>
+<td>Redis</td>
+<td></td>
+<td><code>OrderConfirmed</code> (clears the cart)</td>
+</tr>
+<tr>
+<td><strong>inventory-service</strong></td>
+<td>Stock per SKU and warehouse; reservations with expiry; atomic decrement</td>
+<td>PostgreSQL</td>
+<td><code>StockReserved</code>, <code>StockReservationFailed</code>, <code>StockReleased</code>, <code>StockChanged</code></td>
+<td><code>OrderCancelled</code></td>
+</tr>
+<tr>
+<td><strong>order-service</strong></td>
+<td>Order lifecycle; checkout <strong>saga orchestrator</strong> (calls inventory and payment synchronously); idempotent order placement</td>
+<td>PostgreSQL</td>
+<td><code>OrderPlaced</code>, <code>OrderConfirmed</code>, <code>OrderCancelled</code></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>payment-service</strong></td>
+<td>Payment intents; authorise, capture, refund through a provider port</td>
+<td>PostgreSQL</td>
+<td><code>PaymentAuthorized</code>, <code>PaymentCaptured</code>, <code>PaymentFailed</code>, <code>PaymentRefunded</code></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>review-service</strong></td>
+<td>Ratings and reviews per product; rating summaries</td>
+<td>Cassandra</td>
+<td><code>ReviewPosted</code></td>
+<td><code>OrderConfirmed</code> (verified-purchase check)</td>
+</tr>
+<tr>
+<td><strong>recommendation-service</strong> (Python)</td>
+<td>"Also bought" recommendations from co-purchase counts</td>
+<td>Redis (sorted sets)</td>
+<td></td>
+<td><code>OrderConfirmed</code></td>
+</tr>
+<tr>
+<td><strong>notification-service</strong> (Go)</td>
+<td>Turns order events into email jobs; a worker sends them with priorities and delayed retries</td>
+<td>RabbitMQ (work queues) + Redis (dedupe keys)</td>
+<td></td>
+<td><code>OrderConfirmed</code>, <code>OrderCancelled</code></td>
+</tr>
+<tr>
+<td><strong>analytics</strong> (ClickHouse)</td>
+<td>Sales analytics; ingests events directly through the Kafka table engine; Grafana dashboards</td>
+<td>ClickHouse</td>
+<td></td>
+<td><code>order.events</code>, <code>payment.events</code></td>
+</tr>
+<tr>
+<td><strong>Keycloak</strong> (external)</td>
+<td>Users, roles, OIDC tokens</td>
+<td>PostgreSQL</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="51-public-api-through-the-gateway">5.1 Public API (through the gateway)<a class="headerlink" href="#51-public-api-through-the-gateway" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/products/{id}</code></td>
+<td>public</td>
+<td>Product detail</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/categories</code></td>
+<td>public</td>
+<td>Category tree</td>
+</tr>
+<tr>
+<td>GET / POST</td>
+<td><code>/api/v1/products/{id}/reviews</code></td>
+<td>public / customer</td>
+<td>Newest reviews (cursor) / post a review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/products/{sku}/recommendations</code></td>
+<td>public</td>
+<td>Products often bought together</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/admin/products/{id}/images</code></td>
+<td>staff</td>
+<td>Returns a presigned upload URL (Valet Key)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/search?q=&amp;category=&amp;brand=&amp;minPrice=&amp;maxPrice=&amp;sort=&amp;page=</code></td>
+<td>public</td>
+<td>Faceted search</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/cart</code></td>
+<td>guest token or customer</td>
+<td>Current cart with live prices</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/v1/cart/items/{sku}</code></td>
+<td>guest token or customer</td>
+<td>Set quantity (0 removes)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/orders</code></td>
+<td>customer + <code>Idempotency-Key</code> header</td>
+<td>Place order from cart</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/orders</code> / <code>/api/v1/orders/{id}</code></td>
+<td>customer</td>
+<td>Order history / detail</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/orders/{id}/cancel</code></td>
+<td>customer</td>
+<td>Cancel before shipping</td>
+</tr>
+<tr>
+<td>POST/PUT</td>
+<td><code>/api/v1/admin/products…</code>, <code>/api/v1/admin/stock…</code></td>
+<td>staff</td>
+<td>Catalogue and stock management</td>
+</tr>
+</tbody>
+</table>
+<p>Internal service-to-service APIs (<code>/internal/…</code>) are reachable only inside the cluster through mTLS and network policy. They are not routed by the gateway.</p>
+<p>Errors use <strong>RFC 9457 problem details</strong> (<code>application/problem+json</code>). Lists use cursor pagination.</p>
+<h3 id="52-events">5.2 Events<a class="headerlink" href="#52-events" title="Permanent link">#</a></h3>
+<p>All events share one envelope:</p>
+<pre class="highlight"><code class="language-json">{
+  "eventId": "01J9Z3…",            // UUIDv7; consumers dedupe on it
+  "type": "order.OrderPlaced",
+  "version": 1,
+  "occurredAt": "2026-11-01T10:15:30Z",
+  "aggregateId": "ord_…",           // Kafka partition key: ordering per aggregate
+  "traceparent": "00-…",            // W3C trace context
+  "payload": { … }
+}</code></pre>
+<p><strong>Topics</strong></p>
+<ul>
+<li>There is one topic per producing context: <code>catalog.events</code>, <code>inventory.events</code>, <code>order.events</code>, <code>payment.events</code>.</li>
+<li>Each topic has 12 partitions and replication factor 3, with <code>min.insync.replicas=2</code>.</li>
+<li>Producers use <code>acks=all</code> and idempotent mode.</li>
+</ul>
+<p><strong>Consumers</strong></p>
+<ul>
+<li>Consumers commit offsets after processing and record each <code>eventId</code> in a dedupe table inside the same transaction as their state change. Together with the producer settings, this gives effectively-once processing.</li>
+<li>After 5 failed attempts (exponential backoff), an event goes to <code>&lt;topic&gt;.dlq</code> and raises an alert.</li>
+</ul>
+<p><strong>Schema evolution</strong></p>
+<ul>
+<li>Only additive changes are allowed within a version.</li>
+<li>A breaking change publishes <code>version: 2</code> alongside version 1 until all consumers have migrated.</li>
+</ul>
+<h2 id="6-key-flows">6. Key flows<a class="headerlink" href="#6-key-flows" title="Permanent link">#</a></h2>
+<h3 id="61-browse-and-search">6.1 Browse and search<a class="headerlink" href="#61-browse-and-search" title="Permanent link">#</a></h3>
+<ol>
+<li>The browser asks the CDN for static assets and cached product pages, which have a short TTL and are purged on <code>ProductChanged</code>.</li>
+<li>API reads pass through the gateway.
+   * <strong>Product reads:</strong> catalog-service reads Redis first (cache-aside, 10 min TTL, evicted on change), then PostgreSQL read replicas.
+   * <strong>Searches:</strong> they go to OpenSearch through search-service, which adds availability from its own read model.</li>
+<li>Search freshness: each catalogue change produces <code>ProductChanged</code> (outbox → Kafka → indexer). The index is typically updated within a second.</li>
+</ol>
+<h3 id="62-add-to-cart">6.2 Add to cart<a class="headerlink" href="#62-add-to-cart" title="Permanent link">#</a></h3>
+<ol>
+<li><code>PUT /cart/items/{sku}</code> writes to the cart hash in Redis (<code>cart:{customerId|guestId}</code>, 30-day expiry).</li>
+<li>Reading the cart re-prices every line from catalog-service, with a short cache, and flags lines whose price changed or that went out of stock. The cart never holds stock; stock is reserved only at checkout.</li>
+</ol>
+<h3 id="63-checkout-saga-orchestrated-by-order-service">6.3 Checkout saga (orchestrated by order-service)<a class="headerlink" href="#63-checkout-saga-orchestrated-by-order-service" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Checkout saga (orchestrated by order-service) diagram" src="diagrams/spec--checkout-saga-orchestrated-by-order-service.light.svg" data-light="diagrams/spec--checkout-saga-orchestrated-by-order-service.light.svg" data-dark="diagrams/spec--checkout-saga-orchestrated-by-order-service.dark.svg" loading="lazy"></figure></p>
+<p><strong>Compensation</strong></p>
+<table>
+<thead>
+<tr>
+<th>Failure at step</th>
+<th>Compensation</th>
+<th>Final state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reservation fails (out of stock)</td>
+<td>none needed</td>
+<td><code>CANCELLED</code> (reason <code>OUT_OF_STOCK</code>), 409 to client</td>
+</tr>
+<tr>
+<td>Authorisation declined</td>
+<td>release reservation</td>
+<td><code>CANCELLED</code> (reason <code>PAYMENT_DECLINED</code>), 402 to client</td>
+</tr>
+<tr>
+<td>Authorisation times out or is unknown</td>
+<td>release reservation; void the authorisation if it later succeeds (payment-service reconciles with the provider by <code>providerKey</code>)</td>
+<td><code>CANCELLED</code></td>
+</tr>
+<tr>
+<td>Capture fails after commit</td>
+<td>refund / void; return stock</td>
+<td><code>CANCELLED</code>, customer notified</td>
+</tr>
+<tr>
+<td>order-service crashes mid-saga</td>
+<td>on restart, a recovery job resumes <code>PENDING</code> orders older than 30 s from their last recorded step</td>
+<td>Saga completes or compensates</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recovery state.</strong> Each saga step is recorded on the order row (<code>saga_step</code>, <code>saga_updated_at</code>), so the orchestrator can always resume.</p>
+<p><strong>Reservation safety net.</strong> Reservations expire even if every compensation path fails, so stock is never stuck.</p>
+<h3 id="64-flash-sale-hot-sku">6.4 Flash sale (hot SKU)<a class="headerlink" href="#64-flash-sale-hot-sku" title="Permanent link">#</a></h3>
+<ul>
+<li>A few SKUs receive tens of thousands of checkout attempts. The design caps contention:</li>
+<li><strong>Atomic conditional update:</strong> <code>UPDATE stock SET available = available - :q WHERE sku = :s AND available &gt;= :q</code>. This needs no read-modify-write and no distributed lock, and it cannot oversell.</li>
+<li><strong>Admission control:</strong> the gateway rate-limits per user and per SKU. Requests above the limit get <code>429</code> with <code>Retry-After</code>, which protects the database.</li>
+<li><strong>Early rejection:</strong> once a SKU sells out, inventory-service publishes <code>StockChanged(available=0)</code>. The cart and search mark it sold out, so most attempts never reach checkout.</li>
+<li>Optional for extreme cases: split hot SKU stock into N sub-buckets (rows) and decrement a random one.</li>
+</ul>
+<h3 id="65-cancellation-and-refund">6.5 Cancellation and refund<a class="headerlink" href="#65-cancellation-and-refund" title="Permanent link">#</a></h3>
+<p><code>POST /orders/{id}/cancel</code> → order <code>CANCELLING</code> → payment refund → stock release → <code>CANCELLED</code>. Each step is idempotent and resumable like checkout.</p>
+<h2 id="7-data-design">7. Data design<a class="headerlink" href="#7-data-design" title="Permanent link">#</a></h2>
+<h3 id="71-order-service-postgresql">7.1 Order service (PostgreSQL)<a class="headerlink" href="#71-order-service-postgresql" title="Permanent link">#</a></h3>
+<pre class="highlight"><code class="language-sql">orders(
+  id uuid primary key,              -- UUIDv7, time ordered
+  customer_id uuid not null,
+  status text not null,             -- PENDING|CONFIRMED|CANCELLING|CANCELLED|SHIPPED|DELIVERED
+  saga_step text not null,
+  cancel_reason text,
+  total_amount numeric(19,2) not null,
+  currency char(3) not null,
+  idempotency_key text not null,
+  version bigint not null,          -- optimistic locking
+  created_at timestamptz not null,
+  updated_at timestamptz not null,
+  unique (customer_id, idempotency_key)
+) partition by range (created_at);  -- monthly partitions
+
+order_lines(order_id uuid, line_no int, sku text, quantity int, unit_price numeric(19,2), primary key(order_id, line_no))
+outbox(id uuid primary key, aggregate_id text, type text, payload jsonb, created_at timestamptz, published_at timestamptz)
+processed_events(event_id uuid primary key, processed_at timestamptz)</code></pre>
+<h3 id="72-inventory-service">7.2 Inventory service<a class="headerlink" href="#72-inventory-service" title="Permanent link">#</a></h3>
+<pre class="highlight"><code class="language-sql">stock(sku text, warehouse text, available int not null check (available &gt;= 0), reserved int not null,
+      version bigint, primary key (sku, warehouse))
+reservations(order_id uuid, sku text, quantity int, status text, expires_at timestamptz, primary key(order_id, sku))</code></pre>
+<p>The <code>check (available &gt;= 0)</code> constraint is a second line of defence against overselling.</p>
+<h3 id="73-other-stores">7.3 Other stores<a class="headerlink" href="#73-other-stores" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Model</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>catalog</td>
+<td><code>products</code>, <code>categories</code>, <code>product_attributes</code> (JSONB), <code>prices</code>; GIN index on attributes</td>
+</tr>
+<tr>
+<td>payment</td>
+<td><code>payments(order_id unique, status, amount, provider_ref, provider_key)</code>, <code>payment_attempts</code> (audit)</td>
+</tr>
+<tr>
+<td>cart</td>
+<td>Redis hash <code>cart:{owner}</code> → <code>{sku: qty}</code>, with expiry</td>
+</tr>
+<tr>
+<td>search</td>
+<td>OpenSearch index <code>products-v{n}</code> behind alias <code>products</code>; keyword fields for facets; reindex by building a new index and swapping the alias</td>
+</tr>
+</tbody>
+</table>
+<h3 id="74-money-and-identifiers">7.4 Money and identifiers<a class="headerlink" href="#74-money-and-identifiers" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Money</strong> is <code>BigDecimal</code> with an ISO-4217 currency in a <code>Money</code> value type. Floating point is never used for money.</li>
+<li><strong>Identifiers</strong> are UUIDv7: time ordered, so index locality stays good.</li>
+</ul>
+<h2 id="8-cross-cutting-concerns">8. Cross-cutting concerns<a class="headerlink" href="#8-cross-cutting-concerns" title="Permanent link">#</a></h2>
+<h3 id="81-security">8.1 Security<a class="headerlink" href="#81-security" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Authentication:</strong> OIDC through Keycloak; access tokens are short-lived JWTs (5 min) with refresh tokens. The gateway validates the signature, issuer and audience. Services also validate scopes (defence in depth).</li>
+<li><strong>Authorisation:</strong> roles <code>customer</code> and <code>staff</code>. Ownership checks (<code>order.customerId == token.sub</code>) live in the application layer.</li>
+<li><strong>Transport:</strong> TLS at the edge; mTLS between services through the service mesh, or mutual certificates in the plain Kubernetes profile.</li>
+<li><strong>Secrets:</strong> Kubernetes secrets from an external secret store (for example OpenBao or Vault). Nothing secret is in the repository.</li>
+<li><strong>Payments:</strong> card data never reaches the platform; the client tokenises it with the provider (PCI DSS SAQ A scope).</li>
+<li><strong>Abuse:</strong></li>
+<li>WAF at the CDN;</li>
+<li>per-IP and per-user rate limits;</li>
+<li>bot detection hooks at the gateway;</li>
+<li>input validation with Bean Validation;</li>
+<li>parameterised SQL only.</li>
+</ul>
+<h3 id="82-observability">8.2 Observability<a class="headerlink" href="#82-observability" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Tracing:</strong> OpenTelemetry Java agent for all services. Trace context flows through HTTP headers and Kafka event headers. Traces go to Tempo.</li>
+<li><strong>Metrics:</strong></li>
+<li>Micrometer exports to Prometheus.</li>
+<li>RED metrics per endpoint.</li>
+<li>Business metrics: orders/min, payment decline rate, stock-outs, saga compensations.</li>
+<li>Kafka consumer lag.</li>
+<li><strong>Logs:</strong> structured JSON with <code>traceId</code> and <code>spanId</code>, sent to Loki.</li>
+<li><strong>SLOs and alerts:</strong> multi-window burn-rate alerts on availability and latency SLOs; DLQ depth &gt; 0; outbox backlog age &gt; 30 s.</li>
+</ul>
+<h3 id="83-resilience">8.3 Resilience<a class="headerlink" href="#83-resilience" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Setting (default)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Timeouts</td>
+<td>Every client call: connect 200 ms, read 800 ms (payment 2 s)</td>
+</tr>
+<tr>
+<td>Retries</td>
+<td>Only idempotent calls; 2 retries, exponential backoff with jitter</td>
+</tr>
+<tr>
+<td>Circuit breaker</td>
+<td>50% failure rate over 20 calls → open for 10 s</td>
+</tr>
+<tr>
+<td>Bulkhead</td>
+<td>Separate thread pools / semaphores for inventory and payment clients</td>
+</tr>
+<tr>
+<td>Load shedding</td>
+<td>Gateway returns 503 when downstream breakers are open; browse stays up</td>
+</tr>
+<tr>
+<td>Graceful shutdown</td>
+<td>Readiness turns false, in-flight requests drain for 20 s, then stop</td>
+</tr>
+</tbody>
+</table>
+<h3 id="84-caching">8.4 Caching<a class="headerlink" href="#84-caching" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Where</th>
+<th>Invalidation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Product pages / images</td>
+<td>CDN</td>
+<td>TTL 60 s + purge on <code>ProductChanged</code></td>
+</tr>
+<tr>
+<td>Product detail</td>
+<td>Redis cache-aside</td>
+<td>TTL 10 min + evict on change</td>
+</tr>
+<tr>
+<td>Cart prices</td>
+<td>in-process (Caffeine) 30 s</td>
+<td>TTL</td>
+</tr>
+<tr>
+<td>Search results</td>
+<td>none (OpenSearch is the read model)</td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-technology-choices">9. Technology choices<a class="headerlink" href="#9-technology-choices" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Choice</th>
+<th>Why</th>
+<th>Alternatives considered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Main language</td>
+<td>Java 25</td>
+<td>Virtual threads simplify blocking I/O at high concurrency; records and sealed types model the domain; LTS</td>
+<td>Kotlin</td>
+</tr>
+<tr>
+<td>Lightweight event workers</td>
+<td>Go 1.24</td>
+<td>Small static binaries, fast start, low memory per pod for I/O-bound consumers</td>
+<td>Rust</td>
+</tr>
+<tr>
+<td>Data and ML-style services</td>
+<td>Python 3.12 + FastAPI</td>
+<td>The natural ecosystem for recommendation and analytics work; async I/O</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Framework</td>
+<td>Spring Boot 4</td>
+<td>Mature ecosystem (data, security, Kafka, observability), first-class virtual threads</td>
+<td>Quarkus, Micronaut</td>
+</tr>
+<tr>
+<td>Build</td>
+<td>Gradle 9 (Kotlin DSL) per Java service</td>
+<td>Fast incremental builds; each service has its own wrapper and version catalog, so it builds and upgrades on its own schedule</td>
+<td>Maven</td>
+</tr>
+<tr>
+<td>Relational</td>
+<td>PostgreSQL 17</td>
+<td>ACID, partitioning, JSONB, strong tooling</td>
+<td>MySQL</td>
+</tr>
+<tr>
+<td>Event streaming</td>
+<td>Kafka 4 (KRaft)</td>
+<td>Durable, ordered per key, replayable; scales to far beyond the estimates</td>
+<td>Pulsar</td>
+</tr>
+<tr>
+<td>Work queues</td>
+<td>RabbitMQ 4</td>
+<td>Per-message acknowledgement, priorities, delayed retries via TTL + dead-letter exchanges; ideal for jobs such as sending email</td>
+<td>Kafka (no per-message priority or delay)</td>
+</tr>
+<tr>
+<td>Analytics</td>
+<td>ClickHouse</td>
+<td>Columnar OLAP; ingests from Kafka natively; sub-second aggregations over billions of rows</td>
+<td>Apache Druid, Pinot</td>
+</tr>
+<tr>
+<td>Cache / cart</td>
+<td>Redis 8</td>
+<td>Sub-millisecond reads and writes; data structures with expiry</td>
+<td>Memcached, Hazelcast</td>
+</tr>
+<tr>
+<td>Wide-column</td>
+<td>Apache Cassandra 5</td>
+<td>Linear write scaling for reviews; partition per product, newest first</td>
+<td>ScyllaDB, HBase</td>
+</tr>
+<tr>
+<td>Object storage</td>
+<td>MinIO (S3 API)</td>
+<td>Images served from the CDN; presigned uploads; any S3 store in production</td>
+<td>Ceph RGW</td>
+</tr>
+<tr>
+<td>Pooling / scale-out SQL</td>
+<td>PgBouncer; Citus (when orders outgrow one primary)</td>
+<td>Thousands of client connections onto few server connections; transparent sharding by <code>customer_id</code></td>
+<td>Vitess (MySQL)</td>
+</tr>
+<tr>
+<td>Scheduled jobs</td>
+<td>ShedLock</td>
+<td>Exactly one replica runs each job (outbox relay sweep, reservation expiry, saga recovery)</td>
+<td>Quartz cluster</td>
+</tr>
+<tr>
+<td>Load testing</td>
+<td>Gatling (Java DSL)</td>
+<td>Performance budgets checked in CI against the SLOs in §2.2</td>
+<td>k6, JMeter</td>
+</tr>
+<tr>
+<td>Search</td>
+<td>OpenSearch 3</td>
+<td>Open-source full text with aggregations for facets</td>
+<td>Solr, Meilisearch</td>
+</tr>
+<tr>
+<td>Identity</td>
+<td>Keycloak</td>
+<td>Standards-based OIDC, user federation, admin UI</td>
+<td>Authentik, Ory</td>
+</tr>
+<tr>
+<td>Gateway</td>
+<td>Spring Cloud Gateway</td>
+<td>Same stack as services; filters for JWT and rate limits</td>
+<td>Envoy, Kong</td>
+</tr>
+<tr>
+<td>Resilience</td>
+<td>Resilience4j</td>
+<td>Lightweight, works with virtual threads</td>
+<td>Hystrix (retired)</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>OpenTelemetry + Prometheus + Grafana + Tempo + Loki</td>
+<td>Vendor-neutral open standard</td>
+<td>Elastic APM</td>
+</tr>
+<tr>
+<td>Orchestration</td>
+<td>Kubernetes + Kustomize</td>
+<td>Standard scheduling, autoscaling, self-healing</td>
+<td>Nomad</td>
+</tr>
+<tr>
+<td>Testing</td>
+<td>JUnit 6, AssertJ, ArchUnit, Testcontainers</td>
+<td>Real dependencies in tests; architecture rules as code</td>
+<td>Mocks only</td>
+</tr>
+</tbody>
+</table>
+<p>Detailed reasoning for each choice is recorded in <code>docs/adr/</code>.</p>
+<h2 id="10-deployment">10. Deployment<a class="headerlink" href="#10-deployment" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Deployment diagram" src="diagrams/spec--deployment.light.svg" data-light="diagrams/spec--deployment.light.svg" data-dark="diagrams/spec--deployment.dark.svg" loading="lazy"></figure></p>
+<ul>
+<li><strong>Replicas:</strong> at least 2 per service, spread across zones (topology spread constraints), with PodDisruptionBudgets.</li>
+<li><strong>Autoscaling:</strong> HPA on CPU and request rate. Kafka consumers scale up to the partition count (12).</li>
+<li><strong>Zero-downtime deploys:</strong></li>
+<li>Rolling updates with readiness probes.</li>
+<li>Database migrations are backward compatible (expand → migrate → contract) and run as a pre-deploy job.</li>
+<li><strong>Disaster recovery:</strong></li>
+<li>PostgreSQL point-in-time recovery with continuous WAL archiving.</li>
+<li>Kafka topics replicated across zones.</li>
+<li>The search index can always be rebuilt from the catalogue.</li>
+<li><strong>Environments:</strong></li>
+<li><code>local</code> (Docker Compose);</li>
+<li><code>dev</code>, <code>staging</code>, <code>prod</code> (Kustomize overlays).</li>
+</ul>
+<h2 id="11-failure-modes">11. Failure modes<a class="headerlink" href="#11-failure-modes" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Effect</th>
+<th>Handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>inventory-service down</td>
+<td>Checkout cannot reserve</td>
+<td>Breaker opens; checkout returns 503 with <code>Retry-After</code>; browse, search and cart unaffected</td>
+</tr>
+<tr>
+<td>Payment provider slow</td>
+<td>Checkout latency rises</td>
+<td>2 s timeout, then compensate; payment reconciler settles unknown outcomes</td>
+</tr>
+<tr>
+<td>Kafka unavailable</td>
+<td>Events delayed</td>
+<td>Outbox rows accumulate durably; relay resumes; no data loss</td>
+</tr>
+<tr>
+<td>OpenSearch down</td>
+<td>Search unavailable</td>
+<td>Gateway serves a "search unavailable" problem response; product pages still work from the catalogue</td>
+</tr>
+<tr>
+<td>Redis down</td>
+<td>Carts and rate limits unavailable</td>
+<td>Cart returns 503; gateway rate limiter fails open with a conservative local limit</td>
+</tr>
+<tr>
+<td>Duplicate client request</td>
+<td>Possible double order</td>
+<td><code>Idempotency-Key</code> returns the original response</td>
+</tr>
+<tr>
+<td>Duplicate event delivery</td>
+<td>Possible double effect</td>
+<td><code>processed_events</code> dedupe in the same transaction</td>
+</tr>
+<tr>
+<td>Poison message</td>
+<td>Consumer stuck</td>
+<td>Retry with backoff, then DLQ, then alert</td>
+</tr>
+<tr>
+<td>Order DB primary loss</td>
+<td>Writes fail briefly</td>
+<td>Synchronous standby promoted automatically (Patroni); RPO 0</td>
+</tr>
+<tr>
+<td>Region loss</td>
+<td>Outage</td>
+<td>Out of scope for draft 1; see extensions (warm standby region)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="12-extensions">12. Extensions<a class="headerlink" href="#12-extensions" title="Permanent link">#</a></h2>
+<ul>
+<li>Multi-region active/passive with Kafka MirrorMaker 2 and PostgreSQL logical replication.</li>
+<li>Recommendations service fed by order and click events.</li>
+<li>Fulfilment and shipping integration; returns.</li>
+<li>Promotions and coupon engine (rules evaluated at cart pricing).</li>
+<li>Marketplace: seller onboarding and split payments.</li>
+<li>Storefront web app (server-rendered, CDN cached).</li>
+</ul>
+<h2 id="13-scalability-modularity-and-performance">13. Scalability, modularity and performance<a class="headerlink" href="#13-scalability-modularity-and-performance" title="Permanent link">#</a></h2>
+<h3 id="131-scaling-up-and-out">13.1 Scaling up and out<a class="headerlink" href="#131-scaling-up-and-out" title="Permanent link">#</a></h3>
+<p>Every tier has a planned way to grow. None of them needs a redesign at 10× the estimates in §3.</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>First step (vertical)</th>
+<th>Next step (horizontal)</th>
+<th>Limit it removes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gateway and services</td>
+<td>More CPU per pod; virtual threads use it without more threads</td>
+<td>HPA adds stateless pods behind the load balancer</td>
+<td>Request throughput</td>
+</tr>
+<tr>
+<td>Kafka consumers</td>
+<td>Larger fetch batches</td>
+<td>One consumer per partition (12 → raise partitions ahead of need)</td>
+<td>Event throughput</td>
+</tr>
+<tr>
+<td>PostgreSQL (orders, inventory, payments)</td>
+<td>Bigger primary; PgBouncer transaction pooling</td>
+<td>Read replicas for history and admin; then Citus hash-sharding orders by <code>customer_id</code></td>
+<td>Write throughput per primary</td>
+</tr>
+<tr>
+<td>Cassandra (reviews)</td>
+<td></td>
+<td>Add nodes; data rebalances by token range</td>
+<td>Write volume</td>
+</tr>
+<tr>
+<td>OpenSearch</td>
+<td></td>
+<td>More shards (set at index creation) and replicas for query load; reindex behind the alias to change shard count</td>
+<td>Query and index throughput</td>
+</tr>
+<tr>
+<td>Redis</td>
+<td></td>
+<td>Redis Cluster: 16,384 hash slots spread across primaries</td>
+<td>Memory and ops per node</td>
+</tr>
+<tr>
+<td>Object storage / CDN</td>
+<td></td>
+<td>Effectively unlimited; the CDN absorbs image traffic</td>
+<td>Bandwidth</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Hot partition rules</strong></p>
+<ul>
+<li>Kafka keys are aggregate ids, so load spreads evenly while order per aggregate is kept.</li>
+<li>Cassandra review partitions are bucketed by month (<code>(product_id, month)</code>), so a best-selling product never grows one partition without limit.</li>
+<li>Hot SKUs in inventory can be split into sub-bucket rows (§6.4).</li>
+</ul>
+<h3 id="132-modularity">13.2 Modularity<a class="headerlink" href="#132-modularity" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Bounded contexts → services.</strong></li>
+<li>Each service owns one context: catalogue, search, cart, inventory, ordering, payment, reviews, notification.</li>
+<li>It has its own store, its own release cadence and its own scaling profile.</li>
+<li><strong>Inside a service: hexagonal layers.</strong></li>
+<li><code>domain</code> (pure Java), <code>application</code> (use cases and ports) and <code>adapter</code> (web, persistence, messaging, clients).</li>
+<li>ArchUnit fails the build if <code>domain</code> imports Spring or an adapter.</li>
+<li><strong>Nothing is shared between services.</strong></li>
+<li>Each service is a standalone project: its own build, dependencies, documents, image and pipeline.</li>
+<li>Small helpers such as <code>Money</code>, identifiers and the outbox are copied into each service that needs them. The duplication is deliberate: it costs a few hundred lines, and in return no change to one service can break another's build.</li>
+<li>Services agree only on <strong>contracts</strong>. The producer owns the JSON Schema of each event it publishes; a consumer keeps its own copy of the schemas it reads and tests against it (consumer-driven contracts).</li>
+<li><strong>Replaceable adapters.</strong></li>
+<li>A payment provider, search engine or mail relay is one adapter behind a port.</li>
+<li>Swapping one does not touch the domain. The payment adapter is the anti-corruption layer for the provider's model.</li>
+<li><strong>Same shape everywhere.</strong> Every service follows the same folder layout (README, docs, contracts, source, Dockerfile, k8s), so moving between services is easy even though they share no code.</li>
+</ul>
+<h3 id="133-performance">13.3 Performance<a class="headerlink" href="#133-performance" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Technique</th>
+<th>Where</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Virtual threads (Java 25)</td>
+<td>All servlet services</td>
+<td>Blocking JDBC and HTTP calls without thread-pool exhaustion; high concurrency with simple code</td>
+</tr>
+<tr>
+<td>Multi-tier caching</td>
+<td>CDN → Redis → Caffeine</td>
+<td>Most reads never reach a database (§8.4)</td>
+</tr>
+<tr>
+<td>Read models (CQRS)</td>
+<td>search-service, order history replicas</td>
+<td>Queries served from stores shaped for them</td>
+</tr>
+<tr>
+<td>Keyset (cursor) pagination</td>
+<td>All list endpoints</td>
+<td>Constant cost per page, unlike <code>OFFSET</code></td>
+</tr>
+<tr>
+<td>Covering and partial indexes</td>
+<td>Orders by customer, pending sagas, unpublished outbox rows</td>
+<td>Index-only scans on hot queries</td>
+</tr>
+<tr>
+<td>Batching</td>
+<td>Outbox relay (batches of 500), Kafka producer (<code>linger.ms=5</code>, zstd compression), JDBC batch inserts</td>
+<td>Fewer round trips; smaller payloads</td>
+</tr>
+<tr>
+<td>Conditional single-statement updates</td>
+<td>Stock decrement</td>
+<td>No read-modify-write races, no locks held across calls</td>
+</tr>
+<tr>
+<td>Connection pooling</td>
+<td>HikariCP in services + PgBouncer</td>
+<td>Bounded database connections at any pod count</td>
+</tr>
+<tr>
+<td>HTTP/2 and response compression</td>
+<td>Gateway</td>
+<td>Less latency and bandwidth for clients</td>
+</tr>
+<tr>
+<td>Async side effects</td>
+<td>Notifications, indexing, reviews' verified-purchase check</td>
+<td>Not on the request path</td>
+</tr>
+<tr>
+<td>Startup and footprint</td>
+<td>Class Data Sharing (AppCDS) + Spring AOT; layered container images</td>
+<td>Fast scale-out and smaller images</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Performance budgets</strong> are the latency targets in §2.2. Gatling simulations for browse, search, add-to-cart and checkout run in CI against a production-like stack. A regression of more than 10% in p99 fails the pipeline.</p>
+<h2 id="14-polyglot-persistence">14. Polyglot persistence<a class="headerlink" href="#14-polyglot-persistence" title="Permanent link">#</a></h2>
+<p>Each service uses the store whose data model and access pattern fit its data. They are open-source products, and no two services share a database.</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Store</th>
+<th>Why this store</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>catalog</td>
+<td>PostgreSQL + JSONB</td>
+<td>Relational core (categories, prices) with flexible per-category attributes; GIN indexes; strong consistency for staff edits</td>
+</tr>
+<tr>
+<td>catalog media</td>
+<td>MinIO (S3 API)</td>
+<td>Large binary objects belong in object storage behind a CDN, not in a database</td>
+</tr>
+<tr>
+<td>search</td>
+<td>OpenSearch</td>
+<td>Inverted index, relevance scoring, aggregations for facets; a rebuildable read model</td>
+</tr>
+<tr>
+<td>cart</td>
+<td>Redis</td>
+<td>Key-value access by owner, sub-millisecond, expiring data that is cheap to lose</td>
+</tr>
+<tr>
+<td>inventory</td>
+<td>PostgreSQL</td>
+<td>Contended counters need ACID transactions, check constraints and row-level atomic updates</td>
+</tr>
+<tr>
+<td>order</td>
+<td>PostgreSQL (partitioned; Citus later)</td>
+<td>Transactions, constraints and joins for order + lines + outbox in one commit</td>
+</tr>
+<tr>
+<td>payment</td>
+<td>PostgreSQL</td>
+<td>Financial records: ACID, append-only attempt log, auditability</td>
+</tr>
+<tr>
+<td>review</td>
+<td>Apache Cassandra</td>
+<td>Write-heavy, append-only, read by product newest-first; scales linearly across nodes</td>
+</tr>
+<tr>
+<td>notification</td>
+<td>RabbitMQ + Redis</td>
+<td>Email jobs are tasks, not facts: a queue with acknowledgements, priorities and delayed retries; Redis holds short-lived dedupe keys</td>
+</tr>
+<tr>
+<td>recommendation</td>
+<td>Redis sorted sets</td>
+<td><code>ZINCRBY</code> per co-purchased pair, <code>ZREVRANGE</code> for the top N: O(log n) writes, constant-time reads</td>
+</tr>
+<tr>
+<td>analytics</td>
+<td>ClickHouse</td>
+<td>Columnar storage and vectorised aggregation for dashboards over all orders</td>
+</tr>
+<tr>
+<td>gateway</td>
+<td>Redis</td>
+<td>Shared token buckets for rate limiting across gateway replicas</td>
+</tr>
+<tr>
+<td>identity</td>
+<td>PostgreSQL (Keycloak's own)</td>
+<td>Managed by Keycloak</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Consistency across stores.</strong> No transaction spans two stores. Changes flow between services through events (transactional outbox + idempotent consumers) and through sagas for multi-step business transactions (§6.3).</p>
+<h2 id="15-design-patterns-applied">15. Design patterns applied<a class="headerlink" href="#15-design-patterns-applied" title="Permanent link">#</a></h2>
+<p>Pattern names follow the course in <a href="https://github.com/jk-boot-up/java-design-patterns">jk-boot-up/java-design-patterns</a>. Each link leads to the plain-Java project that explains the pattern.</p>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Where it is used</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/architectural-design-patterns/hexagonal-architecture-pattern">Hexagonal Architecture</a></td>
+<td>Every service</td>
+<td>Domain independent of frameworks and infrastructure</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/architectural-design-patterns/event-driven-architecture-pattern">Event-Driven Architecture</a></td>
+<td>Kafka between contexts</td>
+<td>Loose coupling and independent scaling</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/bounded-context-pattern">Bounded Context</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/context-map-pattern">Context Map</a></td>
+<td>One service per context</td>
+<td>Clear ownership of models and data</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/aggregate-pattern">Aggregate</a></td>
+<td><code>Order</code>, <code>Cart</code>, <code>StockItem</code>, <code>Payment</code></td>
+<td>Invariants enforced in one consistency boundary</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/value-object-pattern">Value Object</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/money-pattern">Money</a></td>
+<td><code>Money</code>, <code>Sku</code>, <code>Quantity</code>, identifiers</td>
+<td>Immutable, validated domain primitives; no floating-point money</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/domain-event-pattern">Domain Event</a></td>
+<td><code>OrderPlaced</code>, <code>StockReserved</code>, …</td>
+<td>Facts other contexts react to</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/specification-pattern">Specification</a></td>
+<td>Search filters; cancellation eligibility</td>
+<td>Composable business rules</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/domain-driven-design-patterns/anti-corruption-layer-pattern">Anti-Corruption Layer</a></td>
+<td>Payment provider adapter</td>
+<td>Provider's model never leaks into ours</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/behavioural/state-pattern">State</a></td>
+<td>Order and payment lifecycles</td>
+<td>Only legal transitions compile and run</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/behavioural/strategy-pattern">Strategy</a></td>
+<td>Payment providers; pricing rules</td>
+<td>Swap behaviour without changing callers</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/behavioural/chain-of-responsibility-pattern">Chain of Responsibility</a></td>
+<td>Gateway filters; validation pipeline</td>
+<td>Ordered, independent request checks</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/structural/adapter-pattern">Adapter</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/structural/facade-pattern">Facade</a></td>
+<td>Persistence and client adapters; application services</td>
+<td>Ports implemented by infrastructure; simple entry points</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/creational/builder-pattern">Builder</a></td>
+<td>Search queries; test data</td>
+<td>Readable construction of complex objects</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/repository-pattern">Repository</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/data-mapper-pattern">Data Mapper</a></td>
+<td>Persistence adapters</td>
+<td>Domain objects stay free of persistence concerns</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/service-layer-pattern">Service Layer</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/unit-of-work-pattern">Unit of Work</a></td>
+<td>Application use cases with one transaction each</td>
+<td>Clear transaction boundaries</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/optimistic-offline-lock-pattern">Optimistic Offline Lock</a></td>
+<td><code>version</code> columns on orders, stock, payments</td>
+<td>Lost-update protection without long locks</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/enterprise-design-patterns/gateway-pattern">Gateway</a></td>
+<td>Clients for inventory, payment, provider</td>
+<td>One place for remote-call concerns</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/saga-pattern">Saga</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/messaging-integration-patterns/process-manager-pattern">Process Manager</a></td>
+<td>Checkout and cancellation in order-service</td>
+<td>Multi-service transaction with compensations</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/transactional-outbox-pattern">Transactional Outbox</a></td>
+<td>Every event producer</td>
+<td>No dual writes; guaranteed publication</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/idempotent-consumer-pattern">Idempotent Consumer</a></td>
+<td>Every event consumer; <code>Idempotency-Key</code> on orders</td>
+<td>Effectively-once effects</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/database-per-service-pattern">Database per Service</a></td>
+<td>All services (§14)</td>
+<td>Independent schemas, scaling and technology</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/cqrs-pattern">CQRS</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/materialized-view-pattern">Materialized View</a></td>
+<td>Search index; rating summaries</td>
+<td>Reads served from query-shaped models</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/event-carried-state-transfer-pattern">Event-Carried State Transfer</a></td>
+<td><code>ProductChanged</code> carries the product</td>
+<td>Consumers need no call back to catalog</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/api-gateway-pattern">API Gateway</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/gateway-offloading-pattern">Gateway Offloading</a></td>
+<td>api-gateway</td>
+<td>One entry point; TLS, auth and rate limits off the services</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/circuit-breaker-pattern">Circuit Breaker</a>, <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/retry-pattern">Retry</a>, <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/timeout-pattern">Timeout</a>, <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/bulkhead-pattern">Bulkhead</a></td>
+<td>All synchronous clients (§8.3)</td>
+<td>Contain failures; protect callers</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/rate-limiter-pattern">Rate Limiter</a></td>
+<td>Gateway, per user and per hot SKU</td>
+<td>Admission control during flash sales</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/cache-aside-pattern">Cache-Aside</a></td>
+<td>Product detail in Redis</td>
+<td>Fast reads with simple invalidation</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/valet-key-pattern">Valet Key</a></td>
+<td>Presigned image uploads</td>
+<td>Clients write to storage directly, with scoped short-lived rights</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/sharding-pattern">Sharding</a></td>
+<td>Kafka partitions; Cassandra partitions; Citus for orders</td>
+<td>Spread load across nodes</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/competing-consumers-pattern">Competing Consumers</a></td>
+<td>Kafka consumer groups</td>
+<td>Parallel event processing</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/micro-services-design-patterns/health-endpoint-monitoring-pattern">Health Endpoint Monitoring</a></td>
+<td>Actuator liveness and readiness</td>
+<td>Safe rollouts and self-healing</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/messaging-integration-patterns/dead-letter-channel-pattern">Dead Letter Channel</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/messaging-integration-patterns/guaranteed-delivery-pattern">Guaranteed Delivery</a></td>
+<td>Kafka DLQs; <code>acks=all</code></td>
+<td>Poison messages isolated; nothing lost</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/concurrency-design-patterns/scheduler-pattern">Scheduler</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/concurrency-design-patterns/producer-consumer-pattern">Producer–Consumer</a></td>
+<td>Reservation expiry, saga recovery, outbox relay</td>
+<td>Background work outside the request path</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/platform-design-patterns/distributed-tracing-pattern">Distributed Tracing</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/platform-design-patterns/externalised-configuration-pattern">Externalised Configuration</a></td>
+<td>OpenTelemetry; Spring config + Kubernetes ConfigMaps</td>
+<td>Observable, environment-independent builds</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/security-design-patterns/token-authentication-pattern">Token Authentication</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/security-design-patterns/authorization-policy-pattern">Authorization Policy</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/security-design-patterns/input-validation-pattern">Input Validation</a></td>
+<td>Keycloak JWTs; ownership checks; Bean Validation</td>
+<td>Defence in depth</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/testing-design-patterns/test-double-pattern">Test Double</a> / <a href="https://github.com/jk-boot-up/java-design-patterns/tree/main/gradle-java/testing-design-patterns/object-mother-pattern">Object Mother</a></td>
+<td>In-memory adapters; test fixtures</td>
+<td>Fast, deterministic tests</td>
+</tr>
+</tbody>
+</table>
+<h2 id="16-languages">16. Languages<a class="headerlink" href="#16-languages" title="Permanent link">#</a></h2>
+<p>Java is the main language. Other languages are used where their strengths clearly matter, and every service still follows the same
+contracts: HTTP + JSON with problem details, the shared event envelope, OpenTelemetry, Prometheus metrics, health endpoints and
+container images.</p>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Services</th>
+<th>Why there</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Java 25 (Spring Boot 4)</td>
+<td>gateway, catalog, search, cart, inventory, order, payment, review</td>
+<td>Rich transactional domain logic, mature data and messaging libraries, virtual threads</td>
+</tr>
+<tr>
+<td>Go 1.24</td>
+<td>notification-service (event router + email worker)</td>
+<td>I/O-bound event processing with tiny memory per pod and instant start, so it scales out cheaply under bursts</td>
+</tr>
+<tr>
+<td>Python 3.12 (FastAPI)</td>
+<td>recommendation-service</td>
+<td>Data-oriented logic; easy path to richer models (implicit-feedback collaborative filtering) later</td>
+</tr>
+<tr>
+<td>SQL (ClickHouse)</td>
+<td>analytics</td>
+<td>Ingestion and aggregation expressed as materialised views; no service code needed</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>Implementation plan and milestones: <a href="PLAN.html">PLAN.md</a>.</em></p>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

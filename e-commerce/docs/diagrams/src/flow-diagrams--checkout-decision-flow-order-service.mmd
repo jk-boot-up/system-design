@@ -1,0 +1,20 @@
+flowchart TD
+    A([POST /orders with Idempotency-Key]) --> B{Key seen for this customer?}
+    B -- yes --> B1[Return the stored order<br/>same status code] --> Z([End])
+    B -- no --> C[Fetch priced cart snapshot]
+    C --> C1{Cart empty or a line unavailable?}
+    C1 -- yes --> C2[422 problem: cart not checkout-ready] --> Z
+    C1 -- no --> D[Create order PENDING<br/>+ idempotency key + OrderPlaced]
+    D --> E[Reserve stock]
+    E --> E1{Result}
+    E1 -- out of stock --> X1[Cancel: OUT_OF_STOCK] --> R409[409] --> Z
+    E1 -- timeout / breaker open --> X2[Release reservation best-effort<br/>Cancel: INVENTORY_UNAVAILABLE] --> R503[503 Retry-After] --> Z
+    E1 -- reserved --> F[Authorise payment]
+    F --> F1{Result}
+    F1 -- declined --> G1[Release stock<br/>Cancel: PAYMENT_DECLINED] --> R402[402] --> Z
+    F1 -- unknown / timeout --> G2[Request void<br/>Release stock<br/>Cancel: PAYMENT_UNKNOWN] --> R503
+    F1 -- authorised --> H[Commit reservation]
+    H --> I[Capture payment]
+    I --> I1{Captured?}
+    I1 -- no --> G3[Void authorisation<br/>Return stock<br/>Cancel: CAPTURE_FAILED] --> R502[502] --> Z
+    I1 -- yes --> J[Confirm order + OrderConfirmed] --> R201[201 Created] --> Z

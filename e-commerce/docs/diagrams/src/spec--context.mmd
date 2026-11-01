@@ -1,0 +1,8 @@
+flowchart LR
+    C[Customer browser / app] -->|HTTPS| CDN[CDN + WAF]
+    S[Staff console] -->|HTTPS| CDN
+    CDN --> GW[API Gateway]
+    GW --> IDP[Keycloak]
+    GW --> SVC[Platform services]
+    SVC --> PSP[Payment provider]
+    SVC --> MAIL[Email relay]

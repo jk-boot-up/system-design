@@ -1,0 +1,8 @@
+stateDiagram-v2
+    [*] --> QUEUED: router publishes
+    QUEUED --> SENT: worker sent + ack
+    QUEUED --> RETRY_WAIT: temporary failure
+    RETRY_WAIT --> QUEUED: TTL expired (30 s → 2 min → 10 min)
+    QUEUED --> DEAD: permanent failure or 5th attempt
+    SENT --> [*]
+    DEAD --> [*]

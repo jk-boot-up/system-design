@@ -1,0 +1,17 @@
+sequenceDiagram
+    autonumber
+    participant GW as api-gateway
+    participant CAT as catalog-service
+    participant R as Redis
+    participant PG as PostgreSQL (replica)
+    GW->>CAT: GET /api/v1/products/{id}
+    CAT->>R: GET product:{id}
+    alt cache hit
+        R-->>CAT: JSON
+    else cache miss
+        R-->>CAT: nil
+        CAT->>PG: SELECT product + images
+        PG-->>CAT: row
+        CAT->>R: SET product:{id} JSON EX 600
+    end
+    CAT-->>GW: 200 product (ETag, Cache-Control: max-age=60)

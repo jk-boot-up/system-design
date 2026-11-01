@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-commerce platform</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../README.html">System design</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="e-commerce-platform">E-commerce platform<a class="headerlink" href="#e-commerce-platform" title="Permanent link">#</a></h1>
+<p>A production-grade online store: scalable, modular and high-performance, built from independent services in Java, Go and Python
+over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and RabbitMQ.</p>
+<table>
+<thead>
+<tr>
+<th>Read</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="docs/SPEC.html">Specification</a></td>
+<td>Requirements, capacity estimates, architecture, flows, data, operations, patterns, languages</td>
+</tr>
+<tr>
+<td><a href="docs/PLAN.html">Plan</a></td>
+<td>Goals, technology, milestones, working agreements</td>
+</tr>
+<tr>
+<td><a href="docs/design/README.html">System design documents</a></td>
+<td>HLD, data flow, deployment, database, sequence, flow, state and class diagrams, API and event catalogues</td>
+</tr>
+<tr>
+<td><a href="docs/visual/index.html">Animated walkthrough</a></td>
+<td>The whole system in motion, with themes and narration</td>
+</tr>
+</tbody>
+</table>
+<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">#</a></h2>
+<pre class="highlight"><code>e-commerce/
+├─ docs/                         whole-system documents
+│  ├─ SPEC.md, PLAN.md
+│  ├─ design/                    system-level design documents
+│  ├─ adr/                       architecture decision records
+│  ├─ diagrams/                  SVG diagrams (light + dark) and their sources in diagrams/src
+│  └─ visual/                    whole-system animated walkthrough
+├─ services/                     one standalone project per service — nothing shared between them
+│  └─ &lt;service&gt;/
+│     ├─ README.md               what it does, how to build, run and test it
+│     ├─ docs/                   the service's own design: low-level design, diagrams, animation
+│     │  ├─ design.md
+│     │  ├─ diagrams/
+│     │  └─ visual/index.html
+│     ├─ contracts/              APIs it exposes (OpenAPI) and events it publishes or consumes (JSON Schema)
+│     ├─ src/ … or cmd/, internal/ (Go) … or src/, tests/ (Python)
+│     ├─ build files             gradlew + settings.gradle.kts + build.gradle.kts + gradle/libs.versions.toml (Java),
+│     │                          go.mod (Go), pyproject.toml (Python)
+│     ├─ Dockerfile
+│     └─ k8s/                    the service's Kubernetes base (Deployment, Service, HPA, PDB, NetworkPolicy)
+├─ deploy/
+│  ├─ compose/                   local stack: data stores, brokers, Keycloak, observability, all services
+│  └─ k8s/overlays/              dev / staging / prod overlays composing every service's k8s base
+└─ tests/
+   ├─ e2e/                       end-to-end tests against the running stack
+   └─ performance/               Gatling simulations with p99 budgets</code></pre>
+<h2 id="services">Services<a class="headerlink" href="#services" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Language</th>
+<th>Store</th>
+<th>Project</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>api-gateway</td>
+<td>Java 25</td>
+<td>Redis</td>
+<td><a href="services/api-gateway/README.html">services/api-gateway</a></td>
+</tr>
+<tr>
+<td>catalog-service</td>
+<td>Java 25</td>
+<td>PostgreSQL, MinIO</td>
+<td><a href="services/catalog-service/README.html">services/catalog-service</a></td>
+</tr>
+<tr>
+<td>search-service</td>
+<td>Java 25</td>
+<td>OpenSearch</td>
+<td><a href="services/search-service/README.html">services/search-service</a></td>
+</tr>
+<tr>
+<td>cart-service</td>
+<td>Java 25</td>
+<td>Redis</td>
+<td><a href="services/cart-service/README.html">services/cart-service</a></td>
+</tr>
+<tr>
+<td>inventory-service</td>
+<td>Java 25</td>
+<td>PostgreSQL</td>
+<td><a href="services/inventory-service/README.html">services/inventory-service</a></td>
+</tr>
+<tr>
+<td>order-service</td>
+<td>Java 25</td>
+<td>PostgreSQL</td>
+<td><a href="services/order-service/README.html">services/order-service</a></td>
+</tr>
+<tr>
+<td>payment-service</td>
+<td>Java 25</td>
+<td>PostgreSQL</td>
+<td><a href="services/payment-service/README.html">services/payment-service</a></td>
+</tr>
+<tr>
+<td>review-service</td>
+<td>Java 25</td>
+<td>Cassandra</td>
+<td><a href="services/review-service/README.html">services/review-service</a></td>
+</tr>
+<tr>
+<td>recommendation-service</td>
+<td>Python 3.12</td>
+<td>Redis</td>
+<td><a href="services/recommendation-service/README.html">services/recommendation-service</a></td>
+</tr>
+<tr>
+<td>notification-service</td>
+<td>Go 1.24</td>
+<td>RabbitMQ, Redis</td>
+<td><a href="services/notification-service/README.html">services/notification-service</a></td>
+</tr>
+<tr>
+<td>analytics</td>
+<td>ClickHouse SQL</td>
+<td>ClickHouse</td>
+<td><a href="services/analytics/README.html">services/analytics</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="build-a-service">Build a service<a class="headerlink" href="#build-a-service" title="Permanent link">#</a></h2>
+<p>Every service builds and tests on its own; nothing at this level builds them all.</p>
+<pre class="highlight"><code class="language-bash">cd services/order-service &amp;&amp; ./gradlew build                     # Java
+cd services/notification-service &amp;&amp; go test ./...                # Go
+cd services/recommendation-service &amp;&amp; pip install -e '.[dev]' &amp;&amp; pytest   # Python</code></pre>
+<h2 id="run-everything-locally">Run everything locally<a class="headerlink" href="#run-everything-locally" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash">cd deploy/compose &amp;&amp; docker compose up -d     # data stores, brokers, Keycloak, observability and all services</code></pre>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

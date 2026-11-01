@@ -1,0 +1,18 @@
+sequenceDiagram
+    autonumber
+    actor C as Customer
+    participant B as Browser app
+    participant KC as Keycloak
+    participant GW as api-gateway
+    participant S as cart-service
+    C->>B: Sign in
+    B->>KC: Authorization Code + PKCE
+    KC-->>B: access token (JWT, 5 min) + refresh token
+    B->>GW: GET /api/v1/cart (Authorization: Bearer JWT)
+    GW->>GW: verify signature (cached JWKS), issuer, audience, expiry
+    GW->>GW: rate limit (Redis token bucket), add X-Request-Id
+    GW->>S: GET /api/v1/cart (JWT forwarded, traceparent)
+    S->>S: validate JWT again (defence in depth), owner = sub
+    S-->>GW: 200 cart
+    GW-->>B: 200 cart
+    Note over B,KC: Before expiry the app refreshes the token silently

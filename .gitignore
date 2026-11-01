@@ -1,0 +1,26 @@
+# build output
+build/
+out/
+target/
+bin/
+.gradle/
+.kotlin/
+*.class
+# tooling
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage/
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+# local secrets
+.env
+*.local.yaml

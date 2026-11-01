@@ -1,0 +1,10 @@
+stateDiagram-v2
+    [*] --> PENDING: place()
+    PENDING --> CONFIRMED: confirm()<br/>payment captured
+    PENDING --> CANCELLED: cancel(reason)<br/>out of stock / declined / unknown / abandoned
+    CONFIRMED --> CANCELLING: requestCancellation()<br/>customer or staff
+    CONFIRMED --> SHIPPED: ship()
+    CANCELLING --> CANCELLED: refunded and stock returned
+    SHIPPED --> DELIVERED: deliver()
+    CANCELLED --> [*]
+    DELIVERED --> [*]

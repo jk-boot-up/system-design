@@ -1,0 +1,33 @@
+erDiagram
+    CATEGORIES ||--o{ CATEGORIES : "parent of"
+    CATEGORIES ||--o{ PRODUCTS : contains
+    PRODUCTS ||--o{ PRODUCT_IMAGES : has
+
+    CATEGORIES {
+        uuid id PK
+        uuid parent_id FK "null for roots"
+        text slug UK
+        text name
+        timestamptz created_at
+    }
+    PRODUCTS {
+        uuid id PK
+        text sku UK
+        text name
+        text description
+        uuid category_id FK
+        text brand
+        numeric price_amount "numeric(19,2) >= 0"
+        char currency "ISO 4217"
+        jsonb attributes "per-category attributes"
+        text status "DRAFT | ACTIVE | ARCHIVED"
+        bigint version "optimistic lock"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    PRODUCT_IMAGES {
+        uuid product_id PK, FK
+        int position PK
+        text object_key "key in MinIO bucket"
+        text content_type
+    }

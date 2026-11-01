@@ -1,0 +1,6 @@
+flowchart TD
+    R([Read product id]) --> C{In Redis?}
+    C -- yes --> RET[Return cached]
+    C -- no --> DB[Read from PostgreSQL replica] --> P[Put in Redis, TTL 10 min] --> RET
+    W([Staff update]) --> T[Commit change + outbox] --> EV[Delete Redis key]
+    EV --> CDN[CDN purge on ProductChanged]

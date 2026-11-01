@@ -1,0 +1,13 @@
+flowchart LR
+    dev[Push / pull request] --> b[Build<br/>Gradle, Go, Python]
+    b --> ut[Unit + ArchUnit tests]
+    ut --> it[Integration tests<br/>Testcontainers]
+    it --> sec[Dependency + image scan<br/>OWASP DC, Trivy]
+    sec --> img[Build images<br/>layered jars, AppCDS, distroless Go]
+    img --> sign[Sign + SBOM<br/>cosign, CycloneDX]
+    sign --> devenv[Deploy dev<br/>Kustomize overlay]
+    devenv --> perf[Gatling budgets]
+    perf --> stg[Deploy staging]
+    stg --> canary[Production canary 5%<br/>SLO gates]
+    canary --> prod[Production 100%]
+    canary -- SLO breach --> rb[Automatic rollback]

@@ -1,0 +1,16 @@
+sequenceDiagram
+    autonumber
+    participant GW as api-gateway
+    participant CART as cart-service
+    participant R as Redis
+    participant CAT as catalog-service
+    GW->>CART: PUT /api/v1/cart/items/SKU-1 {quantity: 2}
+    CART->>CART: validate (1..99), owner from JWT or guest token
+    CART->>R: HSET cart:c:{id} SKU-1 2 #59; EXPIRE 30d
+    CART->>CAT: POST /internal/products/prices {skus} [timeout 300 ms, breaker]
+    alt catalog available
+        CAT-->>CART: prices, names, status
+        CART-->>GW: 200 priced cart
+    else breaker open / timeout
+        CART-->>GW: 200 cart with lines marked "price pending" (degraded)
+    end

@@ -1,0 +1,9 @@
+flowchart TD
+    A([OrderConfirmed]) --> B{reco:seen:eventId set NX?}
+    B -- no --> Z([Skip duplicate])
+    B -- yes --> C[Distinct SKUs in order]
+    C --> D{At least 2 SKUs?}
+    D -- no --> Z2([Nothing to learn])
+    D -- yes --> E[For every ordered pair a ≠ b:<br/>ZINCRBY reco:also:a 1 b]
+    E --> F[Trim each set to top 200]
+    F --> Z3([Done])

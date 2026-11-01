@@ -1,0 +1,79 @@
+flowchart TB
+    C[Customer]
+    S[Staff]
+    P[Payment provider]
+    M[Email relay]
+
+    subgraph TB1[Trust boundary: public edge]
+        G((1. Authenticate,<br/>throttle, route))
+    end
+
+    subgraph TB2[Trust boundary: cluster - mTLS]
+        CAT((2. Manage<br/>catalogue))
+        SR((3. Search<br/>products))
+        CA((4. Maintain<br/>cart))
+        ORD((5. Place and<br/>track orders))
+        INV((6. Control<br/>stock))
+        PAY((7. Take<br/>payment))
+        REV((8. Collect<br/>reviews))
+        NOT((9. Notify<br/>customers))
+        RECO((10. Recommend<br/>products))
+        AN((11. Analyse<br/>sales))
+    end
+
+    D1[(D1 Products)]
+    D2[(D2 Search index)]
+    D3[(D3 Carts)]
+    D4[(D4 Orders + outbox)]
+    D5[(D5 Stock + reservations)]
+    D6[(D6 Payments)]
+    D7[(D7 Reviews)]
+    D8[(D8 Images)]
+    D9[(D9 Co-purchase sets)]
+    D10[(D10 Analytics tables)]
+    Q1[(Q1 Email job queue)]
+    EV[(Event log - Kafka)]
+
+    C -- requests + JWT --> G
+    S -- admin requests + JWT --> G
+    G -- product queries --> CAT
+    G -- search query --> SR
+    G -- cart change --> CA
+    G -- order request + idempotency key --> ORD
+    G -- review --> REV
+
+    CAT <--> D1
+    CAT -- presigned URL --> S
+    S -- image bytes --> D8
+    CAT -- ProductChanged --> EV
+    EV -- ProductChanged, StockChanged --> SR
+    SR <--> D2
+
+    CA <--> D3
+    CA -- SKUs --> CAT
+    CAT -- current prices --> CA
+
+    ORD -- checkout snapshot request --> CA
+    ORD <--> D4
+    ORD -- reserve / commit / release --> INV
+    INV <--> D5
+    INV -- StockChanged --> EV
+    ORD -- authorise / capture / void / refund --> PAY
+    PAY <--> D6
+    PAY -- charge requests --> P
+    ORD -- OrderConfirmed, OrderCancelled --> EV
+
+    EV -- OrderConfirmed --> CA
+    EV -- OrderConfirmed --> REV
+    EV -- OrderCancelled --> INV
+    REV <--> D7
+    EV -- order events --> NOT
+    NOT -- email jobs --> Q1
+    Q1 -- jobs --> NOT
+    NOT -- emails --> M
+    EV -- OrderConfirmed --> RECO
+    RECO <--> D9
+    G -- recommendation query --> RECO
+    EV -- order + payment events --> AN
+    AN <--> D10
+    S -- dashboards --> AN

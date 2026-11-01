@@ -1,0 +1,11 @@
+flowchart TD
+    A([Record received]) --> B{Already in processed_events?}
+    B -- yes --> K[Commit offset] --> Z([Next])
+    B -- no --> C[Process in one transaction<br/>+ insert processed_events]
+    C --> D{Success?}
+    D -- yes --> K
+    D -- no --> E{Error type}
+    E -- deserialisation / validation --> DLQ[Publish to topic.dlq<br/>headers: error, stack, attempt] --> K
+    E -- transient --> F{Attempt < 5?}
+    F -- yes --> G[Back off 1, 2, 4, 8, 16 s<br/>pause partition, seek back] --> A
+    F -- no --> DLQ

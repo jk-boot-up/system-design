@@ -1,0 +1,69 @@
+flowchart TB
+    subgraph edge[Edge]
+        cdn[CDN + WAF]
+        gw[api-gateway<br/>Spring Cloud Gateway]
+    end
+
+    subgraph services[Microservices - Java 25 / Spring Boot 4, plus Go and Python]
+        cat[catalog-service]
+        srch[search-service]
+        cart[cart-service]
+        inv[inventory-service]
+        ord[order-service<br/>saga orchestrator]
+        pay[payment-service]
+        rev[review-service]
+        notif[notification-service<br/>Go]
+        reco[recommendation-service<br/>Python]
+    end
+
+    subgraph data[Data stores - one per service]
+        pgcat[(PostgreSQL<br/>catalog)]
+        minio[(MinIO<br/>images)]
+        os[(OpenSearch<br/>products index)]
+        rcart[(Redis<br/>carts)]
+        pginv[(PostgreSQL<br/>inventory)]
+        pgord[(PostgreSQL<br/>orders)]
+        pgpay[(PostgreSQL<br/>payments)]
+        cass[(Cassandra<br/>reviews)]
+        rnot[(Redis<br/>dedupe)]
+        rmq[(RabbitMQ<br/>email jobs)]
+        rreco[(Redis<br/>co-purchase sets)]
+        ch[(ClickHouse<br/>analytics)]
+        rgw[(Redis<br/>rate limits)]
+    end
+
+    kafka{{Kafka<br/>catalog / inventory / order / payment / review topics}}
+
+    cdn --> gw
+    gw --> cat & srch & cart & ord & rev
+    gw --- rgw
+    cat --- pgcat
+    cat --- minio
+    srch --- os
+    cart --- rcart
+    inv --- pginv
+    ord --- pgord
+    pay --- pgpay
+    rev --- cass
+    notif --- rnot
+    notif --- rmq
+    reco --- rreco
+    gw --> reco
+
+    cart -->|price lookup| cat
+    ord -->|checkout snapshot| cart
+    ord -->|reserve / commit / release| inv
+    ord -->|authorise / capture / void / refund| pay
+
+    cat -. ProductChanged .-> kafka
+    inv -. StockChanged .-> kafka
+    ord -. OrderPlaced / Confirmed / Cancelled .-> kafka
+    pay -. PaymentCaptured / Failed / Refunded .-> kafka
+    rev -. ReviewPosted .-> kafka
+    kafka -. ProductChanged, StockChanged .-> srch
+    kafka -. OrderConfirmed .-> cart
+    kafka -. OrderConfirmed .-> rev
+    kafka -. OrderCancelled .-> inv
+    kafka -. Order events .-> notif
+    kafka -. OrderConfirmed .-> reco
+    kafka -. order + payment events .-> ch

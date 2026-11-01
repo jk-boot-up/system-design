@@ -1,0 +1,16 @@
+flowchart LR
+    C[Customer]
+    S[Staff]
+    P[Payment provider]
+    M[Email relay]
+    I[Identity provider]
+    SYS((0. E-commerce<br/>platform))
+
+    C -- search terms, cart changes, order request, payment token --> SYS
+    SYS -- products, results, cart, order status --> C
+    S -- products, prices, stock levels, images --> SYS
+    SYS -- presigned upload URL, confirmation --> S
+    SYS -- authorise / capture / refund request + idempotency key --> P
+    P -- result, provider reference --> SYS
+    SYS -- order emails --> M
+    I -- signing keys, user identity in tokens --> SYS

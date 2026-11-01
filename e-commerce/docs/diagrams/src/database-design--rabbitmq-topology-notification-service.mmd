@@ -1,0 +1,9 @@
+flowchart LR
+    R[notification router<br/>Kafka consumer] -->|routing key email.order| X{{exchange: email<br/>type direct}}
+    X --> Q[(queue: email.send<br/>quorum, x-max-priority 10)]
+    Q --> W[email worker ×N<br/>prefetch 20, manual ack]
+    W -->|nack, attempt < 5| RX{{exchange: email.retry}}
+    RX --> RQ[(queue: email.retry.30s / 2m / 10m<br/>x-message-ttl, dead-letters back to email)]
+    RQ -->|TTL expired| X
+    W -->|attempt = 5| DX{{exchange: email.dlx}}
+    DX --> DQ[(queue: email.dead<br/>alert when depth > 0)]

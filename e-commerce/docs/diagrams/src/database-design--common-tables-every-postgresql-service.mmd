@@ -1,0 +1,22 @@
+erDiagram
+    OUTBOX {
+        uuid id PK "UUIDv7"
+        text aggregate_type
+        text aggregate_id "Kafka key"
+        text event_type
+        text topic
+        jsonb payload "event envelope"
+        timestamptz created_at
+        timestamptz published_at "null until relayed"
+    }
+    PROCESSED_EVENTS {
+        text consumer PK
+        uuid event_id PK
+        timestamptz processed_at
+    }
+    SHEDLOCK {
+        varchar name PK
+        timestamp lock_until
+        timestamp locked_at
+        varchar locked_by
+    }

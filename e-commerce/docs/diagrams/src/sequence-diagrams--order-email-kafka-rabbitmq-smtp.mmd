@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    participant K as Kafka order.events
+    participant NR as notification router (Go)
+    participant RD as Redis
+    participant MQ as RabbitMQ
+    participant W as email worker (Go)
+    participant SMTP as Email relay
+    K->>NR: OrderConfirmed (eventId e7)
+    NR->>RD: SET notif:sent:e7 1 NX EX 7d
+    alt first time
+        NR->>MQ: publish email.order (priority 8, message_id e7, persistent)
+        MQ-->>NR: publisher confirm
+    else duplicate
+        NR->>NR: skip
+    end
+    NR->>K: commit offset
+    MQ->>W: deliver (prefetch 20)
+    W->>SMTP: send rendered email
+    alt sent
+        W->>MQ: ack
+    else temporary failure
+        W->>MQ: publish to email.retry.30s (attempt + 1), ack original
+        Note over MQ: after TTL the job dead-letters back to email.send
+    end

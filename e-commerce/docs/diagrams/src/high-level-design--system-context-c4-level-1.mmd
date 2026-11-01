@@ -1,0 +1,20 @@
+flowchart TB
+    customer([Customer<br/>web / mobile])
+    staff([Staff<br/>catalogue and stock managers])
+    subgraph platform[E-commerce platform]
+        core[Online store backend]
+    end
+    idp[Keycloak<br/>identity provider]
+    psp[Payment provider<br/>card tokenisation and charges]
+    smtp[Email relay<br/>SMTP]
+    cdn[CDN + WAF]
+
+    customer -->|browse, search, cart, checkout| cdn
+    staff -->|manage catalogue and stock| cdn
+    cdn -->|HTTPS| core
+    customer -.->|sign in| idp
+    staff -.->|sign in| idp
+    core -->|validate tokens - JWKS| idp
+    core -->|authorise, capture, refund| psp
+    customer -.->|card details, tokenised client side| psp
+    core -->|order emails| smtp

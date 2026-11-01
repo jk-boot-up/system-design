@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-commerce platform: delivery plan</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">System design</a>
+  <span class="src">PLAN.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="e-commerce-platform-delivery-plan">E-commerce platform: delivery plan<a class="headerlink" href="#e-commerce-platform-delivery-plan" title="Permanent link">#</a></h1>
+<p>This plan covers how the e-commerce system described in <a href="SPEC.html">SPEC.md</a> is built, in what order, and how each step is verified.</p>
+<ul>
+<li><strong>Plan and spec</strong> live on <code>main</code>.</li>
+<li><strong>Implementation</strong> happens on <code>system-design-e-commerce-draft-1</code> and is merged to <code>main</code> once it is reviewed.</li>
+</ul>
+<h2 id="1-goals">1. Goals<a class="headerlink" href="#1-goals" title="Permanent link">#</a></h2>
+<ol>
+<li>A production-grade <strong>reference design</strong> for an online store, written as a system design spec with supporting design documents.</li>
+<li>A <strong>working implementation</strong>:
+   * Java 25 and Gradle as the main stack, open-source technology only.
+   * Organised so each service can be built, tested, deployed and scaled on its own.</li>
+<li><strong>Visual walkthroughs</strong> of the architecture and the key flows, which:
+   * animate the flows in the browser;
+   * support light, medium and dark themes;
+   * offer optional voice narration with an on/off button.</li>
+</ol>
+<h2 id="2-non-goals-first-release">2. Non-goals (first release)<a class="headerlink" href="#2-non-goals-first-release" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Real payment processors.</strong> Payment uses a pluggable provider port with a simulated provider. A real provider (for example Stripe or Adyen) is an adapter added later.</li>
+<li><strong>A full storefront UI.</strong> A small demo storefront is planned as a later milestone; the first release exposes the platform through APIs.</li>
+<li><strong>Recommendations, marketplace sellers, multi-currency tax engines.</strong> These are listed as extensions in the spec.</li>
+</ul>
+<h2 id="3-technology-choices-summary">3. Technology choices (summary)<a class="headerlink" href="#3-technology-choices-summary" title="Permanent link">#</a></h2>
+<p>All components are open source. See <a href="SPEC.html#9-technology-choices">SPEC.md §9</a> for the reasoning behind each choice.</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Choice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Languages / build</td>
+<td>Java 25 with Gradle 9 (Kotlin DSL, version catalog) as the main stack; Go 1.24 (notification); Python 3.12 + FastAPI (recommendations)</td>
+</tr>
+<tr>
+<td>Service framework</td>
+<td>Spring Boot 4.0, Spring Cloud 2025.1</td>
+</tr>
+<tr>
+<td>API gateway</td>
+<td>Spring Cloud Gateway</td>
+</tr>
+<tr>
+<td>Identity</td>
+<td>Keycloak (OIDC / OAuth 2.1, JWT)</td>
+</tr>
+<tr>
+<td>Relational data</td>
+<td>PostgreSQL 17 (catalog, inventory, orders, payments), Flyway migrations, PgBouncer; Citus when orders need sharding</td>
+</tr>
+<tr>
+<td>Wide-column data</td>
+<td>Apache Cassandra 5 (reviews)</td>
+</tr>
+<tr>
+<td>Object storage</td>
+<td>MinIO, S3 API (product images, presigned uploads)</td>
+</tr>
+<tr>
+<td>Cache, cart, rate limits</td>
+<td>Redis 8 (Valkey-compatible)</td>
+</tr>
+<tr>
+<td>Events</td>
+<td>Apache Kafka 4 (KRaft), transactional outbox</td>
+</tr>
+<tr>
+<td>Work queues</td>
+<td>RabbitMQ 4 (email jobs: priorities, delayed retries)</td>
+</tr>
+<tr>
+<td>Analytics</td>
+<td>ClickHouse (Kafka table engine) + Grafana dashboards</td>
+</tr>
+<tr>
+<td>Search</td>
+<td>OpenSearch 3</td>
+</tr>
+<tr>
+<td>Resilience</td>
+<td>Resilience4j (timeouts, retries, circuit breakers, bulkheads)</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>OpenTelemetry, Prometheus, Grafana, Tempo, Loki</td>
+</tr>
+<tr>
+<td>Local platform</td>
+<td>Docker Compose</td>
+</tr>
+<tr>
+<td>Production platform</td>
+<td>Kubernetes (Kustomize manifests, HPA, PDB)</td>
+</tr>
+<tr>
+<td>Testing</td>
+<td>JUnit 6, AssertJ, ArchUnit, Testcontainers</td>
+</tr>
+<tr>
+<td>Load testing</td>
+<td>Gatling (Java DSL) with p99 budgets in CI</td>
+</tr>
+<tr>
+<td>Scheduled jobs</td>
+<td>ShedLock (one runner per job across replicas)</td>
+</tr>
+<tr>
+<td>CI</td>
+<td>GitHub Actions</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-repository-layout">4. Repository layout<a class="headerlink" href="#4-repository-layout" title="Permanent link">#</a></h2>
+<p>See the <a href="../README.html#layout">e-commerce README</a> for the full tree.
+* <strong>System folder:</strong> everything for the store lives in <code>e-commerce/</code>: documents, services, deployment and tests.
+* <strong>Services:</strong> each folder in <code>e-commerce/services/</code> is a standalone project, sharing no code with the others (Java/Gradle, Go module or Python project) with its own tests, image, Kubernetes base and pipeline.
+* <strong>Deployment:</strong> <code>e-commerce/deploy/</code> composes the services for local Docker Compose and for Kubernetes environments.</p>
+<p>Each Java service follows a <strong>hexagonal</strong> layout:
+* <code>domain</code> holds pure Java with no framework imports;
+* <code>application</code> holds use cases and ports;
+* <code>adapter</code> holds the web, persistence, messaging and external clients.</p>
+<p>ArchUnit tests enforce the dependency direction.</p>
+<h2 id="5-milestones">5. Milestones<a class="headerlink" href="#5-milestones" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Milestone</th>
+<th>Content</th>
+<th>Done when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M0</td>
+<td>Plan and spec</td>
+<td><code>docs/PLAN.md</code>, <code>docs/SPEC.md</code> on <code>main</code></td>
+<td>Reviewed and pushed</td>
+</tr>
+<tr>
+<td>M1</td>
+<td>Project template</td>
+<td>Standalone service layout (build, docs, contracts, Dockerfile, k8s), CI workflow per service</td>
+<td>First service builds alone and in CI</td>
+</tr>
+<tr>
+<td>M2</td>
+<td>Contracts</td>
+<td>Event JSON Schemas and OpenAPI documents owned by each producing service</td>
+<td>Schema validation tests in producers and consumers</td>
+</tr>
+<tr>
+<td>M3</td>
+<td>Catalog and search</td>
+<td>product/category CRUD, outbox events, OpenSearch indexing and faceted search</td>
+<td>API tests, indexing integration test</td>
+</tr>
+<tr>
+<td>M4</td>
+<td>Cart and inventory</td>
+<td>Redis cart, stock with reservations and expiry</td>
+<td>Concurrency test: no overselling under parallel reservations</td>
+</tr>
+<tr>
+<td>M5</td>
+<td>Orders and payments</td>
+<td>checkout saga, idempotency keys, payment provider port</td>
+<td>Saga tests: happy path, payment failure, inventory failure, timeout</td>
+</tr>
+<tr>
+<td>M5b</td>
+<td>Reviews and media</td>
+<td>Cassandra-backed reviews, presigned image uploads</td>
+<td>Review pagination test, verified-purchase consumer test</td>
+</tr>
+<tr>
+<td>M6</td>
+<td>Gateway, identity, notifications</td>
+<td>routing, JWT validation, rate limits, email notifications</td>
+<td>End-to-end flow through the gateway</td>
+</tr>
+<tr>
+<td>M7</td>
+<td>Operations</td>
+<td>Compose stack, Kubernetes manifests, dashboards, alerts, runbooks</td>
+<td>Stack starts locally; manifests pass <code>kubectl --dry-run</code></td>
+</tr>
+<tr>
+<td>M8</td>
+<td>Design docs</td>
+<td>ADRs, per-service designs, data model, API and event catalogues, capacity model, failure modes</td>
+<td>Docs cover every decision in the spec</td>
+</tr>
+<tr>
+<td>M6b</td>
+<td>Polyglot services</td>
+<td>Go notification router + email worker (RabbitMQ), Python recommendations, ClickHouse analytics</td>
+<td>Go and Python tests green; events flow end to end in the Compose stack</td>
+</tr>
+<tr>
+<td>M8b</td>
+<td>Performance</td>
+<td>Gatling simulations, AppCDS/AOT images, index and cache tuning</td>
+<td>p99 budgets from SPEC §2.2 met in CI</td>
+</tr>
+<tr>
+<td>M9</td>
+<td>Visual walkthroughs</td>
+<td>animated architecture and flows, themes, narration toggle</td>
+<td>Every scenario plays end to end with no console errors</td>
+</tr>
+</tbody>
+</table>
+<h2 id="6-design-principles">6. Design principles<a class="headerlink" href="#6-design-principles" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Scale up, then out:</strong> every tier has a documented vertical and horizontal growth path (SPEC §13.1).</li>
+<li><strong>Modular:</strong> one bounded context per service, hexagonal inside, no code shared between services (SPEC §13.2).</li>
+<li><strong>High performance:</strong> virtual threads, layered caching, read models, batching and keyset pagination, with budgets enforced by load tests (SPEC §13.3).</li>
+<li><strong>Right store for the data:</strong> polyglot persistence, one store per service (SPEC §14).</li>
+<li><strong>Proven patterns, named:</strong> each one is mapped to its project in <a href="https://github.com/jk-boot-up/java-design-patterns">jk-boot-up/java-design-patterns</a> (SPEC §15).</li>
+</ul>
+<h2 id="7-working-agreements">7. Working agreements<a class="headerlink" href="#7-working-agreements" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Branching:</strong> all implementation goes to <code>system-design-e-commerce-draft-1</code>. Commits are small and describe one change each.</li>
+<li><strong>Quality gates on every commit:</strong></li>
+<li>compile;</li>
+<li>unit tests;</li>
+<li>ArchUnit rules;</li>
+<li>Testcontainers integration tests, wherever a container runtime is available (always in CI).</li>
+<li><strong>Contracts first:</strong> event schemas and OpenAPI definitions change through versioned, backward-compatible additions. Breaking changes need a new version.</li>
+<li><strong>Every decision is recorded:</strong> one ADR in <code>docs/adr/</code> per significant choice.</li>
+</ul>
+<h2 id="8-risks-and-mitigations">8. Risks and mitigations<a class="headerlink" href="#8-risks-and-mitigations" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Distributed transactions across services</td>
+<td>Saga with explicit compensations; outbox avoids dual writes; idempotent consumers</td>
+</tr>
+<tr>
+<td>Overselling during flash sales</td>
+<td>Conditional atomic stock decrement, short reservation expiry, queue-based admission for hot items</td>
+</tr>
+<tr>
+<td>Duplicate orders or charges on retries</td>
+<td>Client idempotency keys stored with the result; provider idempotency keys on payment calls</td>
+</tr>
+<tr>
+<td>Cascading failures</td>
+<td>Timeouts on every remote call, circuit breakers, bulkheads, load shedding at the gateway</td>
+</tr>
+<tr>
+<td>Search index drift</td>
+<td>Rebuildable index from catalog events plus a periodic full reindex job</td>
+</tr>
+<tr>
+<td>Local environment without Docker</td>
+<td>Pure-domain and in-memory adapter tests always run; container tests are tagged and run when Docker is present</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

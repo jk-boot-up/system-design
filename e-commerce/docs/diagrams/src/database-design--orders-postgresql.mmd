@@ -1,0 +1,31 @@
+erDiagram
+    ORDERS ||--|{ ORDER_LINES : contains
+    IDEMPOTENCY_KEYS ||--|| ORDERS : "points to"
+    ORDERS {
+        uuid id PK "UUIDv7"
+        timestamptz created_at PK "partition key = time in the UUIDv7"
+        uuid customer_id
+        text customer_email
+        text status "PENDING | CONFIRMED | CANCELLING | CANCELLED | SHIPPED | DELIVERED"
+        text saga_step
+        text cancel_reason
+        numeric total_amount
+        char currency
+        bigint version
+        timestamptz updated_at
+    }
+    ORDER_LINES {
+        uuid order_id PK, FK
+        timestamptz order_created_at PK, FK
+        int line_no PK
+        text sku
+        text product_name
+        int quantity
+        numeric unit_price
+    }
+    IDEMPOTENCY_KEYS {
+        uuid customer_id PK
+        text idempotency_key PK
+        uuid order_id
+        timestamptz created_at
+    }

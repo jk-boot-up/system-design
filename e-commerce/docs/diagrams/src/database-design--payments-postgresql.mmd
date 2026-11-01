@@ -1,0 +1,25 @@
+erDiagram
+    PAYMENTS ||--o{ PAYMENT_ATTEMPTS : "audited by"
+    PAYMENTS {
+        uuid id PK
+        uuid order_id UK
+        numeric amount
+        char currency
+        text status "AUTHORIZING | AUTHORIZED | CAPTURED | DECLINED | UNKNOWN | VOIDED | REFUNDED"
+        text payment_token "provider token, never a card number"
+        text provider_ref
+        text failure_reason
+        boolean void_requested
+        bigint version
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    PAYMENT_ATTEMPTS {
+        uuid id PK
+        uuid payment_id FK
+        text operation "AUTHORIZE | CAPTURE | VOID | REFUND | RECONCILE"
+        text outcome "SUCCESS | DECLINED | ERROR | TIMEOUT"
+        text provider_ref
+        text detail
+        timestamptz created_at
+    }

@@ -1,0 +1,14 @@
+stateDiagram-v2
+    [*] --> AUTHORIZING: authorize()
+    AUTHORIZING --> AUTHORIZED: provider ok
+    AUTHORIZING --> DECLINED: provider declined
+    AUTHORIZING --> UNKNOWN: timeout / error
+    UNKNOWN --> AUTHORIZED: reconciled, provider had authorised (no void requested)
+    UNKNOWN --> VOIDED: reconciled authorised + void requested
+    UNKNOWN --> DECLINED: reconciled, no authorisation
+    AUTHORIZED --> CAPTURED: capture()
+    AUTHORIZED --> VOIDED: void()
+    CAPTURED --> REFUNDED: refund()
+    DECLINED --> [*]
+    VOIDED --> [*]
+    REFUNDED --> [*]

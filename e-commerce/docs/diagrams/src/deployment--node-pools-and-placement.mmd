@@ -1,0 +1,16 @@
+flowchart LR
+    subgraph AZa[AZ a]
+        a1[general pool<br/>services]
+        a2[memory pool<br/>Redis, OpenSearch]
+        a3[storage pool<br/>PostgreSQL, Kafka, Cassandra]
+    end
+    subgraph AZb[AZ b]
+        b1[general pool]
+        b2[memory pool]
+        b3[storage pool]
+    end
+    subgraph AZc[AZ c]
+        c1[general pool]
+        c2[memory pool]
+        c3[storage pool]
+    end

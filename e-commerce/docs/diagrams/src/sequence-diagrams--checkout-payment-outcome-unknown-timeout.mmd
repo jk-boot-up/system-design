@@ -1,0 +1,24 @@
+sequenceDiagram
+    autonumber
+    participant O as order-service
+    participant I as inventory-service
+    participant P as payment-service
+    participant PSP as Payment provider
+    participant J as payment reconciler (scheduled)
+    O->>P: authorize [2 s]
+    P->>PSP: authorise (key = orderId)
+    Note over P,PSP: Provider is slow#59; no answer within the timeout
+    P-->>O: 504 UNKNOWN (payment row status UNKNOWN)
+    O->>P: POST /internal/payments/{orderId}/void
+    P->>P: void_requested = true
+    O->>I: release reservation
+    O->>O: CANCELLED (PAYMENT_UNKNOWN), outbox OrderCancelled
+    J->>PSP: look up by key = orderId
+    alt provider did authorise late
+        PSP-->>J: authorised
+        J->>PSP: void (key = orderId)
+        J->>J: status VOIDED, attempt logged
+    else provider never authorised
+        PSP-->>J: not found
+        J->>J: status DECLINED
+    end

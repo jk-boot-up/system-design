@@ -1,0 +1,20 @@
+erDiagram
+    STOCK ||--o{ RESERVATIONS : "reserved from"
+    STOCK {
+        text sku PK
+        text warehouse PK "MAIN by default"
+        int available "check >= 0"
+        int reserved "check >= 0"
+        bigint version
+        timestamptz updated_at
+    }
+    RESERVATIONS {
+        uuid order_id PK
+        text sku PK
+        text warehouse
+        int quantity "> 0"
+        text status "RESERVED | COMMITTED | RELEASED | EXPIRED | RETURNED"
+        timestamptz expires_at
+        timestamptz created_at
+        timestamptz updated_at
+    }

@@ -1,0 +1,15 @@
+sequenceDiagram
+    autonumber
+    participant UC as Use case
+    participant DB as Service DB
+    participant RL as Outbox relay (every replica, every 100 ms, SKIP LOCKED)
+    participant K as Kafka
+    UC->>DB: BEGIN#59; UPDATE aggregate#59; INSERT outbox row#59; COMMIT
+    loop poll
+        RL->>DB: BEGIN#59; SELECT … WHERE published_at IS NULL ORDER BY created_at LIMIT 500 FOR UPDATE SKIP LOCKED
+        DB-->>RL: batch
+        RL->>K: send all (key = aggregate_id, acks=all, idempotent producer)
+        K-->>RL: acks
+        RL->>DB: UPDATE outbox SET published_at = now() WHERE id IN (…)#59; COMMIT
+    end
+    Note over RL,K: A crash after send and before commit re-sends the batch: consumers dedupe by eventId

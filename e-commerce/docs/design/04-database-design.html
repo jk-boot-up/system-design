@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4. Database design</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">System design</a>
+  <span class="src">04-database-design.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="4-database-design">4. Database design<a class="headerlink" href="#4-database-design" title="Permanent link">#</a></h1>
+<p>The platform uses <strong>polyglot persistence</strong>, as described in <a href="../SPEC.html#14-polyglot-persistence">SPEC §14</a>.
+* Every service owns its store; no other service connects to it.
+* PostgreSQL schemas are managed by Flyway migrations in each service (<code>src/main/resources/db/migration</code>).
+* Cassandra tables are created by versioned CQL scripts.
+* OpenSearch indexes are created by the search service from a mapping file.</p>
+<h2 id="41-common-tables-every-postgresql-service">4.1 Common tables (every PostgreSQL service)<a class="headerlink" href="#41-common-tables-every-postgresql-service" title="Permanent link">#</a></h2>
+<p>Every service that publishes or consumes events has these tables, created by its own first migration. Each service carries its own small outbox implementation; there is no shared library (ADR 0003).</p>
+<p><figure class="diagram"><img alt="Common tables (every PostgreSQL service) diagram" src="../diagrams/database-design--common-tables-every-postgresql-service.light.svg" data-light="../diagrams/database-design--common-tables-every-postgresql-service.light.svg" data-dark="../diagrams/database-design--common-tables-every-postgresql-service.dark.svg" loading="lazy"></figure></p>
+<pre class="highlight"><code class="language-sql">create table outbox (
+  id             uuid primary key,
+  aggregate_type text        not null,
+  aggregate_id   text        not null,
+  event_type     text        not null,
+  topic          text        not null,
+  payload        jsonb       not null,
+  created_at     timestamptz not null default now(),
+  published_at   timestamptz
+);
+-- the relay only ever reads unpublished rows, oldest first
+create index outbox_unpublished on outbox (created_at) where published_at is null;
+
+create table processed_events (
+  consumer     text        not null,
+  event_id     uuid        not null,
+  processed_at timestamptz not null default now(),
+  primary key (consumer, event_id)
+);</code></pre>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Writes</th>
+<th>Reads</th>
+<th>Retention</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>outbox</code></td>
+<td>One row per event, in the business transaction</td>
+<td>Relay: <code>SELECT … WHERE published_at IS NULL ORDER BY created_at LIMIT 500 FOR UPDATE SKIP LOCKED</code></td>
+<td>Published rows deleted after 7 days</td>
+</tr>
+<tr>
+<td><code>processed_events</code></td>
+<td>One row per consumed event, in the consumer's transaction</td>
+<td>Primary-key insert; a conflict means "already processed"</td>
+<td>14 days (longer than Kafka retention)</td>
+</tr>
+<tr>
+<td><code>shedlock</code></td>
+<td>Lock acquisition by scheduled jobs</td>
+<td>Same</td>
+<td>Permanent, one row per job</td>
+</tr>
+</tbody>
+</table>
+<p><code>FOR UPDATE SKIP LOCKED</code> lets several relay replicas work in parallel without publishing the same row twice.</p>
+<h2 id="42-catalog-postgresql">4.2 catalog (PostgreSQL)<a class="headerlink" href="#42-catalog-postgresql" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="catalog (PostgreSQL) diagram" src="../diagrams/database-design--catalog-postgresql.light.svg" data-light="../diagrams/database-design--catalog-postgresql.light.svg" data-dark="../diagrams/database-design--catalog-postgresql.dark.svg" loading="lazy"></figure></p>
+<pre class="highlight"><code class="language-sql">create table categories (
+  id         uuid primary key,
+  parent_id  uuid references categories (id),
+  slug       text not null unique,
+  name       text not null,
+  created_at timestamptz not null default now()
+);
+
+create table products (
+  id           uuid primary key,
+  sku          text not null unique,
+  name         text not null,
+  description  text not null default '',
+  category_id  uuid not null references categories (id),
+  brand        text not null,
+  price_amount numeric(19, 2) not null check (price_amount &gt;= 0),
+  currency     char(3) not null,
+  attributes   jsonb not null default '{}'::jsonb,
+  status       text not null check (status in ('DRAFT', 'ACTIVE', 'ARCHIVED')),
+  version      bigint not null,
+  created_at   timestamptz not null,
+  updated_at   timestamptz not null
+);
+create index products_category_active on products (category_id) where status = 'ACTIVE';
+create index products_attributes on products using gin (attributes jsonb_path_ops);
+
+create table product_images (
+  product_id   uuid not null references products (id) on delete cascade,
+  position     int  not null,
+  object_key   text not null,
+  content_type text not null,
+  primary key (product_id, position)
+);</code></pre>
+<h2 id="43-inventory-postgresql">4.3 inventory (PostgreSQL)<a class="headerlink" href="#43-inventory-postgresql" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="inventory (PostgreSQL) diagram" src="../diagrams/database-design--inventory-postgresql.light.svg" data-light="../diagrams/database-design--inventory-postgresql.light.svg" data-dark="../diagrams/database-design--inventory-postgresql.dark.svg" loading="lazy"></figure></p>
+<pre class="highlight"><code class="language-sql">create table stock (
+  sku        text not null,
+  warehouse  text not null default 'MAIN',
+  available  int  not null check (available &gt;= 0),
+  reserved   int  not null default 0 check (reserved &gt;= 0),
+  version    bigint not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (sku, warehouse)
+);
+
+create table reservations (
+  order_id   uuid not null,
+  sku        text not null,
+  warehouse  text not null default 'MAIN',
+  quantity   int  not null check (quantity &gt; 0),
+  status     text not null check (status in ('RESERVED', 'COMMITTED', 'RELEASED', 'EXPIRED', 'RETURNED')),
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (order_id, sku)
+);
+-- the expiry job only scans live reservations
+create index reservations_live_expiry on reservations (expires_at) where status = 'RESERVED';</code></pre>
+<p><strong>The reservation statement.</strong> This single atomic statement cannot oversell:</p>
+<pre class="highlight"><code class="language-sql">update stock
+   set available = available - :qty, reserved = reserved + :qty, version = version + 1, updated_at = now()
+ where sku = :sku and warehouse = :wh and available &gt;= :qty;
+-- 1 row updated  → reserved
+-- 0 rows updated → not enough stock (or unknown SKU)</code></pre>
+<ul>
+<li><strong>Ordering:</strong> lines are reserved in SKU order inside one transaction. Two orders for the same SKUs therefore lock rows in the same order and cannot deadlock.</li>
+<li><strong>Commit</strong> turns <code>reserved</code> into a sale: <code>reserved = reserved - q</code>.</li>
+<li><strong>Release</strong> returns the quantity: <code>available = available + q, reserved = reserved - q</code>.</li>
+</ul>
+<h2 id="44-orders-postgresql">4.4 orders (PostgreSQL)<a class="headerlink" href="#44-orders-postgresql" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="orders (PostgreSQL) diagram" src="../diagrams/database-design--orders-postgresql.light.svg" data-light="../diagrams/database-design--orders-postgresql.light.svg" data-dark="../diagrams/database-design--orders-postgresql.dark.svg" loading="lazy"></figure></p>
+<pre class="highlight"><code class="language-sql">create table orders (
+  id             uuid        not null,
+  created_at     timestamptz not null,
+  customer_id    uuid        not null,
+  customer_email text        not null,
+  status         text        not null,
+  saga_step      text        not null,
+  cancel_reason  text,
+  total_amount   numeric(19, 2) not null,
+  currency       char(3)     not null,
+  version        bigint      not null,
+  updated_at     timestamptz not null,
+  primary key (id, created_at)
+) partition by range (created_at);
+
+create table order_lines (
+  order_id         uuid        not null,
+  order_created_at timestamptz not null,
+  line_no          int         not null,
+  sku              text        not null,
+  product_name     text        not null,
+  quantity         int         not null check (quantity &gt; 0),
+  unit_price       numeric(19, 2) not null check (unit_price &gt;= 0),
+  primary key (order_id, order_created_at, line_no),
+  foreign key (order_id, order_created_at) references orders (id, created_at)
+) partition by range (order_created_at);
+
+create index orders_by_customer on orders (customer_id, created_at desc);
+create index orders_in_flight   on orders (updated_at) where status in ('PENDING', 'CANCELLING');
+
+create table idempotency_keys (
+  customer_id     uuid not null,
+  idempotency_key text not null,
+  order_id        uuid not null,
+  created_at      timestamptz not null default now(),
+  primary key (customer_id, idempotency_key)
+);</code></pre>
+<p><strong>Partitioning</strong>
+* <strong>Scheme:</strong> <code>orders</code> and <code>order_lines</code> are range-partitioned by month. A function <code>ensure_order_partitions(months_ahead)</code> creates the missing monthly partitions; a daily job calls it to stay 3 months ahead, and a default partition catches anything unexpected.
+* <strong>Pruning without an extra column:</strong> the order id is a UUIDv7, whose first 48 bits are the creation time in milliseconds. <code>created_at</code> is set from the id, so a lookup by id computes <code>created_at</code> from the id and prunes to one partition.
+* <strong>Archiving:</strong> old partitions are detached and archived, with no expensive <code>DELETE</code>.</p>
+<p><strong>Scaling beyond one primary.</strong> The tables can be distributed with Citus on <code>customer_id</code> (SPEC §13.1). All queries already filter by <code>customer_id</code> or by order id; adding <code>customer_id</code> to the order lookup path makes them single-shard.</p>
+<h2 id="45-payments-postgresql">4.5 payments (PostgreSQL)<a class="headerlink" href="#45-payments-postgresql" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="payments (PostgreSQL) diagram" src="../diagrams/database-design--payments-postgresql.light.svg" data-light="../diagrams/database-design--payments-postgresql.light.svg" data-dark="../diagrams/database-design--payments-postgresql.dark.svg" loading="lazy"></figure></p>
+<pre class="highlight"><code class="language-sql">create table payments (
+  id             uuid primary key,
+  order_id       uuid not null unique,
+  amount         numeric(19, 2) not null check (amount &gt; 0),
+  currency       char(3) not null,
+  status         text not null,
+  payment_token  text not null,
+  provider_ref   text,
+  failure_reason text,
+  void_requested boolean not null default false,
+  version        bigint not null,
+  created_at     timestamptz not null,
+  updated_at     timestamptz not null
+);
+create index payments_unsettled on payments (updated_at) where status in ('AUTHORIZING', 'UNKNOWN');
+
+create table payment_attempts (
+  id           uuid primary key,
+  payment_id   uuid not null references payments (id),
+  operation    text not null,
+  outcome      text not null,
+  provider_ref text,
+  detail       text,
+  created_at   timestamptz not null default now()
+);</code></pre>
+<ul>
+<li><strong>One payment per order:</strong> <code>order_id unique</code> guarantees it. A repeated authorise call returns the existing payment.</li>
+<li><strong>Provider idempotency key:</strong> the provider is always called with <code>order_id</code>, so a retried charge can never be taken twice.</li>
+<li><strong>Audit trail:</strong> <code>payment_attempts</code> is append-only. Rows are never updated.</li>
+</ul>
+<h2 id="46-reviews-cassandra">4.6 reviews (Cassandra)<a class="headerlink" href="#46-reviews-cassandra" title="Permanent link">#</a></h2>
+<p>Each table is designed around one query; data is duplicated on purpose.</p>
+<pre class="highlight"><code class="language-sql">CREATE KEYSPACE reviews WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3};
+
+-- Q1: newest reviews of a product, paged
+CREATE TABLE reviews.reviews_by_product (
+  sku         text,
+  bucket      text,        -- 'yyyy-MM' of created_at: bounds partition size
+  created_at  timestamp,
+  review_id   uuid,
+  customer_id uuid,
+  rating      int,
+  title       text,
+  body        text,
+  verified    boolean,
+  PRIMARY KEY ((sku, bucket), created_at, review_id)
+) WITH CLUSTERING ORDER BY (created_at DESC, review_id ASC);
+
+-- Q2: rating summary of a product
+CREATE TABLE reviews.rating_summary_by_product (
+  sku          text PRIMARY KEY,
+  review_count counter,
+  rating_total counter
+);
+
+-- Q3: has this customer bought this product? (filled from OrderConfirmed)
+CREATE TABLE reviews.purchases_by_customer (
+  customer_id  uuid,
+  sku          text,
+  purchased_at timestamp,
+  PRIMARY KEY ((customer_id), sku)
+);
+
+-- Q4: one review per customer per product (lightweight transaction guard)
+CREATE TABLE reviews.review_guard (
+  sku         text,
+  customer_id uuid,
+  review_id   uuid,
+  PRIMARY KEY ((sku, customer_id))
+);</code></pre>
+<table>
+<thead>
+<tr>
+<th>Query</th>
+<th>Table</th>
+<th>Access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Show newest reviews</td>
+<td><code>reviews_by_product</code></td>
+<td>Read the current month's bucket; continue to earlier buckets until the page is full</td>
+</tr>
+<tr>
+<td>Show rating</td>
+<td><code>rating_summary_by_product</code></td>
+<td>Single-partition read; average = total ÷ count</td>
+</tr>
+<tr>
+<td>Verified-purchase badge</td>
+<td><code>purchases_by_customer</code></td>
+<td>Single-partition read</td>
+</tr>
+<tr>
+<td>Post review</td>
+<td><code>review_guard</code> <code>INSERT … IF NOT EXISTS</code>, then insert the review and increment counters</td>
+<td>The LWT happens once per review, which is rare compared with reads</td>
+</tr>
+</tbody>
+</table>
+<p>Consistency levels: writes and reads use <code>LOCAL_QUORUM</code>; counters use <code>LOCAL_QUORUM</code>.</p>
+<h2 id="47-redis-key-design">4.7 Redis key design<a class="headerlink" href="#47-redis-key-design" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Owner</th>
+<th>TTL</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cart:c:{customerId}</code> / <code>cart:g:{guestId}</code></td>
+<td>Hash <code>sku → quantity</code></td>
+<td>cart-service</td>
+<td>30 days, refreshed on write</td>
+<td><code>HSET</code>, <code>HDEL</code>, <code>HGETALL</code>; merge on sign-in</td>
+</tr>
+<tr>
+<td><code>product:{id}</code></td>
+<td>String (JSON)</td>
+<td>catalog-service</td>
+<td>10 min</td>
+<td>Cache-aside; deleted on change</td>
+</tr>
+<tr>
+<td><code>request_rate_limiter.{key}.tokens</code> / <code>.timestamp</code></td>
+<td>String</td>
+<td>api-gateway</td>
+<td>Seconds</td>
+<td>Token bucket via a Lua script, atomic</td>
+</tr>
+<tr>
+<td><code>notif:sent:{eventId}</code></td>
+<td>String</td>
+<td>notification-service</td>
+<td>7 days</td>
+<td><code>SET NX EX</code>; the first writer sends the email</td>
+</tr>
+<tr>
+<td><code>reco:also:{sku}</code></td>
+<td>Sorted set <code>otherSku → count</code></td>
+<td>recommendation-service</td>
+<td>none (trimmed to top 200)</td>
+<td><code>ZINCRBY</code> for every pair in a confirmed order; <code>ZREVRANGE 0 9</code> to read</td>
+</tr>
+<tr>
+<td><code>reco:seen:{eventId}</code></td>
+<td>String</td>
+<td>recommendation-service</td>
+<td>14 days</td>
+<td><code>SET NX EX</code> dedupe</td>
+</tr>
+</tbody>
+</table>
+<h2 id="48-opensearch-mapping-products-v1-alias-products">4.8 OpenSearch mapping (<code>products-v1</code>, alias <code>products</code>)<a class="headerlink" href="#48-opensearch-mapping-products-v1-alias-products" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-json">{
+  "settings": { "number_of_shards": 3, "number_of_replicas": 1, "refresh_interval": "1s" },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "id":          { "type": "keyword" },
+      "sku":         { "type": "keyword" },
+      "name":        { "type": "text", "analyzer": "english", "fields": { "raw": { "type": "keyword" } } },
+      "description": { "type": "text", "analyzer": "english" },
+      "category":    { "type": "keyword" },
+      "brand":       { "type": "keyword" },
+      "price":       { "type": "scaled_float", "scaling_factor": 100 },
+      "currency":    { "type": "keyword" },
+      "attributes":  { "type": "flat_object" },
+      "inStock":     { "type": "boolean" },
+      "available":   { "type": "integer" },
+      "status":      { "type": "keyword" },
+      "updatedAt":   { "type": "date" },
+      "catalogVersion": { "type": "long" }
+    }
+  }
+}</code></pre>
+<ul>
+<li><strong>Writes are versioned:</strong> the indexer writes with <code>version_type=external</code> using the catalogue version. An older event arriving late can never overwrite newer data.</li>
+<li><strong>Mapping changes:</strong> create <code>products-v2</code>, reindex, then switch the alias atomically.</li>
+</ul>
+<h2 id="49-rabbitmq-topology-notification-service">4.9 RabbitMQ topology (notification-service)<a class="headerlink" href="#49-rabbitmq-topology-notification-service" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="RabbitMQ topology (notification-service) diagram" src="../diagrams/database-design--rabbitmq-topology-notification-service.light.svg" data-light="../diagrams/database-design--rabbitmq-topology-notification-service.light.svg" data-dark="../diagrams/database-design--rabbitmq-topology-notification-service.dark.svg" loading="lazy"></figure></p>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Settings</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>email.send</code></td>
+<td>Quorum queue (Raft-replicated), priority 0–10</td>
+<td>Order confirmations (priority 8) overtake bulk mail</td>
+</tr>
+<tr>
+<td>Retry queues</td>
+<td><code>x-message-ttl</code> 30 s, 2 min, 10 min, then dead-letter back to <code>email</code></td>
+<td>Delayed retries without a scheduler</td>
+</tr>
+<tr>
+<td><code>email.dead</code></td>
+<td>Holds failed jobs; alerting on depth</td>
+<td>Poison jobs never block the queue</td>
+</tr>
+<tr>
+<td>Worker prefetch</td>
+<td>20</td>
+<td>Bounded in-flight work per worker; fair dispatch</td>
+</tr>
+<tr>
+<td>Message properties</td>
+<td><code>message_id</code> = event id, persistent delivery</td>
+<td>Dedupe and durability</td>
+</tr>
+</tbody>
+</table>
+<h2 id="410-clickhouse-analytics">4.10 ClickHouse (analytics)<a class="headerlink" href="#410-clickhouse-analytics" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-sql">-- 1. Kafka engine tables read the topics (one consumer group per table)
+CREATE TABLE analytics.order_events_queue (raw String)
+ENGINE = Kafka SETTINGS kafka_broker_list = 'kafka:9092', kafka_topic_list = 'order.events',
+  kafka_group_name = 'analytics-orders', kafka_format = 'JSONAsString';
+
+-- 2. Storage table: one row per order event
+CREATE TABLE analytics.order_facts (
+  event_id     UUID,
+  event_type   LowCardinality(String),
+  occurred_at  DateTime64(3, 'UTC'),
+  order_id     UUID,
+  customer_key UInt64,                 -- cityHash64(customer_id): no raw personal id
+  total        Decimal(19, 2),
+  currency     LowCardinality(String),
+  reason       LowCardinality(String),
+  line_count   UInt16
+) ENGINE = ReplacingMergeTree
+PARTITION BY toYYYYMM(occurred_at)
+ORDER BY (event_type, occurred_at, event_id);    -- ReplacingMergeTree drops duplicate deliveries
+
+-- 3. Materialised view parses JSON into the storage table as messages arrive
+CREATE MATERIALIZED VIEW analytics.order_facts_mv TO analytics.order_facts AS
+SELECT toUUID(JSONExtractString(raw, 'eventId'))                              AS event_id,
+       JSONExtractString(raw, 'type')                                         AS event_type,
+       parseDateTime64BestEffort(JSONExtractString(raw, 'occurredAt'), 3)      AS occurred_at,
+       toUUID(JSONExtractString(raw, 'payload', 'orderId'))                   AS order_id,
+       cityHash64(JSONExtractString(raw, 'payload', 'customerId'))            AS customer_key,
+       toDecimal64(JSONExtractString(raw, 'payload', 'total', 'amount'), 2)    AS total,
+       JSONExtractString(raw, 'payload', 'total', 'currency')                 AS currency,
+       JSONExtractString(raw, 'payload', 'reason')                            AS reason,
+       toUInt16(JSONLength(raw, 'payload', 'lines'))                          AS line_count
+FROM analytics.order_events_queue;
+
+-- 4. Pre-aggregated rollup for dashboards
+CREATE MATERIALIZED VIEW analytics.revenue_per_minute
+ENGINE = SummingMergeTree ORDER BY (minute, currency) AS
+SELECT toStartOfMinute(occurred_at) AS minute, currency, count() AS orders, sum(total) AS revenue
+FROM analytics.order_facts WHERE event_type = 'order.OrderConfirmed' GROUP BY minute, currency;</code></pre>
+<h2 id="411-retention-and-data-lifecycle">4.11 Retention and data lifecycle<a class="headerlink" href="#411-retention-and-data-lifecycle" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Hot</th>
+<th>Archive</th>
+<th>Deletion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Orders</td>
+<td>24 monthly partitions online</td>
+<td>Detached partitions to object storage (Parquet)</td>
+<td>Per legal retention (e.g. 10 years for invoices)</td>
+</tr>
+<tr>
+<td>Payments</td>
+<td>Online</td>
+<td>Same as orders</td>
+<td>Per legal retention</td>
+</tr>
+<tr>
+<td>Outbox / processed events</td>
+<td>7 / 14 days</td>
+<td>none</td>
+<td>Scheduled delete</td>
+</tr>
+<tr>
+<td>Reviews</td>
+<td>Online</td>
+<td>none</td>
+<td>On customer deletion request (GDPR): delete by <code>customer_id</code> using <code>purchases_by_customer</code> + guard table</td>
+</tr>
+<tr>
+<td>Carts</td>
+<td>30 days</td>
+<td>none</td>
+<td>TTL</td>
+</tr>
+<tr>
+<td>Kafka</td>
+<td>7 days</td>
+<td>none</td>
+<td>Retention policy</td>
+</tr>
+<tr>
+<td>Analytics</td>
+<td>25 monthly partitions</td>
+<td>Older partitions moved to object storage (S3 disk)</td>
+<td>TTL by partition</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

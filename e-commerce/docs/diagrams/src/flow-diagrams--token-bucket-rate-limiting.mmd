@@ -1,0 +1,6 @@
+flowchart TD
+    A([Request with key k]) --> B[Lua script in Redis, atomic:<br/>tokens = min capacity, tokens + elapsed × rate]
+    B --> C{tokens ≥ 1?}
+    C -- yes --> D[tokens -= 1; allow<br/>X-RateLimit-Remaining]
+    C -- no --> E[deny 429<br/>Retry-After = time to the next token]
+    B -. Redis unavailable .-> F[Fail open with a per-pod local limiter<br/>so one outage doesn't block all traffic]

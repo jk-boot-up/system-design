@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    participant C as Customer
+    participant O as order-service
+    participant I as inventory-service
+    participant P as payment-service
+    participant K as Kafka
+    C->>O: POST /orders (Idempotency-Key)
+    O->>O: idempotency check#59; create order PENDING (+ outbox OrderPlaced)
+    O->>I: reserve(orderId, lines) [timeout 800 ms]
+    I->>I: conditional decrement per SKU, reservation expires in 15 min
+    I-->>O: reserved
+    O->>P: authorise(orderId, amount, providerKey=orderId) [timeout 2 s]
+    P-->>O: authorised
+    O->>I: commit reservation
+    O->>P: capture
+    O->>O: order CONFIRMED (+ outbox OrderConfirmed)
+    O-->>C: 201 Created {orderId, status: CONFIRMED}
+    O--)K: OrderConfirmed (relay)

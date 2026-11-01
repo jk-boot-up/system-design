@@ -1,0 +1,13 @@
+sequenceDiagram
+    autonumber
+    participant O as order-service
+    participant DB as orders DB
+    participant I as inventory-service
+    participant P as payment-service
+    O->>P: authorize
+    P-->>O: 402 DECLINED (insufficient funds)
+    O->>DB: saga_step COMPENSATING
+    O->>I: POST /internal/reservations/{orderId}/release
+    I-->>O: 200 RELEASED (stock back)
+    O->>DB: status CANCELLED, reason PAYMENT_DECLINED, saga_step COMPENSATED, outbox OrderCancelled
+    O-->>O: 402 problem+json to the client

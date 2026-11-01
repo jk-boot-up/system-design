@@ -1,0 +1,23 @@
+classDiagram
+    class Deployment {
+      replicas
+      rollingUpdate maxSurge=25% maxUnavailable=0
+      readinessProbe /actuator/health/readiness
+      livenessProbe /actuator/health/liveness
+      resources requests/limits
+      securityContext runAsNonRoot readOnlyRootFilesystem
+    }
+    class Service { ClusterIP port 80 → 8080 }
+    class HorizontalPodAutoscaler { min, max; CPU 60%; http_requests_per_second }
+    class PodDisruptionBudget { minAvailable 50% }
+    class ConfigMap { application.yaml profile overrides }
+    class Secret { DB / Kafka / provider credentials from the external secret store }
+    class ServiceAccount { workload identity; Kafka ACL principal }
+    class NetworkPolicy { allowed ingress / egress only }
+    Deployment --> ConfigMap
+    Deployment --> Secret
+    Deployment --> ServiceAccount
+    Service --> Deployment
+    HorizontalPodAutoscaler --> Deployment
+    PodDisruptionBudget --> Deployment
+    NetworkPolicy --> Deployment

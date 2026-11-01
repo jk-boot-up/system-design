@@ -1,0 +1,18 @@
+flowchart TB
+    subgraph compose[docker compose]
+        pg[(postgres:17<br/>databases: catalog, inventory, orders, payments, keycloak)]
+        kafka[(kafka:4 KRaft, single node)]
+        redis[(redis:8)]
+        os[(opensearch:3 single node)]
+        cass[(cassandra:5)]
+        rmq[(rabbitmq:4-management)]
+        ch[(clickhouse)]
+        minio[(minio)]
+        kc[keycloak<br/>realm import: shop]
+        mail[mailpit<br/>SMTP + web UI]
+        otel[otel-collector] --> tempo[tempo] & prom[prometheus]
+        graf[grafana]
+    end
+    apps[Services: Java, Go, Python images] --> pg & kafka & redis & os & cass & minio & kc & mail & otel & rmq
+    kafka --> ch
+    graf --> ch

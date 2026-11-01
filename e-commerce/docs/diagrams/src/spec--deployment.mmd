@@ -1,0 +1,10 @@
+flowchart LR
+    subgraph Region[Region: three availability zones]
+        LB[Cloud LB] --> ING[Ingress]
+        ING --> GWp[gateway ×3+]
+        GWp --> SVCs[services ×2+ each<br/>HPA on CPU + RPS]
+        SVCs --> PG[(PostgreSQL primary<br/>+ sync standby + async replicas)]
+        SVCs --> KF[(Kafka ×3 brokers)]
+        SVCs --> RD[(Redis primary + replicas<br/>Sentinel / cluster)]
+        SVCs --> OSC[(OpenSearch ×3)]
+    end

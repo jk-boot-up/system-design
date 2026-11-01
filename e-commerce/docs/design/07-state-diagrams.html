@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>7. State diagrams</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">System design</a>
+  <span class="src">07-state-diagrams.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="7-state-diagrams">7. State diagrams<a class="headerlink" href="#7-state-diagrams" title="Permanent link">#</a></h1>
+<p>The domain enforces these state machines in code (State pattern on the aggregates). An illegal transition throws an
+<code>IllegalStateTransition</code> domain error, which maps to HTTP 409.</p>
+<h2 id="71-order-status">7.1 Order status<a class="headerlink" href="#71-order-status" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Order status diagram" src="../diagrams/state-diagrams--order-status.light.svg" data-light="../diagrams/state-diagrams--order-status.light.svg" data-dark="../diagrams/state-diagrams--order-status.dark.svg" loading="lazy"></figure></p>
+<table>
+<thead>
+<tr>
+<th>From</th>
+<th>Allowed to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PENDING</code></td>
+<td><code>CONFIRMED</code>, <code>CANCELLED</code></td>
+</tr>
+<tr>
+<td><code>CONFIRMED</code></td>
+<td><code>CANCELLING</code>, <code>SHIPPED</code></td>
+</tr>
+<tr>
+<td><code>CANCELLING</code></td>
+<td><code>CANCELLED</code></td>
+</tr>
+<tr>
+<td><code>SHIPPED</code></td>
+<td><code>DELIVERED</code></td>
+</tr>
+<tr>
+<td><code>CANCELLED</code>, <code>DELIVERED</code></td>
+<td>none (final)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="72-checkout-saga-step">7.2 Checkout saga step<a class="headerlink" href="#72-checkout-saga-step" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Checkout saga step diagram" src="../diagrams/state-diagrams--checkout-saga-step.light.svg" data-light="../diagrams/state-diagrams--checkout-saga-step.light.svg" data-dark="../diagrams/state-diagrams--checkout-saga-step.dark.svg" loading="lazy"></figure></p>
+<h2 id="73-payment-status">7.3 Payment status<a class="headerlink" href="#73-payment-status" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Payment status diagram" src="../diagrams/state-diagrams--payment-status.light.svg" data-light="../diagrams/state-diagrams--payment-status.light.svg" data-dark="../diagrams/state-diagrams--payment-status.dark.svg" loading="lazy"></figure></p>
+<h2 id="74-stock-reservation-status">7.4 Stock reservation status<a class="headerlink" href="#74-stock-reservation-status" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Stock reservation status diagram" src="../diagrams/state-diagrams--stock-reservation-status.light.svg" data-light="../diagrams/state-diagrams--stock-reservation-status.light.svg" data-dark="../diagrams/state-diagrams--stock-reservation-status.dark.svg" loading="lazy"></figure></p>
+<p>Every transition is idempotent: repeating <code>release()</code> on a <code>RELEASED</code> reservation is a no-op that still answers success. A retried
+compensation therefore never fails.</p>
+<h2 id="75-email-job-notification-service">7.5 Email job (notification-service)<a class="headerlink" href="#75-email-job-notification-service" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Email job (notification-service) diagram" src="../diagrams/state-diagrams--email-job-notification-service.light.svg" data-light="../diagrams/state-diagrams--email-job-notification-service.light.svg" data-dark="../diagrams/state-diagrams--email-job-notification-service.dark.svg" loading="lazy"></figure></p>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

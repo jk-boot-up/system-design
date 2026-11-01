@@ -1,0 +1,15 @@
+stateDiagram-v2
+    [*] --> STARTED
+    STARTED --> STOCK_RESERVED: reservation ok
+    STARTED --> COMPENSATED: out of stock
+    STOCK_RESERVED --> PAYMENT_AUTHORIZED: authorised
+    STOCK_RESERVED --> COMPENSATING: declined / unknown
+    PAYMENT_AUTHORIZED --> STOCK_COMMITTED: commit ok
+    STOCK_COMMITTED --> PAYMENT_CAPTURED: capture ok
+    STOCK_COMMITTED --> COMPENSATING: capture failed
+    PAYMENT_CAPTURED --> COMPLETED: order confirmed
+    COMPENSATING --> COMPENSATED: void/refund + release done
+    COMPLETED --> REFUNDING: cancellation requested
+    REFUNDING --> COMPENSATED: refunded + stock returned
+    COMPLETED --> [*]
+    COMPENSATED --> [*]

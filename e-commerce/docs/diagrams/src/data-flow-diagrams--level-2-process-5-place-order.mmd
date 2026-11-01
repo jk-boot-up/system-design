@@ -1,0 +1,33 @@
+flowchart TB
+    C[Customer]
+    D4[(D4 Orders)]
+    D4o[(D4 Outbox)]
+    D4i[(D4 Idempotency keys)]
+    EV[(Event log)]
+
+    P51((5.1 Check<br/>idempotency key))
+    P52((5.2 Fetch priced<br/>cart snapshot))
+    P53((5.3 Create PENDING<br/>order))
+    P54((5.4 Reserve<br/>stock))
+    P55((5.5 Authorise<br/>payment))
+    P56((5.6 Commit stock,<br/>capture payment))
+    P57((5.7 Confirm or<br/>compensate))
+    P58((5.8 Relay outbox<br/>to event log))
+
+    C -- order request, Idempotency-Key --> P51
+    P51 <-- key lookup --> D4i
+    P51 -- stored response, if the key was used before --> C
+    P51 -- new request --> P52
+    P52 -- lines with prices --> P53
+    P53 -- order, OrderPlaced --> D4 & D4o
+    P53 --> P54
+    P54 -- reserved / out of stock --> P57
+    P54 -- reserved --> P55
+    P55 -- authorised / declined / unknown --> P57
+    P55 -- authorised --> P56
+    P56 --> P57
+    P57 -- final status, saga step --> D4
+    P57 -- OrderConfirmed or OrderCancelled --> D4o
+    P57 -- response --> C
+    D4o -- unpublished rows --> P58
+    P58 -- events --> EV

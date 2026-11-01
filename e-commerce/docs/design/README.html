@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design documents</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">System design</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="design-documents">Design documents<a class="headerlink" href="#design-documents" title="Permanent link">#</a></h1>
+<p>The detailed design of the e-commerce platform. Start with the <a href="../SPEC.html">specification</a> for requirements and the reasons behind
+the design, then read these documents in order.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Document</th>
+<th>What it contains</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><a href="01-high-level-design.html">High-level design</a></td>
+<td>System context, containers, layers, request and event paths, technology map</td>
+</tr>
+<tr>
+<td>2</td>
+<td><a href="02-data-flow-diagrams.html">Data-flow diagrams</a></td>
+<td>DFD level 0, level 1 and level 2 for checkout; data stores; trust boundaries</td>
+</tr>
+<tr>
+<td>3</td>
+<td><a href="03-deployment.html">Deployment design</a></td>
+<td>Kubernetes topology across zones, networking, CI/CD pipeline, environments, local stack</td>
+</tr>
+<tr>
+<td>4</td>
+<td><a href="04-database-design.html">Database design</a></td>
+<td>ER diagrams, tables, indexes, partitioning, Cassandra tables, Redis keys, OpenSearch mapping, retention</td>
+</tr>
+<tr>
+<td>5</td>
+<td><a href="05-sequence-diagrams.html">Sequence diagrams</a></td>
+<td>Checkout (happy path and every failure), cancellation, outbox relay, idempotent consumer, sign-in, uploads, search indexing, reviews</td>
+</tr>
+<tr>
+<td>6</td>
+<td><a href="06-flow-diagrams.html">Flow diagrams</a></td>
+<td>Checkout decisions, saga recovery, reservation expiry, rate limiting, consumer retry and dead letters, cache-aside</td>
+</tr>
+<tr>
+<td>7</td>
+<td><a href="07-state-diagrams.html">State diagrams</a></td>
+<td>Order, saga step, payment and reservation state machines</td>
+</tr>
+<tr>
+<td>8</td>
+<td><a href="08-class-diagrams.html">Class and UML diagrams</a></td>
+<td>Domain models, ports and adapters, component and package diagrams</td>
+</tr>
+<tr>
+<td>9</td>
+<td><a href="09-api-catalogue.html">API catalogue</a></td>
+<td>Every public and internal endpoint with request and response shapes</td>
+</tr>
+<tr>
+<td>10</td>
+<td><a href="10-event-catalogue.html">Event catalogue</a></td>
+<td>Every event, topic, key, producer, consumer and payload</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Low-level design per service</td>
+<td>Each service keeps its own design in <code>services/&lt;service&gt;/docs/design.md</code> (links below)</td>
+</tr>
+<tr>
+<td>12</td>
+<td><a href="../adr/">Architecture decision records</a></td>
+<td>One record per significant decision</td>
+</tr>
+</tbody>
+</table>
+<h2 id="microservices">Microservices<a class="headerlink" href="#microservices" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Language</th>
+<th>Port</th>
+<th>Store</th>
+<th>Low-level design</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>api-gateway</td>
+<td>Java 25</td>
+<td>8080</td>
+<td>Redis</td>
+<td><a href="../../services/api-gateway/docs/design.html">api-gateway</a></td>
+</tr>
+<tr>
+<td>catalog-service</td>
+<td>Java 25</td>
+<td>8081</td>
+<td>PostgreSQL, MinIO</td>
+<td><a href="../../services/catalog-service/docs/design.html">catalog-service</a></td>
+</tr>
+<tr>
+<td>search-service</td>
+<td>Java 25</td>
+<td>8082</td>
+<td>OpenSearch</td>
+<td><a href="../../services/search-service/docs/design.html">search-service</a></td>
+</tr>
+<tr>
+<td>cart-service</td>
+<td>Java 25</td>
+<td>8083</td>
+<td>Redis</td>
+<td><a href="../../services/cart-service/docs/design.html">cart-service</a></td>
+</tr>
+<tr>
+<td>inventory-service</td>
+<td>Java 25</td>
+<td>8084</td>
+<td>PostgreSQL</td>
+<td><a href="../../services/inventory-service/docs/design.html">inventory-service</a></td>
+</tr>
+<tr>
+<td>order-service</td>
+<td>Java 25</td>
+<td>8085</td>
+<td>PostgreSQL</td>
+<td><a href="../../services/order-service/docs/design.html">order-service</a></td>
+</tr>
+<tr>
+<td>payment-service</td>
+<td>Java 25</td>
+<td>8086</td>
+<td>PostgreSQL</td>
+<td><a href="../../services/payment-service/docs/design.html">payment-service</a></td>
+</tr>
+<tr>
+<td>review-service</td>
+<td>Java 25</td>
+<td>8087</td>
+<td>Cassandra</td>
+<td><a href="../../services/review-service/docs/design.html">review-service</a></td>
+</tr>
+<tr>
+<td>recommendation-service</td>
+<td>Python 3.12</td>
+<td>8089</td>
+<td>Redis</td>
+<td><a href="../../services/recommendation-service/docs/design.html">recommendation-service</a></td>
+</tr>
+<tr>
+<td>notification-service</td>
+<td>Go 1.24</td>
+<td>8088</td>
+<td>RabbitMQ, Redis</td>
+<td><a href="../../services/notification-service/docs/design.html">notification-service</a></td>
+</tr>
+<tr>
+<td>analytics</td>
+<td>ClickHouse SQL</td>
+<td>8123</td>
+<td>ClickHouse</td>
+<td><a href="../../services/analytics/docs/design.html">analytics</a></td>
+</tr>
+</tbody>
+</table>
+<p>All diagrams are written in <a href="https://mermaid.js.org">Mermaid</a>, which GitHub renders in place. The animated walkthroughs of the same
+flows are in <a href="../visual/index.html"><code>docs/visual</code></a>; each service has its own walkthrough in <code>services/&lt;service&gt;/docs/visual/</code>.</p>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

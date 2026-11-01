@@ -1,0 +1,8 @@
+flowchart TD
+    A([Checkout request for hot SKU]) --> B{Per-user bucket ok?}
+    B -- no --> R1[429]
+    B -- yes --> C{Per-SKU bucket ok?}
+    C -- no --> R2[429 + Retry-After<br/>client shows queue position]
+    C -- yes --> D{SKU marked sold out?<br/>local cache from StockChanged}
+    D -- yes --> R3[409 sold out, no DB hit]
+    D -- no --> E[Normal checkout<br/>conditional stock decrement]

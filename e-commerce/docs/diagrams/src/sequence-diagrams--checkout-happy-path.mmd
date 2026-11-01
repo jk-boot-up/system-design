@@ -1,0 +1,36 @@
+sequenceDiagram
+    autonumber
+    actor C as Customer
+    participant GW as api-gateway
+    participant O as order-service
+    participant DB as orders DB
+    participant CART as cart-service
+    participant I as inventory-service
+    participant P as payment-service
+    participant PSP as Payment provider
+    participant K as Kafka
+    C->>GW: POST /api/v1/orders {paymentToken} Idempotency-Key: k1
+    GW->>O: forward (JWT)
+    O->>DB: SELECT idempotency_keys (customer, k1)
+    DB-->>O: none
+    O->>CART: GET /internal/carts/{customer}/checkout-snapshot
+    CART-->>O: lines with current prices
+    O->>DB: BEGIN#59; INSERT orders PENDING, order_lines, idempotency_keys, outbox OrderPlaced#59; COMMIT
+    O->>I: POST /internal/reservations {orderId, lines} [800 ms]
+    I-->>O: 200 RESERVED (expires in 15 min)
+    O->>DB: saga_step = STOCK_RESERVED
+    O->>P: POST /internal/payments/authorize {orderId, amount, token} [2 s]
+    P->>PSP: authorise (idempotency key = orderId)
+    PSP-->>P: authorised, ref
+    P-->>O: 200 AUTHORIZED
+    O->>DB: saga_step = PAYMENT_AUTHORIZED
+    O->>I: POST /internal/reservations/{orderId}/commit
+    I-->>O: 200 COMMITTED
+    O->>P: POST /internal/payments/{orderId}/capture
+    P->>PSP: capture
+    P-->>O: 200 CAPTURED
+    O->>DB: BEGIN#59; status CONFIRMED, saga_step COMPLETED, outbox OrderConfirmed#59; COMMIT
+    O-->>GW: 201 {orderId, status: CONFIRMED}
+    GW-->>C: 201
+    Note over DB,K: Outbox relay publishes OrderPlaced, OrderConfirmed to order.events
+    K-->>CART: OrderConfirmed → clear cart

@@ -1,0 +1,14 @@
+flowchart TD
+    S([Tick]) --> Q[Select orders with status PENDING or CANCELLING<br/>and updated_at older than 30 s, limit 100]
+    Q --> L{More orders?}
+    L -- no --> E([Done])
+    L -- yes --> O[Load order and its saga step]
+    O --> D{Saga step}
+    D -- STARTED --> R1[Release any reservation<br/>cancel: CHECKOUT_ABANDONED]
+    D -- STOCK_RESERVED --> R2[Request void, release stock<br/>cancel: CHECKOUT_ABANDONED]
+    D -- PAYMENT_AUTHORIZED --> R3[Continue forward:<br/>commit stock, capture, confirm]
+    D -- STOCK_COMMITTED --> R4[Continue forward:<br/>capture, confirm]
+    D -- PAYMENT_CAPTURED --> R5[Confirm order]
+    D -- REFUNDING --> R6[Refund, return stock, cancel]
+    R1 & R2 & R3 & R4 & R5 & R6 --> U[Persist step and status + outbox event]
+    U --> L

@@ -1,0 +1,13 @@
+sequenceDiagram
+    autonumber
+    actor S as Staff
+    participant CAT as catalog-service
+    participant M as MinIO
+    S->>CAT: POST /api/v1/admin/products/{id}/images {contentType: image/webp, size}
+    CAT->>CAT: validate type and size#59; key = products/{id}/{uuid}.webp
+    CAT->>M: presign PUT (5 min, content-type fixed)
+    CAT-->>S: 201 {uploadUrl, objectKey}
+    S->>M: PUT image bytes to uploadUrl
+    S->>CAT: POST /api/v1/admin/products/{id}/images/{objectKey}/confirm
+    CAT->>M: HEAD object (exists, size, type)
+    CAT->>CAT: add product_images row, outbox ProductChanged

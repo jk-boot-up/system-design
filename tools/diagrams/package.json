@@ -1,0 +1,12 @@
+{
+  "name": "system-design-diagrams",
+  "private": true,
+  "description": "Renders docs/diagrams/src/*.mmd to light and dark SVG files",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "devDependencies": {
+    "@mermaid-js/mermaid-cli": "12.0.0",
+    "svgo": "^4.1.0"
+  }
+}

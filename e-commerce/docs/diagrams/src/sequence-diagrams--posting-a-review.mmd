@@ -1,0 +1,16 @@
+sequenceDiagram
+    autonumber
+    actor C as Customer
+    participant RV as review-service
+    participant CS as Cassandra
+    C->>RV: POST /api/v1/products/{sku}/reviews {rating 5, title, body}
+    RV->>CS: SELECT purchases_by_customer WHERE customer_id = ? AND sku = ?
+    CS-->>RV: found → verified = true
+    RV->>CS: INSERT INTO review_guard … IF NOT EXISTS
+    alt applied
+        RV->>CS: INSERT reviews_by_product (bucket = 2026-11)
+        RV->>CS: UPDATE rating_summary_by_product SET review_count += 1, rating_total += 5
+        RV-->>C: 201 review
+    else already reviewed
+        RV-->>C: 409 problem+json
+    end

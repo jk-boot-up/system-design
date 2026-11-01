@@ -1,0 +1,28 @@
+flowchart LR
+    subgraph L1[Client layer]
+        web[Web / mobile apps]
+    end
+    subgraph L2[Edge layer]
+        cdn2[CDN, WAF]
+        gw2[API gateway<br/>auth, rate limit, routing]
+    end
+    subgraph L3[Service layer]
+        sync[Request services<br/>catalog, cart, order, review]
+        async[Event processors<br/>search indexer, notifications, recommendations, analytics]
+        core2[Core transactional services<br/>inventory, payment]
+    end
+    subgraph L4[Data layer]
+        sql[(Relational)]
+        kv[(Key-value)]
+        idx[(Search)]
+        wide[(Wide-column)]
+        obj[(Object)]
+        log{{Event log}}
+    end
+    subgraph L5[Platform layer]
+        k8s[Kubernetes, autoscaling]
+        obs[OpenTelemetry, Prometheus,<br/>Grafana, Tempo, Loki]
+        sec[Keycloak, secrets store]
+    end
+    L1 --> L2 --> L3 --> L4
+    L5 -.supports.- L3

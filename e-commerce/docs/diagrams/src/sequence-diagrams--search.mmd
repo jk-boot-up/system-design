@@ -1,0 +1,10 @@
+sequenceDiagram
+    autonumber
+    participant GW as api-gateway
+    participant SR as search-service
+    participant OS as OpenSearch
+    GW->>SR: GET /api/v1/search?q=running shoes&brand=Acme&maxPrice=120&sort=price_asc
+    SR->>SR: build query (Builder + Specification): must match q, filter brand, range price, term status=ACTIVE
+    SR->>OS: _search (bool query + terms aggs on brand, category#59; search_after cursor)
+    OS-->>SR: hits + aggregations
+    SR-->>GW: 200 {items, facets, nextCursor}

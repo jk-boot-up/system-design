@@ -1,0 +1,60 @@
+flowchart TB
+    users([Users]) --> cdn[CDN + WAF]
+    cdn --> lb[Cloud load balancer]
+
+    subgraph region[Region]
+        subgraph k8s[Kubernetes cluster]
+            ing[Ingress controller<br/>2+ replicas]
+            subgraph ns_edge[namespace: edge]
+                gw[api-gateway ×3..20]
+            end
+            subgraph ns_shop[namespace: shop]
+                cat[catalog ×2..10]
+                srch[search ×2..10]
+                cart[cart ×2..10]
+                ord[order ×3..20]
+                inv[inventory ×3..20]
+                pay[payment ×2..10]
+                rev[review ×2..6]
+                notif[notification router + email worker ×2..6]
+                reco[recommendation ×2..6]
+            end
+            subgraph ns_platform[namespace: platform]
+                kc[Keycloak ×2]
+                otel[OTel collector<br/>DaemonSet]
+                prom[Prometheus]
+                graf[Grafana]
+                tempo[Tempo]
+                loki[Loki]
+            end
+        end
+
+        subgraph az[Data tier spread across AZ-a, AZ-b, AZ-c]
+            pg[(PostgreSQL clusters<br/>Patroni: primary + sync standby + async replica<br/>catalog, inventory, orders, payments, keycloak)]
+            pgb[PgBouncer ×2 per cluster]
+            kafka[(Kafka ×3 brokers, KRaft<br/>RF 3, min ISR 2)]
+            redis[(Redis Cluster<br/>3 primaries + 3 replicas)]
+            os[(OpenSearch ×3 data<br/>+ 3 cluster-manager)]
+            cass[(Cassandra ×3, RF 3<br/>LOCAL_QUORUM)]
+            minio[(MinIO ×4, erasure coded)]
+            rmq[(RabbitMQ ×3, quorum queues)]
+            ch[(ClickHouse ×2 replicas<br/>Keeper ×3)]
+        end
+    end
+
+    lb --> ing --> gw
+    gw --> cat & srch & cart & ord & rev
+    ord --> inv & pay & cart
+    cart --> cat
+    cat & inv & ord & pay --> pgb --> pg
+    cat & inv & ord & pay & rev & srch & cart & notif --> kafka
+    cart & gw & notif --> redis
+    srch --> os
+    rev --> cass
+    cat --> minio
+    pay --> psp[Payment provider]
+    notif --> smtp[Email relay]
+    notif --> rmq
+    reco --> redis
+    kafka --> ch
+    graf --> ch

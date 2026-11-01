@@ -1,0 +1,6 @@
+flowchart TD
+    S([Tick, ShedLock]) --> Q[SELECT reservations WHERE status = RESERVED<br/>AND expires_at < now LIMIT 500 FOR UPDATE SKIP LOCKED]
+    Q --> L{Rows?}
+    L -- no --> E([Done])
+    L -- yes --> T[In one transaction per row:<br/>stock.available += q, stock.reserved -= q<br/>reservation.status = EXPIRED<br/>outbox StockChanged]
+    T --> Q
