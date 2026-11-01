@@ -1,6 +1,6 @@
 # 4. Database design
 
-The platform uses **polyglot persistence**, as described in [SPEC §14](../SPEC.md#14-polyglot-persistence).
+The platform uses **polyglot persistence**, as described in [SPEC §14](SPEC.md#14-polyglot-persistence).
 * Every service owns its store; no other service connects to it.
 * PostgreSQL schemas are managed by Flyway migrations in each service (`src/main/resources/db/migration`).
 * Cassandra tables are created by versioned CQL scripts.
@@ -11,8 +11,8 @@ The platform uses **polyglot persistence**, as described in [SPEC §14](../SPEC.
 Every service that publishes or consumes events has these tables, created by its own first migration. Each service carries its own small outbox implementation; there is no shared library (ADR 0003).
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/database-design--common-tables-every-postgresql-service.dark.svg">
-  <img alt="Common tables (every PostgreSQL service) diagram" src="../diagrams/database-design--common-tables-every-postgresql-service.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/database-design--common-tables-every-postgresql-service.dark.svg">
+  <img alt="Common tables (every PostgreSQL service) diagram" src="diagrams/database-design--common-tables-every-postgresql-service.light.svg">
 </picture>
 
 ```sql
@@ -48,8 +48,8 @@ create table processed_events (
 ## 4.2 catalog (PostgreSQL)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/database-design--catalog-postgresql.dark.svg">
-  <img alt="catalog (PostgreSQL) diagram" src="../diagrams/database-design--catalog-postgresql.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/database-design--catalog-postgresql.dark.svg">
+  <img alt="catalog (PostgreSQL) diagram" src="diagrams/database-design--catalog-postgresql.light.svg">
 </picture>
 
 ```sql
@@ -91,8 +91,8 @@ create table product_images (
 ## 4.3 inventory (PostgreSQL)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/database-design--inventory-postgresql.dark.svg">
-  <img alt="inventory (PostgreSQL) diagram" src="../diagrams/database-design--inventory-postgresql.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/database-design--inventory-postgresql.dark.svg">
+  <img alt="inventory (PostgreSQL) diagram" src="diagrams/database-design--inventory-postgresql.light.svg">
 </picture>
 
 ```sql
@@ -138,8 +138,8 @@ update stock
 ## 4.4 orders (PostgreSQL)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/database-design--orders-postgresql.dark.svg">
-  <img alt="orders (PostgreSQL) diagram" src="../diagrams/database-design--orders-postgresql.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/database-design--orders-postgresql.dark.svg">
+  <img alt="orders (PostgreSQL) diagram" src="diagrams/database-design--orders-postgresql.light.svg">
 </picture>
 
 ```sql
@@ -192,8 +192,8 @@ create table idempotency_keys (
 ## 4.5 payments (PostgreSQL)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/database-design--payments-postgresql.dark.svg">
-  <img alt="payments (PostgreSQL) diagram" src="../diagrams/database-design--payments-postgresql.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/database-design--payments-postgresql.dark.svg">
+  <img alt="payments (PostgreSQL) diagram" src="diagrams/database-design--payments-postgresql.light.svg">
 </picture>
 
 ```sql
@@ -326,8 +326,8 @@ Consistency levels: writes and reads use `LOCAL_QUORUM`; counters use `LOCAL_QUO
 ## 4.9 RabbitMQ topology (notification-service)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/database-design--rabbitmq-topology-notification-service.dark.svg">
-  <img alt="RabbitMQ topology (notification-service) diagram" src="../diagrams/database-design--rabbitmq-topology-notification-service.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/database-design--rabbitmq-topology-notification-service.dark.svg">
+  <img alt="RabbitMQ topology (notification-service) diagram" src="diagrams/database-design--rabbitmq-topology-notification-service.light.svg">
 </picture>
 
 | Element | Settings | Why |

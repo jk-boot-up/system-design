@@ -390,7 +390,7 @@ The `check (available >= 0)` constraint is a second line of defence against over
 | Orchestration | Kubernetes + Kustomize | Standard scheduling, autoscaling, self-healing | Nomad |
 | Testing | JUnit 6, AssertJ, ArchUnit, Testcontainers | Real dependencies in tests; architecture rules as code | Mocks only |
 
-Detailed reasoning for each choice is recorded in `docs/adr/`.
+Detailed reasoning for each choice is recorded in `design/adr/`.
 
 ## 10. Deployment
 

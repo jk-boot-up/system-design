@@ -1,4 +1,4 @@
-// Renders every **/docs/diagrams/src/<name>.mmd in this system to ../<name>.light.svg and ../<name>.dark.svg.
+// Renders every **/design/diagrams/src/<name>.mmd in this system to ../<name>.light.svg and ../<name>.dark.svg.
 // Only diagrams whose source is newer than their images are re-rendered (pass --all to force).
 //
 //   cd tools/diagrams && npm install && npm run render
@@ -37,13 +37,13 @@ function naturalSize(svg) {
 
 const mtime = async p => { try { return (await stat(p)).mtimeMs; } catch { return 0; } };
 
-// every docs/diagrams/src folder in the repository, skipping dependency and build folders
+// every design/diagrams/src folder, skipping dependency and build folders
 async function findSourceDirs(dir, found = []) {
   if (!(await stat(dir)).isDirectory()) return found;
   for (const e of await readdir(dir, { withFileTypes: true })) {
     if (!e.isDirectory() || ['node_modules', '.git', 'build', '.gradle', '.venv'].includes(e.name)) continue;
     const p = join(dir, e.name);
-    if (e.name === 'src' && p.endsWith(join('docs', 'diagrams', 'src'))) found.push(p);
+    if (e.name === 'src' && p.endsWith(join('design', 'diagrams', 'src'))) found.push(p);
     else await findSourceDirs(p, found);
   }
   return found;

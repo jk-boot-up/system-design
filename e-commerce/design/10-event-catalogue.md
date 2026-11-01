@@ -91,8 +91,8 @@ transaction.
 ## Who consumes what
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/event-catalogue--who-consumes-what.dark.svg">
-  <img alt="Who consumes what diagram" src="../diagrams/event-catalogue--who-consumes-what.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/event-catalogue--who-consumes-what.dark.svg">
+  <img alt="Who consumes what diagram" src="diagrams/event-catalogue--who-consumes-what.light.svg">
 </picture>
 
 ## Evolution rules

@@ -5,41 +5,42 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 
 | Read | |
 |---|---|
-| [Specification](docs/SPEC.md) | Requirements, capacity estimates, architecture, flows, data, operations, patterns, languages |
-| [Plan](docs/PLAN.md) | Goals, technology, milestones, working agreements |
-| [System design documents](docs/design/README.md) | HLD, data flow, deployment, database, sequence, flow, state and class diagrams, API and event catalogues |
-| [Animated walkthrough](docs/visual/index.html) | The whole system in motion, with themes and narration |
+| [Specification](design/SPEC.md) | Requirements, capacity estimates, architecture, flows, data, operations, patterns, languages |
+| [Plan](design/PLAN.md) | Goals, technology, milestones, working agreements |
+| [System design documents](design/README.md) | HLD, data flow, deployment, database, sequence, flow, state and class diagrams, API and event catalogues |
+| [Animated walkthrough](design/walkthrough/index.html) | The whole system in motion, with themes and narration |
 
 ## Layout
 
 ```
 e-commerce/
-├─ docs/                         whole-system documents
-│  ├─ SPEC.md, PLAN.md
-│  ├─ design/                    system-level design documents
+├─ README.md                     this page
+├─ design/                       WHOLE-SYSTEM DESIGN
+│  ├─ README.md                  index of the design documents
+│  ├─ SPEC.md, PLAN.md           specification and delivery plan
+│  ├─ 01-high-level-design.md … 10-event-catalogue.md
 │  ├─ adr/                       architecture decision records
-│  ├─ diagrams/                  SVG diagrams (light + dark) and their sources in diagrams/src
-│  └─ visual/                    whole-system animated walkthrough
-├─ services/                     one standalone project per service — nothing shared between them
+│  ├─ diagrams/                  SVG diagrams (light + dark); editable sources in diagrams/src
+│  └─ walkthrough/               animated walkthrough of the whole system (themes + narration)
+├─ services/                     IMPLEMENTATION: one standalone project per service, nothing shared
 │  └─ <service>/
-│     ├─ README.md               what it does, how to build, run and test it
-│     ├─ docs/                   the service's own design: low-level design, diagrams, animation
-│     │  ├─ design.md
-│     │  ├─ diagrams/
-│     │  └─ visual/index.html
-│     ├─ contracts/              APIs it exposes (OpenAPI) and events it publishes or consumes (JSON Schema)
-│     ├─ src/ … or cmd/, internal/ (Go) … or src/, tests/ (Python)
-│     ├─ build files             gradlew + settings.gradle.kts + build.gradle.kts + gradle/libs.versions.toml (Java),
-│     │                          go.mod (Go), pyproject.toml (Python)
+│     ├─ README.md               what it does; how to build, run and test it
+│     ├─ design/                 the service's own design
+│     │  ├─ README.md            low-level design: API, events, data, classes, sequences, scaling, failure handling
+│     │  ├─ diagrams/            its SVG diagrams and their sources
+│     │  └─ walkthrough/         its animated walkthrough
+│     ├─ contracts/              openapi.yaml, events it publishes, copies of events it consumes
+│     ├─ source + build          Java: gradlew, settings.gradle.kts, build.gradle.kts, gradle/libs.versions.toml, src/
+│     │                          Go: go.mod, cmd/, internal/      Python: pyproject.toml, src/, tests/
 │     ├─ Dockerfile
-│     └─ k8s/                    the service's Kubernetes base (Deployment, Service, HPA, PDB, NetworkPolicy)
-├─ deploy/
-│  ├─ compose/                   local stack: data stores, brokers, Keycloak, observability, all services
+│     └─ k8s/                    Kubernetes base: Deployment, Service, HPA, PDB, NetworkPolicy, ConfigMap
+├─ deploy/                       RUNNING THE WHOLE SYSTEM
+│  ├─ compose/                   local stack (project name "e-commerce"): data stores, brokers, Keycloak, observability, services
 │  └─ k8s/overlays/              dev / staging / prod overlays composing every service's k8s base
-├─ tests/
-│  ├─ e2e/                       end-to-end tests against the running stack
+├─ tests/                        WHOLE-SYSTEM TESTS
+│  ├─ e2e/                       end-to-end journeys against the running stack
 │  └─ performance/               Gatling simulations with p99 budgets
-└─ tools/                        this system's documentation pipeline (diagrams → SVG, Markdown → HTML)
+└─ tools/                        documentation pipeline (diagrams → SVG, Markdown → HTML), scoped to this folder
 ```
 
 ## Services
@@ -71,7 +72,7 @@ cd services/recommendation-service && pip install -e '.[dev]' && pytest   # Pyth
 ## Documentation
 
 Every Markdown file has an HTML counterpart with light, medium and dark themes. Diagrams are SVG images (light and dark) rendered
-from the editable sources in each `docs/diagrams/src` folder.
+from the editable sources in each `design/diagrams/src` folder.
 
 ```bash
 tools/docs.sh                 # extract new diagram sources, render changed diagrams, regenerate HTML

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Move diagram sources out of Markdown and reference rendered SVG images instead.
 
-Every ```mermaid block found in a Markdown file is written to <docs>/diagrams/src/<name>.mmd and
-replaced by a <picture> element that shows <docs>/diagrams/<name>.light.svg, or the .dark.svg
-variant when the reader uses a dark colour scheme. <docs> is the nearest enclosing folder named
-"docs", or a "docs" folder next to the Markdown file, so every project keeps its own diagrams.
+Every ```mermaid block found in a Markdown file is written to <design>/diagrams/src/<name>.mmd and
+replaced by a <picture> element that shows <design>/diagrams/<name>.light.svg, or the .dark.svg
+variant when the reader uses a dark colour scheme. <design> is the nearest enclosing folder named
+"design", or a "design" folder next to the Markdown file, so every project keeps its own diagrams.
 Run tools/diagrams (npm run render) afterwards to produce the images.
 
 Usage: python3 tools/extract_diagrams.py [path ...]   (default: the whole system folder)
@@ -29,9 +29,9 @@ def diagram_dir(md_path: Path) -> Path:
     for parent in md_path.parents:
         if parent == ROOT.parent:
             break
-        if parent.name == "docs":
+        if parent.name == "design":
             return parent / "diagrams"
-    return md_path.parent / "docs" / "diagrams"
+    return md_path.parent / "design" / "diagrams"
 
 
 def picture(md_path: Path, name: str, alt: str) -> str:
@@ -50,7 +50,8 @@ def process(md_path: Path) -> int:
         return 0
     OUT = diagram_dir(md_path)
     SRC = OUT / "src"
-    prefix = slug(md_path.stem) if md_path.stem.lower() != "readme" else slug(md_path.parent.name)
+    stem = md_path.stem if md_path.stem.lower() != "readme" else md_path.parent.name
+    prefix = slug(stem if stem != "design" else md_path.parent.parent.name)
     out, pos, count = [], 0, 0
     for m in BLOCK.finditer(text):
         before = text[: m.start()]

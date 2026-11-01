@@ -3,8 +3,8 @@
 ## 1.1 System context (C4 level 1)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/high-level-design--system-context-c4-level-1.dark.svg">
-  <img alt="System context (C4 level 1) diagram" src="../diagrams/high-level-design--system-context-c4-level-1.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/high-level-design--system-context-c4-level-1.dark.svg">
+  <img alt="System context (C4 level 1) diagram" src="diagrams/high-level-design--system-context-c4-level-1.light.svg">
 </picture>
 
 The platform never sees card numbers; the browser tokenises them directly with the payment provider. That keeps the platform in
@@ -13,8 +13,8 @@ PCI DSS SAQ A scope.
 ## 1.2 Containers (C4 level 2)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/high-level-design--containers-c4-level-2.dark.svg">
-  <img alt="Containers (C4 level 2) diagram" src="../diagrams/high-level-design--containers-c4-level-2.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/high-level-design--containers-c4-level-2.dark.svg">
+  <img alt="Containers (C4 level 2) diagram" src="diagrams/high-level-design--containers-c4-level-2.light.svg">
 </picture>
 
 **Solid arrows are synchronous HTTP calls** (inside the cluster, with mTLS). **Dotted arrows are events** published through the
@@ -23,15 +23,15 @@ transactional outbox and consumed by idempotent consumers.
 ## 1.3 Layers
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/high-level-design--layers.dark.svg">
-  <img alt="Layers diagram" src="../diagrams/high-level-design--layers.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/high-level-design--layers.dark.svg">
+  <img alt="Layers diagram" src="diagrams/high-level-design--layers.light.svg">
 </picture>
 
 ## 1.4 Inside every service: hexagonal architecture
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/high-level-design--inside-every-service-hexagonal-architecture.dark.svg">
-  <img alt="Inside every service: hexagonal architecture diagram" src="../diagrams/high-level-design--inside-every-service-hexagonal-architecture.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/high-level-design--inside-every-service-hexagonal-architecture.dark.svg">
+  <img alt="Inside every service: hexagonal architecture diagram" src="diagrams/high-level-design--inside-every-service-hexagonal-architecture.light.svg">
 </picture>
 
 Dependencies point inwards. The `domain` package imports nothing from Spring or any adapter. ArchUnit tests in every service enforce

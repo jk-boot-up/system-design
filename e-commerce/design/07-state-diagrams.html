@@ -37,7 +37,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </head>
 <body>
 <header>
-  <a class="home" href="../../README.html">E-commerce platform</a>
+  <a class="home" href="../README.html">E-commerce platform</a>
   <span class="src">07-state-diagrams.md</span>
   <div class="themes" role="group" aria-label="Theme">
     <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
@@ -48,7 +48,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <p>The domain enforces these state machines in code (State pattern on the aggregates). An illegal transition throws an
 <code>IllegalStateTransition</code> domain error, which maps to HTTP 409.</p>
 <h2 id="71-order-status">7.1 Order status<a class="headerlink" href="#71-order-status" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Order status diagram" src="../diagrams/state-diagrams--order-status.light.svg" data-light="../diagrams/state-diagrams--order-status.light.svg" data-dark="../diagrams/state-diagrams--order-status.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Order status diagram" src="diagrams/state-diagrams--order-status.light.svg" data-light="diagrams/state-diagrams--order-status.light.svg" data-dark="diagrams/state-diagrams--order-status.dark.svg" loading="lazy"></figure></p>
 <table>
 <thead>
 <tr>
@@ -80,15 +80,15 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tbody>
 </table>
 <h2 id="72-checkout-saga-step">7.2 Checkout saga step<a class="headerlink" href="#72-checkout-saga-step" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Checkout saga step diagram" src="../diagrams/state-diagrams--checkout-saga-step.light.svg" data-light="../diagrams/state-diagrams--checkout-saga-step.light.svg" data-dark="../diagrams/state-diagrams--checkout-saga-step.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Checkout saga step diagram" src="diagrams/state-diagrams--checkout-saga-step.light.svg" data-light="diagrams/state-diagrams--checkout-saga-step.light.svg" data-dark="diagrams/state-diagrams--checkout-saga-step.dark.svg" loading="lazy"></figure></p>
 <h2 id="73-payment-status">7.3 Payment status<a class="headerlink" href="#73-payment-status" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Payment status diagram" src="../diagrams/state-diagrams--payment-status.light.svg" data-light="../diagrams/state-diagrams--payment-status.light.svg" data-dark="../diagrams/state-diagrams--payment-status.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Payment status diagram" src="diagrams/state-diagrams--payment-status.light.svg" data-light="diagrams/state-diagrams--payment-status.light.svg" data-dark="diagrams/state-diagrams--payment-status.dark.svg" loading="lazy"></figure></p>
 <h2 id="74-stock-reservation-status">7.4 Stock reservation status<a class="headerlink" href="#74-stock-reservation-status" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Stock reservation status diagram" src="../diagrams/state-diagrams--stock-reservation-status.light.svg" data-light="../diagrams/state-diagrams--stock-reservation-status.light.svg" data-dark="../diagrams/state-diagrams--stock-reservation-status.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Stock reservation status diagram" src="diagrams/state-diagrams--stock-reservation-status.light.svg" data-light="diagrams/state-diagrams--stock-reservation-status.light.svg" data-dark="diagrams/state-diagrams--stock-reservation-status.dark.svg" loading="lazy"></figure></p>
 <p>Every transition is idempotent: repeating <code>release()</code> on a <code>RELEASED</code> reservation is a no-op that still answers success. A retried
 compensation therefore never fails.</p>
 <h2 id="75-email-job-notification-service">7.5 Email job (notification-service)<a class="headerlink" href="#75-email-job-notification-service" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Email job (notification-service) diagram" src="../diagrams/state-diagrams--email-job-notification-service.light.svg" data-light="../diagrams/state-diagrams--email-job-notification-service.light.svg" data-dark="../diagrams/state-diagrams--email-job-notification-service.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Email job (notification-service) diagram" src="diagrams/state-diagrams--email-job-notification-service.light.svg" data-light="diagrams/state-diagrams--email-job-notification-service.light.svg" data-dark="diagrams/state-diagrams--email-job-notification-service.dark.svg" loading="lazy"></figure></p>
 </main>
 <script>
 function setTheme(t) {

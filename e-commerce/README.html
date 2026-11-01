@@ -56,51 +56,52 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 </thead>
 <tbody>
 <tr>
-<td><a href="docs/SPEC.html">Specification</a></td>
+<td><a href="design/SPEC.html">Specification</a></td>
 <td>Requirements, capacity estimates, architecture, flows, data, operations, patterns, languages</td>
 </tr>
 <tr>
-<td><a href="docs/PLAN.html">Plan</a></td>
+<td><a href="design/PLAN.html">Plan</a></td>
 <td>Goals, technology, milestones, working agreements</td>
 </tr>
 <tr>
-<td><a href="docs/design/README.html">System design documents</a></td>
+<td><a href="design/README.html">System design documents</a></td>
 <td>HLD, data flow, deployment, database, sequence, flow, state and class diagrams, API and event catalogues</td>
 </tr>
 <tr>
-<td><a href="docs/visual/index.html">Animated walkthrough</a></td>
+<td><a href="design/walkthrough/index.html">Animated walkthrough</a></td>
 <td>The whole system in motion, with themes and narration</td>
 </tr>
 </tbody>
 </table>
 <h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">#</a></h2>
 <pre class="highlight"><code>e-commerce/
-├─ docs/                         whole-system documents
-│  ├─ SPEC.md, PLAN.md
-│  ├─ design/                    system-level design documents
+├─ README.md                     this page
+├─ design/                       WHOLE-SYSTEM DESIGN
+│  ├─ README.md                  index of the design documents
+│  ├─ SPEC.md, PLAN.md           specification and delivery plan
+│  ├─ 01-high-level-design.md … 10-event-catalogue.md
 │  ├─ adr/                       architecture decision records
-│  ├─ diagrams/                  SVG diagrams (light + dark) and their sources in diagrams/src
-│  └─ visual/                    whole-system animated walkthrough
-├─ services/                     one standalone project per service — nothing shared between them
+│  ├─ diagrams/                  SVG diagrams (light + dark); editable sources in diagrams/src
+│  └─ walkthrough/               animated walkthrough of the whole system (themes + narration)
+├─ services/                     IMPLEMENTATION: one standalone project per service, nothing shared
 │  └─ &lt;service&gt;/
-│     ├─ README.md               what it does, how to build, run and test it
-│     ├─ docs/                   the service's own design: low-level design, diagrams, animation
-│     │  ├─ design.md
-│     │  ├─ diagrams/
-│     │  └─ visual/index.html
-│     ├─ contracts/              APIs it exposes (OpenAPI) and events it publishes or consumes (JSON Schema)
-│     ├─ src/ … or cmd/, internal/ (Go) … or src/, tests/ (Python)
-│     ├─ build files             gradlew + settings.gradle.kts + build.gradle.kts + gradle/libs.versions.toml (Java),
-│     │                          go.mod (Go), pyproject.toml (Python)
+│     ├─ README.md               what it does; how to build, run and test it
+│     ├─ design/                 the service's own design
+│     │  ├─ README.md            low-level design: API, events, data, classes, sequences, scaling, failure handling
+│     │  ├─ diagrams/            its SVG diagrams and their sources
+│     │  └─ walkthrough/         its animated walkthrough
+│     ├─ contracts/              openapi.yaml, events it publishes, copies of events it consumes
+│     ├─ source + build          Java: gradlew, settings.gradle.kts, build.gradle.kts, gradle/libs.versions.toml, src/
+│     │                          Go: go.mod, cmd/, internal/      Python: pyproject.toml, src/, tests/
 │     ├─ Dockerfile
-│     └─ k8s/                    the service's Kubernetes base (Deployment, Service, HPA, PDB, NetworkPolicy)
-├─ deploy/
-│  ├─ compose/                   local stack: data stores, brokers, Keycloak, observability, all services
+│     └─ k8s/                    Kubernetes base: Deployment, Service, HPA, PDB, NetworkPolicy, ConfigMap
+├─ deploy/                       RUNNING THE WHOLE SYSTEM
+│  ├─ compose/                   local stack (project name "e-commerce"): data stores, brokers, Keycloak, observability, services
 │  └─ k8s/overlays/              dev / staging / prod overlays composing every service's k8s base
-├─ tests/
-│  ├─ e2e/                       end-to-end tests against the running stack
+├─ tests/                        WHOLE-SYSTEM TESTS
+│  ├─ e2e/                       end-to-end journeys against the running stack
 │  └─ performance/               Gatling simulations with p99 budgets
-└─ tools/                        this system's documentation pipeline (diagrams → SVG, Markdown → HTML)</code></pre>
+└─ tools/                        documentation pipeline (diagrams → SVG, Markdown → HTML), scoped to this folder</code></pre>
 <h2 id="services">Services<a class="headerlink" href="#services" title="Permanent link">#</a></h2>
 <table>
 <thead>
@@ -187,7 +188,7 @@ cd services/notification-service &amp;&amp; go test ./...                # Go
 cd services/recommendation-service &amp;&amp; pip install -e '.[dev]' &amp;&amp; pytest   # Python</code></pre>
 <h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">#</a></h2>
 <p>Every Markdown file has an HTML counterpart with light, medium and dark themes. Diagrams are SVG images (light and dark) rendered
-from the editable sources in each <code>docs/diagrams/src</code> folder.</p>
+from the editable sources in each <code>design/diagrams/src</code> folder.</p>
 <pre class="highlight"><code class="language-bash">tools/docs.sh                 # extract new diagram sources, render changed diagrams, regenerate HTML</code></pre>
 <h2 id="run-everything-locally">Run everything locally<a class="headerlink" href="#run-everything-locally" title="Permanent link">#</a></h2>
 <pre class="highlight"><code class="language-bash">cd deploy/compose &amp;&amp; docker compose up -d     # project name "e-commerce"; host ports 8080–8099 for services, see deploy/compose/README.md</code></pre>

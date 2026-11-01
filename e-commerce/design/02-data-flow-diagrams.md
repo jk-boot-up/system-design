@@ -10,22 +10,22 @@ Notation:
 ## 2.1 Level 0: context
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/data-flow-diagrams--level-0-context.dark.svg">
-  <img alt="Level 0: context diagram" src="../diagrams/data-flow-diagrams--level-0-context.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/data-flow-diagrams--level-0-context.dark.svg">
+  <img alt="Level 0: context diagram" src="diagrams/data-flow-diagrams--level-0-context.light.svg">
 </picture>
 
 ## 2.2 Level 1: main processes
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/data-flow-diagrams--level-1-main-processes.dark.svg">
-  <img alt="Level 1: main processes diagram" src="../diagrams/data-flow-diagrams--level-1-main-processes.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/data-flow-diagrams--level-1-main-processes.dark.svg">
+  <img alt="Level 1: main processes diagram" src="diagrams/data-flow-diagrams--level-1-main-processes.light.svg">
 </picture>
 
 ## 2.3 Level 2: process 5 (place order)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/data-flow-diagrams--level-2-process-5-place-order.dark.svg">
-  <img alt="Level 2: process 5 (place order) diagram" src="../diagrams/data-flow-diagrams--level-2-process-5-place-order.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/data-flow-diagrams--level-2-process-5-place-order.dark.svg">
+  <img alt="Level 2: process 5 (place order) diagram" src="diagrams/data-flow-diagrams--level-2-process-5-place-order.light.svg">
 </picture>
 
 ## 2.4 Data stores

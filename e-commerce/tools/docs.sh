@@ -2,7 +2,7 @@
 # Rebuild this system's documentation for the given paths (default: the whole system folder):
 # extract diagram sources, render changed diagrams to SVG, regenerate HTML pages.
 #   tools/docs.sh                     everything in e-commerce/
-#   tools/docs.sh docs/design         only the system design documents
+#   tools/docs.sh design              only the whole-system design documents
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 paths=()

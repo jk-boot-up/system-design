@@ -3,8 +3,8 @@
 ## 3.1 Production topology (one region, three availability zones)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/deployment--production-topology-one-region-three-availabilit.dark.svg">
-  <img alt="Production topology (one region, three availability zones) diagram" src="../diagrams/deployment--production-topology-one-region-three-availabilit.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/deployment--production-topology-one-region-three-availabilit.dark.svg">
+  <img alt="Production topology (one region, three availability zones) diagram" src="diagrams/deployment--production-topology-one-region-three-availabilit.light.svg">
 </picture>
 
 Stateful systems run either as managed services or through Kubernetes operators:
@@ -20,8 +20,8 @@ Stateful systems run either as managed services or through Kubernetes operators:
 ## 3.2 Node pools and placement
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/deployment--node-pools-and-placement.dark.svg">
-  <img alt="Node pools and placement diagram" src="../diagrams/deployment--node-pools-and-placement.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/deployment--node-pools-and-placement.dark.svg">
+  <img alt="Node pools and placement diagram" src="diagrams/deployment--node-pools-and-placement.light.svg">
 </picture>
 
 * **Spread:** `topologySpreadConstraints` with `maxSkew: 1` across zones and hosts for every Deployment and StatefulSet.
@@ -31,8 +31,8 @@ Stateful systems run either as managed services or through Kubernetes operators:
 ## 3.3 Kubernetes objects per service
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/deployment--kubernetes-objects-per-service.dark.svg">
-  <img alt="Kubernetes objects per service diagram" src="../diagrams/deployment--kubernetes-objects-per-service.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/deployment--kubernetes-objects-per-service.dark.svg">
+  <img alt="Kubernetes objects per service diagram" src="diagrams/deployment--kubernetes-objects-per-service.light.svg">
 </picture>
 
 **Network policies** (default deny, then allow):
@@ -51,8 +51,8 @@ Stateful systems run either as managed services or through Kubernetes operators:
 ## 3.4 CI/CD pipeline
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/deployment--ci-cd-pipeline.dark.svg">
-  <img alt="CI/CD pipeline diagram" src="../diagrams/deployment--ci-cd-pipeline.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/deployment--ci-cd-pipeline.dark.svg">
+  <img alt="CI/CD pipeline diagram" src="diagrams/deployment--ci-cd-pipeline.light.svg">
 </picture>
 
 * **Migrations:** database migrations run as a Kubernetes `Job` before the rollout. They are always backward compatible (expand → migrate → contract), so old and new pods work against the same schema.
@@ -70,8 +70,8 @@ Stateful systems run either as managed services or through Kubernetes operators:
 ## 3.6 Local stack (Docker Compose)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../diagrams/deployment--local-stack-docker-compose.dark.svg">
-  <img alt="Local stack (Docker Compose) diagram" src="../diagrams/deployment--local-stack-docker-compose.light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/deployment--local-stack-docker-compose.dark.svg">
+  <img alt="Local stack (Docker Compose) diagram" src="diagrams/deployment--local-stack-docker-compose.light.svg">
 </picture>
 
 | Component | Local port |

@@ -67,7 +67,7 @@ ArchUnit tests enforce the dependency direction.
 
 | # | Milestone | Content | Done when |
 |---|---|---|---|
-| M0 | Plan and spec | `docs/PLAN.md`, `docs/SPEC.md` on `main` | Reviewed and pushed |
+| M0 | Plan and spec | `design/PLAN.md`, `design/SPEC.md` on `main` | Reviewed and pushed |
 | M1 | Project template | Standalone service layout (build, docs, contracts, Dockerfile, k8s), CI workflow per service | First service builds alone and in CI |
 | M2 | Contracts | Event JSON Schemas and OpenAPI documents owned by each producing service | Schema validation tests in producers and consumers |
 | M3 | Catalog and search | product/category CRUD, outbox events, OpenSearch indexing and faceted search | API tests, indexing integration test |
@@ -98,7 +98,7 @@ ArchUnit tests enforce the dependency direction.
   * ArchUnit rules;
   * Testcontainers integration tests, wherever a container runtime is available (always in CI).
 * **Contracts first:** event schemas and OpenAPI definitions change through versioned, backward-compatible additions. Breaking changes need a new version.
-* **Every decision is recorded:** one ADR in `docs/adr/` per significant choice.
+* **Every decision is recorded:** one ADR in `design/adr/` per significant choice.
 
 ## 8. Risks and mitigations
 

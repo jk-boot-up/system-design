@@ -37,7 +37,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </head>
 <body>
 <header>
-  <a class="home" href="../../README.html">E-commerce platform</a>
+  <a class="home" href="../README.html">E-commerce platform</a>
   <span class="src">08-class-diagrams.md</span>
   <div class="themes" role="group" aria-label="Theme">
     <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
@@ -45,29 +45,29 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </header>
 <main>
 <h1 id="8-class-and-uml-diagrams">8. Class and UML diagrams<a class="headerlink" href="#8-class-and-uml-diagrams" title="Permanent link">#</a></h1>
-<p>This document shows the system-level UML. Each service's own <code>docs/design.md</code> repeats its part with more detail: fields,
+<p>This document shows the system-level UML. Each service's own <code>design/README.md</code> repeats its part with more detail: fields,
 adapters and tests.</p>
 <h2 id="81-component-diagram">8.1 Component diagram<a class="headerlink" href="#81-component-diagram" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Component diagram diagram" src="../diagrams/class-diagrams--component-diagram.light.svg" data-light="../diagrams/class-diagrams--component-diagram.light.svg" data-dark="../diagrams/class-diagrams--component-diagram.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Component diagram diagram" src="diagrams/class-diagrams--component-diagram.light.svg" data-light="diagrams/class-diagrams--component-diagram.light.svg" data-dark="diagrams/class-diagrams--component-diagram.dark.svg" loading="lazy"></figure></p>
 <p><code>[[Name]]</code> marks an outbound port (interface); <code>[(Name)]</code> marks a repository port.</p>
 <h2 id="82-domain-primitives-copied-into-each-service-that-needs-them">8.2 Domain primitives (copied into each service that needs them)<a class="headerlink" href="#82-domain-primitives-copied-into-each-service-that-needs-them" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Domain primitives (copied into each service that needs them) diagram" src="../diagrams/class-diagrams--domain-primitives-copied-into-each-service-that-.light.svg" data-light="../diagrams/class-diagrams--domain-primitives-copied-into-each-service-that-.light.svg" data-dark="../diagrams/class-diagrams--domain-primitives-copied-into-each-service-that-.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Domain primitives (copied into each service that needs them) diagram" src="diagrams/class-diagrams--domain-primitives-copied-into-each-service-that-.light.svg" data-light="diagrams/class-diagrams--domain-primitives-copied-into-each-service-that-.light.svg" data-dark="diagrams/class-diagrams--domain-primitives-copied-into-each-service-that-.dark.svg" loading="lazy"></figure></p>
 <h2 id="83-order-context-order-service">8.3 Order context (order-service)<a class="headerlink" href="#83-order-context-order-service" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Order context (order-service) diagram" src="../diagrams/class-diagrams--order-context-order-service.light.svg" data-light="../diagrams/class-diagrams--order-context-order-service.light.svg" data-dark="../diagrams/class-diagrams--order-context-order-service.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Order context (order-service) diagram" src="diagrams/class-diagrams--order-context-order-service.light.svg" data-light="diagrams/class-diagrams--order-context-order-service.light.svg" data-dark="diagrams/class-diagrams--order-context-order-service.dark.svg" loading="lazy"></figure></p>
 <h3 id="application-layer-and-ports">Application layer and ports<a class="headerlink" href="#application-layer-and-ports" title="Permanent link">#</a></h3>
-<p><figure class="diagram"><img alt="Application layer and ports diagram" src="../diagrams/class-diagrams--application-layer-and-ports.light.svg" data-light="../diagrams/class-diagrams--application-layer-and-ports.light.svg" data-dark="../diagrams/class-diagrams--application-layer-and-ports.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Application layer and ports diagram" src="diagrams/class-diagrams--application-layer-and-ports.light.svg" data-light="diagrams/class-diagrams--application-layer-and-ports.light.svg" data-dark="diagrams/class-diagrams--application-layer-and-ports.dark.svg" loading="lazy"></figure></p>
 <p><code>ReservationResult</code> and <code>PaymentResult</code> are <strong>sealed</strong> interfaces. The saga handles each outcome in an exhaustive <code>switch</code>, so a new
 outcome cannot be forgotten: the compiler rejects the code.</p>
 <h2 id="84-inventory-context-inventory-service">8.4 Inventory context (inventory-service)<a class="headerlink" href="#84-inventory-context-inventory-service" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Inventory context (inventory-service) diagram" src="../diagrams/class-diagrams--inventory-context-inventory-service.light.svg" data-light="../diagrams/class-diagrams--inventory-context-inventory-service.light.svg" data-dark="../diagrams/class-diagrams--inventory-context-inventory-service.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Inventory context (inventory-service) diagram" src="diagrams/class-diagrams--inventory-context-inventory-service.light.svg" data-light="diagrams/class-diagrams--inventory-context-inventory-service.light.svg" data-dark="diagrams/class-diagrams--inventory-context-inventory-service.dark.svg" loading="lazy"></figure></p>
 <h2 id="85-payment-context-payment-service">8.5 Payment context (payment-service)<a class="headerlink" href="#85-payment-context-payment-service" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Payment context (payment-service) diagram" src="../diagrams/class-diagrams--payment-context-payment-service.light.svg" data-light="../diagrams/class-diagrams--payment-context-payment-service.light.svg" data-dark="../diagrams/class-diagrams--payment-context-payment-service.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Payment context (payment-service) diagram" src="diagrams/class-diagrams--payment-context-payment-service.light.svg" data-light="diagrams/class-diagrams--payment-context-payment-service.light.svg" data-dark="diagrams/class-diagrams--payment-context-payment-service.dark.svg" loading="lazy"></figure></p>
 <h2 id="86-catalogue-cart-search-and-review-contexts">8.6 Catalogue, cart, search and review contexts<a class="headerlink" href="#86-catalogue-cart-search-and-review-contexts" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Catalogue, cart, search and review contexts diagram" src="../diagrams/class-diagrams--catalogue-cart-search-and-review-contexts.light.svg" data-light="../diagrams/class-diagrams--catalogue-cart-search-and-review-contexts.light.svg" data-dark="../diagrams/class-diagrams--catalogue-cart-search-and-review-contexts.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Catalogue, cart, search and review contexts diagram" src="diagrams/class-diagrams--catalogue-cart-search-and-review-contexts.light.svg" data-light="diagrams/class-diagrams--catalogue-cart-search-and-review-contexts.light.svg" data-dark="diagrams/class-diagrams--catalogue-cart-search-and-review-contexts.dark.svg" loading="lazy"></figure></p>
 <h2 id="87-outbox-and-idempotent-consumer-each-services-own-copy">8.7 Outbox and idempotent consumer (each service's own copy)<a class="headerlink" href="#87-outbox-and-idempotent-consumer-each-services-own-copy" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Outbox and idempotent consumer (each service's own copy) diagram" src="../diagrams/class-diagrams--outbox-and-idempotent-consumer-each-service-s-ow.light.svg" data-light="../diagrams/class-diagrams--outbox-and-idempotent-consumer-each-service-s-ow.light.svg" data-dark="../diagrams/class-diagrams--outbox-and-idempotent-consumer-each-service-s-ow.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Outbox and idempotent consumer (each service's own copy) diagram" src="diagrams/class-diagrams--outbox-and-idempotent-consumer-each-service-s-ow.light.svg" data-light="diagrams/class-diagrams--outbox-and-idempotent-consumer-each-service-s-ow.light.svg" data-dark="diagrams/class-diagrams--outbox-and-idempotent-consumer-each-service-s-ow.dark.svg" loading="lazy"></figure></p>
 <h2 id="88-package-diagram-every-java-service">8.8 Package diagram (every Java service)<a class="headerlink" href="#88-package-diagram-every-java-service" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Package diagram (every Java service) diagram" src="../diagrams/class-diagrams--package-diagram-every-java-service.light.svg" data-light="../diagrams/class-diagrams--package-diagram-every-java-service.light.svg" data-dark="../diagrams/class-diagrams--package-diagram-every-java-service.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Package diagram (every Java service) diagram" src="diagrams/class-diagrams--package-diagram-every-java-service.light.svg" data-light="diagrams/class-diagrams--package-diagram-every-java-service.light.svg" data-dark="diagrams/class-diagrams--package-diagram-every-java-service.dark.svg" loading="lazy"></figure></p>
 <p>ArchUnit rules enforced in every Java service:</p>
 <ol>
 <li><code>domain</code> depends on nothing outside <code>java.*</code> and itself.</li>
@@ -76,7 +76,7 @@ outcome cannot be forgotten: the compiler rejects the code.</p>
 <li>Only <code>config</code> may reference Spring configuration annotations.</li>
 </ol>
 <h2 id="89-deployment-uml-deployment-view">8.9 Deployment (UML deployment view)<a class="headerlink" href="#89-deployment-uml-deployment-view" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Deployment (UML deployment view) diagram" src="../diagrams/class-diagrams--deployment-uml-deployment-view.light.svg" data-light="../diagrams/class-diagrams--deployment-uml-deployment-view.light.svg" data-dark="../diagrams/class-diagrams--deployment-uml-deployment-view.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Deployment (UML deployment view) diagram" src="diagrams/class-diagrams--deployment-uml-deployment-view.light.svg" data-light="diagrams/class-diagrams--deployment-uml-deployment-view.light.svg" data-dark="diagrams/class-diagrams--deployment-uml-deployment-view.dark.svg" loading="lazy"></figure></p>
 </main>
 <script>
 function setTheme(t) {

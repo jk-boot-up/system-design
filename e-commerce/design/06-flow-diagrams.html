@@ -37,7 +37,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </head>
 <body>
 <header>
-  <a class="home" href="../../README.html">E-commerce platform</a>
+  <a class="home" href="../README.html">E-commerce platform</a>
   <span class="src">06-flow-diagrams.md</span>
   <div class="themes" role="group" aria-label="Theme">
     <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
@@ -46,19 +46,19 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <main>
 <h1 id="6-flow-diagrams">6. Flow diagrams<a class="headerlink" href="#6-flow-diagrams" title="Permanent link">#</a></h1>
 <h2 id="61-checkout-decision-flow-order-service">6.1 Checkout decision flow (order-service)<a class="headerlink" href="#61-checkout-decision-flow-order-service" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Checkout decision flow (order-service) diagram" src="../diagrams/flow-diagrams--checkout-decision-flow-order-service.light.svg" data-light="../diagrams/flow-diagrams--checkout-decision-flow-order-service.light.svg" data-dark="../diagrams/flow-diagrams--checkout-decision-flow-order-service.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Checkout decision flow (order-service) diagram" src="diagrams/flow-diagrams--checkout-decision-flow-order-service.light.svg" data-light="diagrams/flow-diagrams--checkout-decision-flow-order-service.light.svg" data-dark="diagrams/flow-diagrams--checkout-decision-flow-order-service.dark.svg" loading="lazy"></figure></p>
 <h2 id="62-saga-recovery-job-every-15-s-one-runner-via-shedlock">6.2 Saga recovery job (every 15 s, one runner via ShedLock)<a class="headerlink" href="#62-saga-recovery-job-every-15-s-one-runner-via-shedlock" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Saga recovery job (every 15 s, one runner via ShedLock) diagram" src="../diagrams/flow-diagrams--saga-recovery-job-every-15-s-one-runner-via-shed.light.svg" data-light="../diagrams/flow-diagrams--saga-recovery-job-every-15-s-one-runner-via-shed.light.svg" data-dark="../diagrams/flow-diagrams--saga-recovery-job-every-15-s-one-runner-via-shed.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Saga recovery job (every 15 s, one runner via ShedLock) diagram" src="diagrams/flow-diagrams--saga-recovery-job-every-15-s-one-runner-via-shed.light.svg" data-light="diagrams/flow-diagrams--saga-recovery-job-every-15-s-one-runner-via-shed.light.svg" data-dark="diagrams/flow-diagrams--saga-recovery-job-every-15-s-one-runner-via-shed.dark.svg" loading="lazy"></figure></p>
 <ul>
 <li><strong>Moving forward or back:</strong> once money has been authorised, the saga moves <strong>forward</strong>, because the customer intended to buy and stock is held. Before that point it moves <strong>back</strong>.</li>
 <li><strong>Safe to repeat:</strong> every step is idempotent on the remote side, so running recovery twice is harmless.</li>
 </ul>
 <h2 id="63-reservation-expiry-job-inventory-service-every-30-s">6.3 Reservation expiry job (inventory-service, every 30 s)<a class="headerlink" href="#63-reservation-expiry-job-inventory-service-every-30-s" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Reservation expiry job (inventory-service, every 30 s) diagram" src="../diagrams/flow-diagrams--reservation-expiry-job-inventory-service-every-3.light.svg" data-light="../diagrams/flow-diagrams--reservation-expiry-job-inventory-service-every-3.light.svg" data-dark="../diagrams/flow-diagrams--reservation-expiry-job-inventory-service-every-3.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Reservation expiry job (inventory-service, every 30 s) diagram" src="diagrams/flow-diagrams--reservation-expiry-job-inventory-service-every-3.light.svg" data-light="diagrams/flow-diagrams--reservation-expiry-job-inventory-service-every-3.light.svg" data-dark="diagrams/flow-diagrams--reservation-expiry-job-inventory-service-every-3.dark.svg" loading="lazy"></figure></p>
 <h2 id="64-gateway-request-pipeline-chain-of-responsibility">6.4 Gateway request pipeline (Chain of Responsibility)<a class="headerlink" href="#64-gateway-request-pipeline-chain-of-responsibility" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Gateway request pipeline (Chain of Responsibility) diagram" src="../diagrams/flow-diagrams--gateway-request-pipeline-chain-of-responsibility.light.svg" data-light="../diagrams/flow-diagrams--gateway-request-pipeline-chain-of-responsibility.light.svg" data-dark="../diagrams/flow-diagrams--gateway-request-pipeline-chain-of-responsibility.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Gateway request pipeline (Chain of Responsibility) diagram" src="diagrams/flow-diagrams--gateway-request-pipeline-chain-of-responsibility.light.svg" data-light="diagrams/flow-diagrams--gateway-request-pipeline-chain-of-responsibility.light.svg" data-dark="diagrams/flow-diagrams--gateway-request-pipeline-chain-of-responsibility.dark.svg" loading="lazy"></figure></p>
 <h2 id="65-token-bucket-rate-limiting">6.5 Token bucket rate limiting<a class="headerlink" href="#65-token-bucket-rate-limiting" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Token bucket rate limiting diagram" src="../diagrams/flow-diagrams--token-bucket-rate-limiting.light.svg" data-light="../diagrams/flow-diagrams--token-bucket-rate-limiting.light.svg" data-dark="../diagrams/flow-diagrams--token-bucket-rate-limiting.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Token bucket rate limiting diagram" src="diagrams/flow-diagrams--token-bucket-rate-limiting.light.svg" data-light="diagrams/flow-diagrams--token-bucket-rate-limiting.light.svg" data-dark="diagrams/flow-diagrams--token-bucket-rate-limiting.dark.svg" loading="lazy"></figure></p>
 <p>Default limits:</p>
 <table>
 <thead>
@@ -83,15 +83,15 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tbody>
 </table>
 <h2 id="66-kafka-consumer-retry-and-dead-letters">6.6 Kafka consumer retry and dead letters<a class="headerlink" href="#66-kafka-consumer-retry-and-dead-letters" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Kafka consumer retry and dead letters diagram" src="../diagrams/flow-diagrams--kafka-consumer-retry-and-dead-letters.light.svg" data-light="../diagrams/flow-diagrams--kafka-consumer-retry-and-dead-letters.light.svg" data-dark="../diagrams/flow-diagrams--kafka-consumer-retry-and-dead-letters.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Kafka consumer retry and dead letters diagram" src="diagrams/flow-diagrams--kafka-consumer-retry-and-dead-letters.light.svg" data-light="diagrams/flow-diagrams--kafka-consumer-retry-and-dead-letters.light.svg" data-dark="diagrams/flow-diagrams--kafka-consumer-retry-and-dead-letters.dark.svg" loading="lazy"></figure></p>
 <p>DLQ records are replayed with <code>tools/dlq-replay</code> after the cause is fixed. Alerts fire when DLQ depth is above 0.</p>
 <h2 id="67-cache-aside-read-and-invalidation">6.7 Cache-aside read and invalidation<a class="headerlink" href="#67-cache-aside-read-and-invalidation" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Cache-aside read and invalidation diagram" src="../diagrams/flow-diagrams--cache-aside-read-and-invalidation.light.svg" data-light="../diagrams/flow-diagrams--cache-aside-read-and-invalidation.light.svg" data-dark="../diagrams/flow-diagrams--cache-aside-read-and-invalidation.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Cache-aside read and invalidation diagram" src="diagrams/flow-diagrams--cache-aside-read-and-invalidation.light.svg" data-light="diagrams/flow-diagrams--cache-aside-read-and-invalidation.light.svg" data-dark="diagrams/flow-diagrams--cache-aside-read-and-invalidation.dark.svg" loading="lazy"></figure></p>
 <p>Deleting the key after the commit, not before it, avoids a race: if the key were deleted first, a concurrent read could put the old value back.</p>
 <h2 id="68-flash-sale-admission">6.8 Flash-sale admission<a class="headerlink" href="#68-flash-sale-admission" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Flash-sale admission diagram" src="../diagrams/flow-diagrams--flash-sale-admission.light.svg" data-light="../diagrams/flow-diagrams--flash-sale-admission.light.svg" data-dark="../diagrams/flow-diagrams--flash-sale-admission.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Flash-sale admission diagram" src="diagrams/flow-diagrams--flash-sale-admission.light.svg" data-light="diagrams/flow-diagrams--flash-sale-admission.light.svg" data-dark="diagrams/flow-diagrams--flash-sale-admission.dark.svg" loading="lazy"></figure></p>
 <h2 id="69-recommendation-update">6.9 Recommendation update<a class="headerlink" href="#69-recommendation-update" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="Recommendation update diagram" src="../diagrams/flow-diagrams--recommendation-update.light.svg" data-light="../diagrams/flow-diagrams--recommendation-update.light.svg" data-dark="../diagrams/flow-diagrams--recommendation-update.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Recommendation update diagram" src="diagrams/flow-diagrams--recommendation-update.light.svg" data-light="diagrams/flow-diagrams--recommendation-update.light.svg" data-dark="diagrams/flow-diagrams--recommendation-update.dark.svg" loading="lazy"></figure></p>
 </main>
 <script>
 function setTheme(t) {

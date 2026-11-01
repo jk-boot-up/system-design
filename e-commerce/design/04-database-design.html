@@ -37,7 +37,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </head>
 <body>
 <header>
-  <a class="home" href="../../README.html">E-commerce platform</a>
+  <a class="home" href="../README.html">E-commerce platform</a>
   <span class="src">04-database-design.md</span>
   <div class="themes" role="group" aria-label="Theme">
     <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
@@ -45,14 +45,14 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </header>
 <main>
 <h1 id="4-database-design">4. Database design<a class="headerlink" href="#4-database-design" title="Permanent link">#</a></h1>
-<p>The platform uses <strong>polyglot persistence</strong>, as described in <a href="../SPEC.html#14-polyglot-persistence">SPEC §14</a>.
+<p>The platform uses <strong>polyglot persistence</strong>, as described in <a href="SPEC.html#14-polyglot-persistence">SPEC §14</a>.
 * Every service owns its store; no other service connects to it.
 * PostgreSQL schemas are managed by Flyway migrations in each service (<code>src/main/resources/db/migration</code>).
 * Cassandra tables are created by versioned CQL scripts.
 * OpenSearch indexes are created by the search service from a mapping file.</p>
 <h2 id="41-common-tables-every-postgresql-service">4.1 Common tables (every PostgreSQL service)<a class="headerlink" href="#41-common-tables-every-postgresql-service" title="Permanent link">#</a></h2>
 <p>Every service that publishes or consumes events has these tables, created by its own first migration. Each service carries its own small outbox implementation; there is no shared library (ADR 0003).</p>
-<p><figure class="diagram"><img alt="Common tables (every PostgreSQL service) diagram" src="../diagrams/database-design--common-tables-every-postgresql-service.light.svg" data-light="../diagrams/database-design--common-tables-every-postgresql-service.light.svg" data-dark="../diagrams/database-design--common-tables-every-postgresql-service.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="Common tables (every PostgreSQL service) diagram" src="diagrams/database-design--common-tables-every-postgresql-service.light.svg" data-light="diagrams/database-design--common-tables-every-postgresql-service.light.svg" data-dark="diagrams/database-design--common-tables-every-postgresql-service.dark.svg" loading="lazy"></figure></p>
 <pre class="highlight"><code class="language-sql">create table outbox (
   id             uuid primary key,
   aggregate_type text        not null,
@@ -104,7 +104,7 @@ create table processed_events (
 </table>
 <p><code>FOR UPDATE SKIP LOCKED</code> lets several relay replicas work in parallel without publishing the same row twice.</p>
 <h2 id="42-catalog-postgresql">4.2 catalog (PostgreSQL)<a class="headerlink" href="#42-catalog-postgresql" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="catalog (PostgreSQL) diagram" src="../diagrams/database-design--catalog-postgresql.light.svg" data-light="../diagrams/database-design--catalog-postgresql.light.svg" data-dark="../diagrams/database-design--catalog-postgresql.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="catalog (PostgreSQL) diagram" src="diagrams/database-design--catalog-postgresql.light.svg" data-light="diagrams/database-design--catalog-postgresql.light.svg" data-dark="diagrams/database-design--catalog-postgresql.dark.svg" loading="lazy"></figure></p>
 <pre class="highlight"><code class="language-sql">create table categories (
   id         uuid primary key,
   parent_id  uuid references categories (id),
@@ -139,7 +139,7 @@ create table product_images (
   primary key (product_id, position)
 );</code></pre>
 <h2 id="43-inventory-postgresql">4.3 inventory (PostgreSQL)<a class="headerlink" href="#43-inventory-postgresql" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="inventory (PostgreSQL) diagram" src="../diagrams/database-design--inventory-postgresql.light.svg" data-light="../diagrams/database-design--inventory-postgresql.light.svg" data-dark="../diagrams/database-design--inventory-postgresql.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="inventory (PostgreSQL) diagram" src="diagrams/database-design--inventory-postgresql.light.svg" data-light="diagrams/database-design--inventory-postgresql.light.svg" data-dark="diagrams/database-design--inventory-postgresql.dark.svg" loading="lazy"></figure></p>
 <pre class="highlight"><code class="language-sql">create table stock (
   sku        text not null,
   warehouse  text not null default 'MAIN',
@@ -175,7 +175,7 @@ create index reservations_live_expiry on reservations (expires_at) where status 
 <li><strong>Release</strong> returns the quantity: <code>available = available + q, reserved = reserved - q</code>.</li>
 </ul>
 <h2 id="44-orders-postgresql">4.4 orders (PostgreSQL)<a class="headerlink" href="#44-orders-postgresql" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="orders (PostgreSQL) diagram" src="../diagrams/database-design--orders-postgresql.light.svg" data-light="../diagrams/database-design--orders-postgresql.light.svg" data-dark="../diagrams/database-design--orders-postgresql.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="orders (PostgreSQL) diagram" src="diagrams/database-design--orders-postgresql.light.svg" data-light="diagrams/database-design--orders-postgresql.light.svg" data-dark="diagrams/database-design--orders-postgresql.dark.svg" loading="lazy"></figure></p>
 <pre class="highlight"><code class="language-sql">create table orders (
   id             uuid        not null,
   created_at     timestamptz not null,
@@ -219,7 +219,7 @@ create table idempotency_keys (
 * <strong>Archiving:</strong> old partitions are detached and archived, with no expensive <code>DELETE</code>.</p>
 <p><strong>Scaling beyond one primary.</strong> The tables can be distributed with Citus on <code>customer_id</code> (SPEC §13.1). All queries already filter by <code>customer_id</code> or by order id; adding <code>customer_id</code> to the order lookup path makes them single-shard.</p>
 <h2 id="45-payments-postgresql">4.5 payments (PostgreSQL)<a class="headerlink" href="#45-payments-postgresql" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="payments (PostgreSQL) diagram" src="../diagrams/database-design--payments-postgresql.light.svg" data-light="../diagrams/database-design--payments-postgresql.light.svg" data-dark="../diagrams/database-design--payments-postgresql.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="payments (PostgreSQL) diagram" src="diagrams/database-design--payments-postgresql.light.svg" data-light="diagrams/database-design--payments-postgresql.light.svg" data-dark="diagrams/database-design--payments-postgresql.dark.svg" loading="lazy"></figure></p>
 <pre class="highlight"><code class="language-sql">create table payments (
   id             uuid primary key,
   order_id       uuid not null unique,
@@ -406,7 +406,7 @@ CREATE TABLE reviews.review_guard (
 <li><strong>Mapping changes:</strong> create <code>products-v2</code>, reindex, then switch the alias atomically.</li>
 </ul>
 <h2 id="49-rabbitmq-topology-notification-service">4.9 RabbitMQ topology (notification-service)<a class="headerlink" href="#49-rabbitmq-topology-notification-service" title="Permanent link">#</a></h2>
-<p><figure class="diagram"><img alt="RabbitMQ topology (notification-service) diagram" src="../diagrams/database-design--rabbitmq-topology-notification-service.light.svg" data-light="../diagrams/database-design--rabbitmq-topology-notification-service.light.svg" data-dark="../diagrams/database-design--rabbitmq-topology-notification-service.dark.svg" loading="lazy"></figure></p>
+<p><figure class="diagram"><img alt="RabbitMQ topology (notification-service) diagram" src="diagrams/database-design--rabbitmq-topology-notification-service.light.svg" data-light="diagrams/database-design--rabbitmq-topology-notification-service.light.svg" data-dark="diagrams/database-design--rabbitmq-topology-notification-service.dark.svg" loading="lazy"></figure></p>
 <table>
 <thead>
 <tr>
