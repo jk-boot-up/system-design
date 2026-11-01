@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: payment-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/payments}
+    username: ${DB_USER:payments}
+    password: ${DB_PASSWORD:payments}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      connection-timeout: 2000
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      compression-type: zstd
+      properties:
+        enable.idempotence: true
+        linger.ms: 5
+server:
+  port: ${PORT:8086}
+  shutdown: graceful
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  observations:
+    key-values:
+      service: payment-service
+payment:
+  provider:
+    timeout: 1500ms        # below order-service's 2 s read timeout, so payment answers 504 before the caller gives up
+    slow-delay: 3s
+  reconcile:
+    interval: 20s
+    settle-after: 30s
+  outbox:
+    poll-interval: 100ms
