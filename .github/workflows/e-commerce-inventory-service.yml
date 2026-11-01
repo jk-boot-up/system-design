@@ -1,0 +1,28 @@
+name: e-commerce / inventory-service
+
+on:
+  push:
+    paths: ['e-commerce/services/inventory-service/**', '.github/workflows/e-commerce-inventory-service.yml']
+  pull_request:
+    paths: ['e-commerce/services/inventory-service/**', '.github/workflows/e-commerce-inventory-service.yml']
+
+defaults:
+  run:
+    working-directory: e-commerce/services/inventory-service
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '25' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit, architecture and container tests
+        run: ./gradlew build -PwithContainers
+      - name: Container image
+        run: docker build -t e-commerce/inventory-service:${{ github.sha }} .
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: inventory-service-test-reports, path: e-commerce/services/inventory-service/build/reports }

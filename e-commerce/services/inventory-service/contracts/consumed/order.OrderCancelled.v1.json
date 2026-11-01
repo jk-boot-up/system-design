@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "order.OrderCancelled v1 (consumer copy)",
+  "description": "inventory-service's own copy of the fields it reads from order.OrderCancelled. Unknown fields are ignored (tolerant reader).",
+  "type": "object",
+  "required": ["eventId", "type", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "type": { "const": "order.OrderCancelled" },
+    "payload": {
+      "type": "object",
+      "required": ["orderId"],
+      "properties": { "orderId": { "type": "string", "format": "uuid" } }
+    }
+  }
+}

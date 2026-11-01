@@ -1,0 +1,116 @@
+openapi: 3.1.0
+info:
+  title: inventory-service internal API
+  version: 1.0.0
+  description: >
+    Stock reservations for the checkout saga and stock administration. Reachable only inside the cluster (mTLS, network
+    policy). Every command is idempotent per order id. Errors are RFC 9457 problem details with a stable `code`.
+servers:
+  - url: http://inventory-service
+paths:
+  /internal/reservations:
+    post:
+      summary: Reserve every line of an order, or nothing
+      operationId: reserve
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReserveRequest' }
+      responses:
+        '200': { description: Reserved (or already reserved for this order), content: { application/json: { schema: { $ref: '#/components/schemas/Reservation' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '409': { description: 'OUT_OF_STOCK (with `sku`) or ILLEGAL_STATE', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  /internal/reservations/{orderId}/commit:
+    post:
+      summary: Reserved stock becomes sold
+      operationId: commit
+      parameters: [ { $ref: '#/components/parameters/OrderId' } ]
+      responses:
+        '200': { description: Committed, content: { application/json: { schema: { $ref: '#/components/schemas/Status' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: RESERVATION_EXPIRED, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  /internal/reservations/{orderId}/release:
+    post:
+      summary: Give reserved stock back (no-op when nothing is held)
+      operationId: release
+      parameters: [ { $ref: '#/components/parameters/OrderId' } ]
+      responses:
+        '200': { description: Released, content: { application/json: { schema: { $ref: '#/components/schemas/Status' } } } }
+  /internal/reservations/{orderId}/return:
+    post:
+      summary: Return sold stock after cancelling a confirmed order
+      operationId: returnStock
+      parameters: [ { $ref: '#/components/parameters/OrderId' } ]
+      responses:
+        '200': { description: Returned, content: { application/json: { schema: { $ref: '#/components/schemas/Status' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /internal/stock/{sku}:
+    parameters:
+      - { name: sku, in: path, required: true, schema: { type: string, pattern: '^[A-Z0-9][A-Z0-9-]{0,63}$' } }
+    get:
+      summary: Current stock level
+      operationId: getStock
+      responses:
+        '200': { description: Stock level, content: { application/json: { schema: { $ref: '#/components/schemas/StockLevel' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+    put:
+      summary: Set available stock (stock-take)
+      operationId: setStock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [available], properties: { available: { type: integer, minimum: 0, maximum: 100000000 } } }
+      responses:
+        '200': { description: New stock level, content: { application/json: { schema: { $ref: '#/components/schemas/StockLevel' } } } }
+components:
+  parameters:
+    OrderId: { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Problem:
+      description: Problem details
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+  schemas:
+    ReserveRequest:
+      type: object
+      required: [orderId, lines]
+      properties:
+        orderId: { type: string, format: uuid }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            type: object
+            required: [sku, quantity]
+            properties:
+              sku: { type: string }
+              quantity: { type: integer, minimum: 1, maximum: 10000 }
+    Reservation:
+      type: object
+      properties:
+        orderId: { type: string, format: uuid }
+        status: { type: string, enum: [RESERVED] }
+        expiresAt: { type: string, format: date-time }
+    Status:
+      type: object
+      properties:
+        orderId: { type: string, format: uuid }
+        status: { type: string, enum: [COMMITTED, RELEASED, RETURNED] }
+    StockLevel:
+      type: object
+      properties:
+        sku: { type: string }
+        available: { type: integer }
+        reserved: { type: integer }
+        inStock: { type: boolean }
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }
+        sku: { type: string }

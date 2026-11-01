@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jkbootup.dev/e-commerce/events/inventory.StockChanged.v1.json",
+  "title": "inventory.StockChanged v1",
+  "description": "Published on topic inventory.events (key = SKU) whenever the sellable quantity of a SKU changes.",
+  "type": "object",
+  "required": ["eventId", "type", "version", "occurredAt", "aggregateId", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "type": { "const": "inventory.StockChanged" },
+    "version": { "const": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "aggregateId": { "type": "string", "description": "the SKU" },
+    "traceparent": { "type": "string" },
+    "payload": {
+      "type": "object",
+      "required": ["sku", "available", "inStock"],
+      "properties": {
+        "sku": { "type": "string" },
+        "available": { "type": "integer", "minimum": 0 },
+        "inStock": { "type": "boolean" }
+      }
+    }
+  }
+}
