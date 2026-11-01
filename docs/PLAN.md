@@ -28,7 +28,7 @@ All components are open source. See [SPEC.md §9](SPEC.md#9-technology-choices) 
 
 | Concern | Choice |
 |---|---|
-| Language / build | Java 25, Gradle 9 (Kotlin DSL, version catalog) |
+| Languages / build | Java 25 with Gradle 9 (Kotlin DSL, version catalog) as the main stack; Go 1.24 (notification); Python 3.12 + FastAPI (recommendations) |
 | Service framework | Spring Boot 4.0, Spring Cloud 2025.1 |
 | API gateway | Spring Cloud Gateway |
 | Identity | Keycloak (OIDC / OAuth 2.1, JWT) |
@@ -37,6 +37,8 @@ All components are open source. See [SPEC.md §9](SPEC.md#9-technology-choices) 
 | Object storage | MinIO, S3 API (product images, presigned uploads) |
 | Cache, cart, rate limits | Redis 8 (Valkey-compatible) |
 | Events | Apache Kafka 4 (KRaft), transactional outbox |
+| Work queues | RabbitMQ 4 (email jobs: priorities, delayed retries) |
+| Analytics | ClickHouse (Kafka table engine) + Grafana dashboards |
 | Search | OpenSearch 3 |
 | Resilience | Resilience4j (timeouts, retries, circuit breakers, bulkheads) |
 | Observability | OpenTelemetry, Prometheus, Grafana, Tempo, Loki |
@@ -66,7 +68,8 @@ system-design/
 │  ├─ order-service/        checkout saga orchestrator
 │  ├─ payment-service/
 │  ├─ review-service/       Cassandra
-│  └─ notification-service/
+│  ├─ recommendation-service/  Python, Redis
+│  └─ notification-service/    Go, RabbitMQ
 ├─ deploy/
 │  ├─ compose/              local stack: Postgres, Kafka, Redis, OpenSearch, Keycloak, observability
 │  └─ k8s/                  Kustomize base + overlays
@@ -95,6 +98,7 @@ ArchUnit tests enforce the dependency direction.
 | M6 | Gateway, identity, notifications | routing, JWT validation, rate limits, email notifications | End-to-end flow through the gateway |
 | M7 | Operations | Compose stack, Kubernetes manifests, dashboards, alerts, runbooks | Stack starts locally; manifests pass `kubectl --dry-run` |
 | M8 | Design docs | ADRs, per-service designs, data model, API and event catalogues, capacity model, failure modes | Docs cover every decision in the spec |
+| M6b | Polyglot services | Go notification router + email worker (RabbitMQ), Python recommendations, ClickHouse analytics | Go and Python tests green; events flow end to end in the Compose stack |
 | M8b | Performance | Gatling simulations, AppCDS/AOT images, index and cache tuning | p99 budgets from SPEC §2.2 met in CI |
 | M9 | Visual walkthroughs | animated architecture and flows, themes, narration toggle | Every scenario plays end to end with no console errors |
 
