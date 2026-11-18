@@ -1,0 +1,32 @@
+name: e-commerce / api-gateway
+
+on:
+  push:
+    paths: ['e-commerce/services/api-gateway/**', '.github/workflows/e-commerce-api-gateway.yml']
+  pull_request:
+    paths: ['e-commerce/services/api-gateway/**', '.github/workflows/e-commerce-api-gateway.yml']
+
+defaults:
+  run:
+    working-directory: e-commerce/services/api-gateway
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '25' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit, architecture and container tests (Redis, stub services, NGINX edge image)
+        run: ./gradlew build -PwithContainers
+      - name: Container images
+        run: |
+          docker build -t e-commerce/api-gateway:${{ github.sha }} .
+          docker build -t e-commerce/edge:${{ github.sha }} edge
+      - name: NGINX configuration check
+        run: docker run --rm -e GATEWAY_UPSTREAM=127.0.0.1:8080 e-commerce/edge:${{ github.sha }} sh -c '/docker-entrypoint.sh true >/dev/null && nginx -t'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: api-gateway-test-reports, path: e-commerce/services/api-gateway/build/reports }

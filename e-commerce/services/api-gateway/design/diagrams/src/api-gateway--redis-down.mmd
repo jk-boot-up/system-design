@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant C as Client
+    participant G as api-gateway
+    participant R as Redis
+    participant L as Local buckets
+    participant S as service
+    C->>G: GET /api/v1/products/42
+    G->>R: token bucket
+    R--xG: no answer in 50 ms
+    G->>L: browse × 0.25 (5/s, burst 10)
+    L-->>G: allowed
+    G->>S: forward
+    S-->>C: 200

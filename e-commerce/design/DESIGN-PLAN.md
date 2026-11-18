@@ -71,7 +71,7 @@ Each service also has its own `README.md` (build, run, configure, operate) and `
 | catalog-service | Java | ✅ | ✅ | ✅ |
 | search-service | Java | ✅ | ✅ | ✅ |
 | review-service | Java | ✅ | ✅ | ✅ |
-| api-gateway (+ NGINX edge) | Java | ⏳ | ⏳ | ⏳ |
+| api-gateway (+ NGINX edge) | Java | ✅ | ✅ | ✅ |
 | notification-service | Go | ⏳ | ⏳ | ⏳ |
 | recommendation-service | Python | ⏳ | ⏳ | ⏳ |
 | analytics | ClickHouse SQL | ⏳ | ⏳ | ⏳ |

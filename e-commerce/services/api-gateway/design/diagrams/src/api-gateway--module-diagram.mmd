@@ -1,0 +1,14 @@
+flowchart TB
+    subgraph edge[NGINX edge]
+        TLS[TLS + HTTP/2] --> LIM[limit_req per address] --> MC[micro-cache 5 s]
+    end
+    subgraph gw[api-gateway]
+        RID[RequestIdFilter] --> SEC[JWT + access rules] --> AC[AdmissionControl filter]
+        AC --> RTB[RedisTokenBuckets]
+        RTB -. Redis error or > 50 ms .-> LTB[LocalTokenBuckets × 0.25]
+        AC --> CB[CircuitBreaker + TimeLimiter] --> RT[route]
+        CB -. open / timeout .-> FB[FallbackController 503]
+    end
+    MC --> RID
+    RTB --> R[(Redis)]
+    RT --> SVC[services]

@@ -1,0 +1,7 @@
+flowchart LR
+    B[Browser / app] -- "HTTPS, HTTP/2" --> E[NGINX edge]
+    E -- "X-Request-Id, X-Real-IP" --> G((api-gateway))
+    G -- "EVALSHA token bucket" --> R[(Redis)]
+    G -- "JWKS (cached)" --> K[Keycloak]
+    G --> CAT[catalog-service] & S[search-service] & C[cart-service] & O[order-service]
+    G --> RV[review-service] & REC[recommendation-service] & I[inventory-service]

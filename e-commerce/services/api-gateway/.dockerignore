@@ -1,0 +1,7 @@
+build
+.gradle
+design
+k8s
+*.md
+*.html
+edge

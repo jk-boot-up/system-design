@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/name: api-gateway
+      app.kubernetes.io/part-of: e-commerce
+    includeSelectors: true
+resources: [deployment.yaml, service.yaml, hpa.yaml, pdb.yaml, networkpolicy.yaml]
+configMapGenerator:
+  - name: api-gateway
+    literals:
+      - REDIS_URL=redis://redis-ratelimit:6379
+      - JWT_ISSUER=https://id.shop.example/realms/shop
+      - JWT_AUDIENCE=shop-api
+      - SHOP_ORIGINS=https://shop.example
+      - CATALOG_URL=http://catalog-service
+      - SEARCH_URL=http://search-service
+      - CART_URL=http://cart-service
+      - INVENTORY_URL=http://inventory-service
+      - ORDER_URL=http://order-service
+      - REVIEW_URL=http://review-service
+      - RECOMMENDATION_URL=http://recommendation-service
+# The gateway has no secrets: it only verifies tokens with Keycloak's public keys.

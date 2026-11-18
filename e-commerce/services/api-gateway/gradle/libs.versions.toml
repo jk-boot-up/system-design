@@ -1,0 +1,12 @@
+[versions]
+java = "25"
+spring-boot = "4.0.9"
+spring-cloud = "2025.1.4"
+archunit = "1.5.1"
+
+[libraries]
+spring-cloud-bom = { module = "org.springframework.cloud:spring-cloud-dependencies", version.ref = "spring-cloud" }
+archunit = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

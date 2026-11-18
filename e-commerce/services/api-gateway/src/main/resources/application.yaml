@@ -1,0 +1,127 @@
+spring:
+  application:
+    name: api-gateway
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+      timeout: 50ms
+  cloud:
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 500
+            response-timeout: 15s
+          globalcors:
+            cors-configurations:
+              '[/api/**]':
+                allowed-origins: ${SHOP_ORIGINS:http://localhost:5173}
+                allowed-methods: [GET, POST, PUT, DELETE]
+                allowed-headers: [Authorization, Content-Type, Idempotency-Key, If-Match, X-Guest-Id, X-Request-Id]
+                exposed-headers: [ETag, Retry-After, X-Request-Id]
+                max-age: 3600
+          default-filters:
+            - AdmissionControl=browse,USER
+            - RemoveRequestHeader=Cookie
+          # Order matters: the first matching route wins, so the more specific product paths come first.
+          routes:
+            - id: reviews
+              uri: ${REVIEW_URL:http://localhost:8087}
+              predicates: [ "Path=/api/v1/products/*/reviews" ]
+              filters:
+                - name: CircuitBreaker
+                  args: { name: review, fallbackUri: 'forward:/fallback/review' }
+            - id: recommendations
+              uri: ${RECOMMENDATION_URL:http://localhost:8089}
+              predicates: [ "Path=/api/v1/products/*/recommendations" ]
+              filters:
+                - name: CircuitBreaker
+                  args: { name: recommendation, fallbackUri: 'forward:/fallback/recommendation' }
+            - id: catalog
+              uri: ${CATALOG_URL:http://localhost:8081}
+              predicates: [ "Path=/api/v1/products/**,/api/v1/categories,/api/v1/admin/products,/api/v1/admin/products/**,/api/v1/admin/categories" ]
+              filters:
+                - name: CircuitBreaker
+                  args: { name: catalog, fallbackUri: 'forward:/fallback/catalog' }
+            - id: stock-admin
+              uri: ${INVENTORY_URL:http://localhost:8084}
+              predicates: [ "Path=/api/v1/admin/stock/{sku}", "Method=PUT" ]
+              filters:
+                - RewritePath=/api/v1/admin/stock/(?<sku>.*), /internal/stock/$\{sku}
+                - name: CircuitBreaker
+                  args: { name: inventory, fallbackUri: 'forward:/fallback/inventory' }
+            - id: search
+              uri: ${SEARCH_URL:http://localhost:8082}
+              predicates: [ "Path=/api/v1/search" ]
+              filters:
+                - name: CircuitBreaker
+                  args: { name: search, fallbackUri: 'forward:/fallback/search' }
+            - id: cart-items
+              uri: ${CART_URL:http://localhost:8083}
+              predicates: [ "Path=/api/v1/cart/items/{sku}" ]
+              filters:
+                - AdmissionControl=hot-sku,SKU
+                - name: CircuitBreaker
+                  args: { name: cart, fallbackUri: 'forward:/fallback/cart' }
+            - id: cart
+              uri: ${CART_URL:http://localhost:8083}
+              predicates: [ "Path=/api/v1/cart,/api/v1/cart/**" ]
+              filters:
+                - name: CircuitBreaker
+                  args: { name: cart, fallbackUri: 'forward:/fallback/cart' }
+            - id: orders
+              uri: ${ORDER_URL:http://localhost:8085}
+              predicates: [ "Path=/api/v1/orders,/api/v1/orders/**" ]
+              filters:
+                - AdmissionControl=checkout,USER
+                - name: CircuitBreaker
+                  args: { name: order, fallbackUri: 'forward:/fallback/order' }
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  http2:
+    enabled: true
+  compression:
+    enabled: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    redis:
+      enabled: false        # Redis down must not take the gateway out of service: rate limits degrade locally
+  observations:
+    key-values:
+      service: api-gateway
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 2s
+    instances:
+      order:
+        timeout-duration: 12s     # checkout runs the saga: reserve, authorise, capture
+gateway:
+  jwt:
+    issuer: ${JWT_ISSUER:http://localhost:8180/realms/shop}
+    audience: ${JWT_AUDIENCE:shop-api}
+  rate-limit-store:
+    timeout: 50ms
+    degraded-factor: 0.25
+  rate-limits:
+    browse:   { rate: 20, burst: 40 }    # per user or address, every route
+    checkout: { rate: 0.2, burst: 3 }    # per user: three orders, then one every five seconds
+    hot-sku:  { rate: 200, burst: 400 }  # per SKU across all users: flash-sale admission control

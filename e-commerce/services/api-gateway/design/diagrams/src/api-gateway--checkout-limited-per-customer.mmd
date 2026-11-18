@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant A as Ada
+    participant E as NGINX
+    participant G as api-gateway
+    participant R as Redis
+    participant O as order-service
+    A->>E: POST /api/v1/orders (4th in 2 s)
+    E->>G: + X-Request-Id, X-Real-IP
+    G->>G: JWT valid, subject ada
+    G->>R: token bucket rate:checkout:user:ada
+    R-->>G: denied, 0.4 tokens left
+    G-->>A: 429 RATE_LIMITED, Retry-After 3
+    Note over O: never called

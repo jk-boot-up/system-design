@@ -1,0 +1,442 @@
+{
+ "title": "api-gateway + NGINX edge",
+ "subtitle": "One way in: cache, limit, degrade",
+ "nodes": [
+  {
+   "id": "ada",
+   "label": "Ada",
+   "kind": "client",
+   "tech": "signed in",
+   "x": 110,
+   "y": 120
+  },
+  {
+   "id": "crowd",
+   "label": "Shoppers",
+   "kind": "client",
+   "tech": "flash sale",
+   "x": 110,
+   "y": 420
+  },
+  {
+   "id": "edge",
+   "label": "NGINX",
+   "kind": "edge",
+   "tech": "TLS · micro-cache",
+   "x": 360,
+   "y": 270
+  },
+  {
+   "id": "gw",
+   "label": "api-gateway",
+   "kind": "service",
+   "tech": "Spring Cloud Gateway",
+   "x": 640,
+   "y": 270
+  },
+  {
+   "id": "redis",
+   "label": "Redis",
+   "kind": "cache",
+   "tech": "token buckets",
+   "x": 640,
+   "y": 500
+  },
+  {
+   "id": "cat",
+   "label": "catalog-service",
+   "kind": "service",
+   "tech": "products",
+   "x": 960,
+   "y": 90
+  },
+  {
+   "id": "order",
+   "label": "order-service",
+   "kind": "service",
+   "tech": "checkout",
+   "x": 960,
+   "y": 270
+  },
+  {
+   "id": "search",
+   "label": "search-service",
+   "kind": "search",
+   "tech": "OpenSearch",
+   "x": 960,
+   "y": 450
+  }
+ ],
+ "edges": [
+  {
+   "from": "ada",
+   "to": "edge"
+  },
+  {
+   "from": "crowd",
+   "to": "edge"
+  },
+  {
+   "from": "edge",
+   "to": "gw"
+  },
+  {
+   "from": "gw",
+   "to": "redis"
+  },
+  {
+   "from": "gw",
+   "to": "cat"
+  },
+  {
+   "from": "gw",
+   "to": "order"
+  },
+  {
+   "from": "gw",
+   "to": "search"
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "spike",
+   "title": "A spike on one product",
+   "summary": "Micro-cache: one upstream call per 5 seconds",
+   "steps": [
+    {
+     "say": "A product goes viral. Thousands of shoppers open the same page, Trail Runner 2, at the same second. None of them is signed in.",
+     "active": [
+      "crowd",
+      "edge"
+     ],
+     "packets": [
+      {
+       "from": "crowd",
+       "to": "edge",
+       "label": "GET /api/v1/products/42 × 3 000",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "NGINX has no copy yet. With the cache lock on, only the first request goes through; the others wait for it instead of all hitting the gateway.",
+     "active": [
+      "edge",
+      "gw",
+      "cat"
+     ],
+     "packets": [
+      {
+       "from": "edge",
+       "to": "gw",
+       "label": "1 request · X-Request-Id",
+       "kind": "req"
+      },
+      {
+       "from": "gw",
+       "to": "cat",
+       "label": "GET /api/v1/products/42",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Edge cache",
+      "rows": {
+       "products/42": "MISS · filling",
+       "waiting": "2 999"
+      }
+     }
+    },
+    {
+     "say": "The answer is stored for five seconds and every waiting request is served from it.",
+     "active": [
+      "edge",
+      "crowd"
+     ],
+     "ok": [
+      "edge"
+     ],
+     "packets": [
+      {
+       "from": "edge",
+       "to": "crowd",
+       "label": "200 · X-Cache HIT",
+       "kind": "res"
+      }
+     ],
+     "state": {
+      "title": "Edge cache",
+      "rows": {
+       "products/42": "HIT · 5 s",
+       "upstream calls": 1
+      }
+     }
+    },
+    {
+     "say": "When the five seconds are up, one request refreshes the copy in the background while everyone else still gets the old one. Ten thousand requests a second become one request every five seconds.",
+     "active": [
+      "edge",
+      "gw"
+     ],
+     "packets": [
+      {
+       "from": "edge",
+       "to": "gw",
+       "label": "background refresh",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Edge cache",
+      "rows": {
+       "products/42": "UPDATING · stale served",
+       "upstream calls": "1 per 5 s"
+      }
+     },
+     "log": "Signed-in requests bypass the cache"
+    }
+   ]
+  },
+  {
+   "id": "limit",
+   "title": "Too many checkouts",
+   "summary": "A token bucket per customer, shared through Redis",
+   "steps": [
+    {
+     "say": "Ada's checkout script misbehaves and sends orders in a loop. Each request reaches the gateway, which checks her token and takes her subject as the key.",
+     "active": [
+      "ada",
+      "edge",
+      "gw"
+     ],
+     "packets": [
+      {
+       "from": "ada",
+       "to": "edge",
+       "label": "POST /api/v1/orders",
+       "kind": "req"
+      },
+      {
+       "from": "edge",
+       "to": "gw",
+       "label": "Bearer … · X-Real-IP",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The checkout bucket holds three tokens and gains one every five seconds. One Lua script refills it and takes a token in a single step, so two gateway replicas can never both spend the last one.",
+     "active": [
+      "gw",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "redis",
+       "label": "bucket rate:checkout:user:ada",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "rate:checkout:user:ada",
+      "rows": {
+       "tokens": "3 → 2",
+       "rate": "0.2 / s",
+       "burst": 3
+      }
+     }
+    },
+    {
+     "say": "The first three orders pass and reach order-service.",
+     "active": [
+      "gw",
+      "order"
+     ],
+     "ok": [
+      "order"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "order",
+       "label": "POST /api/v1/orders × 3",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "rate:checkout:user:ada",
+      "rows": {
+       "tokens": "0.4",
+       "rate": "0.2 / s",
+       "burst": 3
+      }
+     }
+    },
+    {
+     "say": "The fourth finds less than one token. The gateway answers 429 with Retry-After 3 seconds, and order-service never sees the request. Other customers have their own buckets and are not affected.",
+     "active": [
+      "gw",
+      "ada"
+     ],
+     "bad": [
+      "ada"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "ada",
+       "label": "429 RATE_LIMITED · Retry-After 3",
+       "kind": "error"
+      }
+     ],
+     "badges": [
+      {
+       "node": "ada",
+       "text": "429",
+       "tone": "bad"
+      }
+     ],
+     "log": "Limits per user, per address and per hot SKU"
+    }
+   ]
+  },
+  {
+   "id": "failure",
+   "title": "When things break",
+   "summary": "Redis down, search down: degrade, don't fall over",
+   "steps": [
+    {
+     "say": "Redis stops answering. Every call to it has a fifty millisecond timeout, so requests are not stuck waiting.",
+     "active": [
+      "gw",
+      "redis"
+     ],
+     "bad": [
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "redis",
+       "label": "bucket · no answer in 50 ms",
+       "kind": "error"
+      }
+     ],
+     "badges": [
+      {
+       "node": "redis",
+       "text": "down",
+       "tone": "bad"
+      }
+     ]
+    },
+    {
+     "say": "Instead of refusing everyone, or letting everyone through during a sale, each gateway replica limits locally with a quarter of the normal policy. Browsing keeps working at five requests a second per shopper.",
+     "active": [
+      "gw",
+      "cat"
+     ],
+     "ok": [
+      "gw"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "cat",
+       "label": "allowed by local bucket",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "browse limit",
+      "rows": {
+       "normal": "20 / s, burst 40",
+       "degraded": "5 / s, burst 10 per replica"
+      }
+     },
+     "log": "gateway.ratelimit.degraded counts every such decision"
+    },
+    {
+     "say": "Now search-service goes down too. The search route has a two second time limit and a circuit breaker.",
+     "active": [
+      "gw",
+      "search"
+     ],
+     "bad": [
+      "search"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "search",
+       "label": "GET /search · refused",
+       "kind": "error"
+      }
+     ],
+     "badges": [
+      {
+       "node": "search",
+       "text": "down",
+       "tone": "bad"
+      }
+     ]
+    },
+    {
+     "say": "The fallback answers at once: 503 with code SEARCH_UNAVAILABLE and Retry-After five seconds. Once half the recent calls fail, the breaker opens and the gateway stops calling search for ten seconds.",
+     "active": [
+      "gw",
+      "ada"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "ada",
+       "label": "503 SEARCH_UNAVAILABLE",
+       "kind": "error"
+      }
+     ],
+     "state": {
+      "title": "breakers",
+      "rows": {
+       "search": "OPEN",
+       "catalog": "closed",
+       "order": "closed"
+      }
+     }
+    },
+    {
+     "say": "Product pages, the cart and checkout go on working. One failing service takes down its own feature, not the shop.",
+     "active": [
+      "ada",
+      "gw",
+      "cat",
+      "order"
+     ],
+     "ok": [
+      "cat",
+      "order"
+     ],
+     "dim": [
+      "search",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "order",
+       "label": "POST /api/v1/orders",
+       "kind": "req"
+      },
+      {
+       "from": "order",
+       "to": "ada",
+       "label": "201 Created",
+       "kind": "res"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

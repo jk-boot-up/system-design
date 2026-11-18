@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>api-gateway and NGINX edge: low-level design</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="api-gateway-and-nginx-edge-low-level-design">api-gateway and NGINX edge: low-level design<a class="headerlink" href="#api-gateway-and-nginx-edge-low-level-design" title="Permanent link">#</a></h1>
+<p>Part of the <a href="../../../design/README.html">e-commerce system design</a>. Animated version: <a href="walkthrough/index.html">walkthrough</a>.</p>
+<h2 id="1-responsibilities">1. Responsibilities<a class="headerlink" href="#1-responsibilities" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Does</th>
+<th>Does not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Terminate TLS and HTTP/2; compress; redirect plain HTTP (edge)</td>
+<td>Hold any business data</td>
+</tr>
+<tr>
+<td>Micro-cache anonymous product, category and search reads for 5 s (edge)</td>
+<td>Cache anything for signed-in customers</td>
+</tr>
+<tr>
+<td>Route each public path to one service; rewrite the staff stock path</td>
+<td>Aggregate several services into one response</td>
+</tr>
+<tr>
+<td>Validate tokens (signature, expiry, issuer, audience) and coarse roles</td>
+<td>Replace the services' own checks: each service validates again</td>
+</tr>
+<tr>
+<td>Rate-limit per user, per address and per hot SKU</td>
+<td>Decide whether a product can be sold (inventory-service does)</td>
+</tr>
+<tr>
+<td>Give each request an id that every hop logs</td>
+<td></td>
+</tr>
+<tr>
+<td>Answer 503 quickly when a service is down or slow</td>
+<td>Retry non-idempotent requests</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-guarantees">2. Guarantees<a class="headerlink" href="#2-guarantees" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Limits hold across replicas</strong></td>
+<td>Buckets live in Redis; refill and take are one Lua script using Redis's clock, so two replicas can never both spend the last token</td>
+</tr>
+<tr>
+<td><strong>Redis down is neither an outage nor a free-for-all</strong></td>
+<td>Each call to Redis has a 50 ms timeout; on any error the request is decided by an in-process bucket with a quarter of the policy (per replica). Counted in <code>gateway.ratelimit.degraded</code></td>
+</tr>
+<tr>
+<td><strong>A slow service cannot exhaust the gateway</strong></td>
+<td>Per-route TimeLimiter (2 s; 12 s for checkout) and circuit breaker (opens at 50 % failures over 20 calls, 10 s open); the fallback answers 503 + <code>Retry-After: 5</code> immediately</td>
+</tr>
+<tr>
+<td><strong>Internal APIs are never public</strong></td>
+<td><code>/internal/**</code> is denied by the gateway's rules and answered 404 by NGINX before it reaches the gateway</td>
+</tr>
+<tr>
+<td><strong>A spike on a popular page reaches the services once per 5 s</strong></td>
+<td>NGINX <code>proxy_cache_lock</code> lets one request fill a missing entry while the rest wait; <code>use_stale updating</code> serves the old copy during refresh</td>
+</tr>
+<tr>
+<td><strong>Every request is traceable</strong></td>
+<td>NGINX keeps a well-formed <code>X-Request-Id</code> or generates one; the gateway checks it again, forwards it and returns it</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-module-diagram">3. Module diagram<a class="headerlink" href="#3-module-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Module diagram diagram" src="diagrams/api-gateway--module-diagram.light.svg" data-light="diagrams/api-gateway--module-diagram.light.svg" data-dark="diagrams/api-gateway--module-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="4-interaction-diagram">4. Interaction diagram<a class="headerlink" href="#4-interaction-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Interaction diagram diagram" src="diagrams/api-gateway--interaction-diagram.light.svg" data-light="diagrams/api-gateway--interaction-diagram.light.svg" data-dark="diagrams/api-gateway--interaction-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="5-sequences">5. Sequences<a class="headerlink" href="#5-sequences" title="Permanent link">#</a></h2>
+<h3 id="checkout-limited-per-customer">Checkout limited per customer<a class="headerlink" href="#checkout-limited-per-customer" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Checkout limited per customer diagram" src="diagrams/api-gateway--checkout-limited-per-customer.light.svg" data-light="diagrams/api-gateway--checkout-limited-per-customer.light.svg" data-dark="diagrams/api-gateway--checkout-limited-per-customer.dark.svg" loading="lazy"></figure></p>
+<h3 id="redis-down">Redis down<a class="headerlink" href="#redis-down" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Redis down diagram" src="diagrams/api-gateway--redis-down.light.svg" data-light="diagrams/api-gateway--redis-down.light.svg" data-dark="diagrams/api-gateway--redis-down.dark.svg" loading="lazy"></figure></p>
+<h3 id="search-down">Search down<a class="headerlink" href="#search-down" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Search down diagram" src="diagrams/api-gateway--search-down.light.svg" data-light="diagrams/api-gateway--search-down.light.svg" data-dark="diagrams/api-gateway--search-down.dark.svg" loading="lazy"></figure></p>
+<h2 id="6-token-bucket">6. Token bucket<a class="headerlink" href="#6-token-bucket" title="Permanent link">#</a></h2>
+<p>A bucket holds at most <code>burst</code> tokens and gains <code>rate</code> tokens per second. A request takes one token or is refused.
+<code>Retry-After</code> is the time until one whole token is back: <code>ceil((1 − tokens) / rate)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th>Key</th>
+<th>Fields</th>
+<th>Expiry</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Redis hash</td>
+<td><code>rate:&lt;policy&gt;:&lt;key&gt;</code></td>
+<td><code>tokens</code> (fractional), <code>at</code> (Redis time, seconds)</td>
+<td><code>burst / rate × 2 + 1</code> s, so idle buckets disappear</td>
+</tr>
+<tr>
+<td>Local LRU map</td>
+<td><code>&lt;policy&gt;-local:&lt;key&gt;</code></td>
+<td>tokens, nanoTime</td>
+<td>at most 100 000 keys; least recently used dropped</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-scaling-and-performance">7. Scaling and performance<a class="headerlink" href="#7-scaling-and-performance" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Pods:</strong> stateless, 3–20 replicas on CPU. Non-blocking (Netty), so a slow service ties up no threads.</li>
+<li><strong>Per request:</strong> one Redis round trip per limit that applies (one, or two on cart item and checkout routes); a cached JWKS check.</li>
+<li><strong>Redis:</strong> a dedicated instance (<code>redis-ratelimit</code>) so a cache flood cannot slow admission; about 100 bytes per active key.</li>
+<li><strong>Edge:</strong> NGINX absorbs read spikes with the micro-cache; at 5 s per URL, 10 000 identical requests per second become 0.2.</li>
+</ul>
+<h2 id="8-failure-handling">8. Failure handling<a class="headerlink" href="#8-failure-handling" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Redis down or slow</td>
+<td>Local buckets at 25 %; health stays UP (the Redis health check is off on purpose)</td>
+</tr>
+<tr>
+<td>A service down</td>
+<td>Its route answers 503 within the time limit, then immediately while the breaker is open; other routes unaffected</td>
+</tr>
+<tr>
+<td>Keycloak down</td>
+<td>Tokens keep validating with cached keys; new signing keys cannot be fetched until it returns</td>
+</tr>
+<tr>
+<td>Gateway pod lost</td>
+<td>NGINX keep-alive pool retries the next pod; the PDB keeps half available during upgrades</td>
+</tr>
+<tr>
+<td>Edge pod lost</td>
+<td>The load balancer drops it; each pod has its own 512 MB cache, refilled within seconds</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-tests">9. Tests<a class="headerlink" href="#9-tests" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Kind</th>
+<th>Proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LocalTokenBucketsTest</code></td>
+<td>domain</td>
+<td>Burst then refill at the rate; correct <code>Retry-After</code>; keys independent; map bounded; scaled policy stricter</td>
+</tr>
+<tr>
+<td><code>RedisTokenBucketsFallbackTest</code></td>
+<td>adapter</td>
+<td>With Redis unreachable, exactly 10 of 15 requests pass (40 × 0.25) and every one is counted as degraded</td>
+</tr>
+<tr>
+<td><code>ArchitectureTest</code></td>
+<td>ArchUnit</td>
+<td>Pure domain; adapters independent</td>
+</tr>
+<tr>
+<td><code>GatewayContainersIT</code></td>
+<td>Redis + stub services</td>
+<td>Routes and the reviews-before-catalogue order; stock path rewrite; request id kept or replaced; 401 / 403 / <code>/internal</code> denied; guest cart; checkout limited per customer with <code>Retry-After</code> while another customer passes; a hot SKU limited across shoppers; down search answers 503 <code>SEARCH_UNAVAILABLE</code></td>
+</tr>
+<tr>
+<td><code>EdgeContainersIT</code></td>
+<td>NGINX image + stub gateway</td>
+<td>HTTP/2 over TLS; MISS then HIT with one upstream call; signed-in requests bypass the cache; HSTS; request id generated or kept and forwarded with the client address; <code>/internal</code> 404 without reaching upstream; HTTP redirects to HTTPS</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

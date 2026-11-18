@@ -1,0 +1,10 @@
+sequenceDiagram
+    participant C as Client
+    participant G as api-gateway
+    participant S as search-service
+    C->>G: GET /api/v1/search?q=trail
+    G->>S: connect
+    S--xG: refused / 2 s timeout
+    G->>G: breaker records failure (opens at 50 %)
+    G-->>C: 503 SEARCH_UNAVAILABLE, Retry-After 5
+    Note over C,G: product pages, cart and checkout keep working
