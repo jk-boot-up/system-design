@@ -1,0 +1,10 @@
+[versions]
+java = "25"
+spring-boot = "4.0.9"
+archunit = "1.5.1"
+
+[libraries]
+archunit = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

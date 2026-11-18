@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: review-service
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+  cassandra:
+    contact-points: ${CASSANDRA_CONTACT_POINTS:localhost:9042}
+    local-datacenter: ${CASSANDRA_DC:datacenter1}
+    connection:
+      connect-timeout: 5s
+      init-query-timeout: 10s
+    request:
+      timeout: 2s
+      consistency: local_quorum
+      serial-consistency: local_serial
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    listener:
+      ack-mode: record
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER:http://localhost:8180/realms/shop}
+server:
+  port: ${PORT:8087}
+  shutdown: graceful
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  observations:
+    key-values:
+      service: review-service
+review:
+  cassandra:
+    # Production: {'class': 'NetworkTopologyStrategy', 'dc1': 3}
+    replication: "${CASSANDRA_REPLICATION:{'class': 'SimpleStrategy', 'replication_factor': 1}}"
