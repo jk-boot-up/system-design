@@ -143,10 +143,10 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>POST</td>
-<td><code>/api/v1/admin/products/{id}/images/{objectKey}/confirm</code></td>
+<td><code>/api/v1/admin/products/{id}/images/confirm</code></td>
 <td>staff</td>
-<td></td>
-<td><code>200 Product</code> · <code>422</code> if the object is missing</td>
+<td><code>{objectKey}</code></td>
+<td><code>200 Product</code> · <code>422 IMAGE_MISSING</code> if nothing was uploaded</td>
 </tr>
 <tr>
 <td>POST</td>

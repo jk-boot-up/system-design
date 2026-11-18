@@ -1,0 +1,7 @@
+stateDiagram-v2
+    [*] --> DRAFT
+    [*] --> ACTIVE: created ready to sell
+    DRAFT --> ACTIVE: publish (price above zero)
+    DRAFT --> ARCHIVED
+    ACTIVE --> ARCHIVED: withdraw
+    ARCHIVED --> DRAFT: bring back to edit

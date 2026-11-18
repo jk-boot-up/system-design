@@ -1,0 +1,46 @@
+flowchart TB
+    subgraph web[adapter.web]
+        PC[ProductController<br/>public reads]
+        AC[AdminController<br/>staff, ETag / If-Match]
+        IC[InternalController<br/>prices for cart]
+    end
+    subgraph app[application]
+        CS[CatalogService]
+        subgraph ports[port]
+            PR[[ProductRepository]]
+            CR[[CategoryRepository]]
+            PE[[ProductEvents]]
+            PCa[[ProductCache]]
+            IS[[ImageStorage]]
+            TX[[Transactions]]
+        end
+    end
+    subgraph dom[domain]
+        P[Product<br/>versioned]
+        PD[ProductDetails]
+        PS[ProductStatus]
+        C[Category]
+        M[Money]
+    end
+    subgraph pers[adapter.persistence]
+        JP[JdbcProductRepository<br/>UPDATE … WHERE version = ?]
+        JC[JdbcCategoryRepository]
+        OE[OutboxProductEvents]
+    end
+    subgraph redis[adapter.redis]
+        RC[RedisProductCache<br/>product:id, 10 min]
+    end
+    subgraph storage[adapter.storage]
+        MS[MinioImageStorage<br/>presigned PUT, stat]
+    end
+    subgraph msg[adapter.messaging]
+        OR[OutboxRelay<br/>SKIP LOCKED]
+    end
+    PC & AC & IC --> CS
+    CS --> dom
+    CS --> PR & CR & PE & PCa & IS & TX
+    PR -.-> JP
+    CR -.-> JC
+    PE -.-> OE
+    PCa -.-> RC
+    IS -.-> MS

@@ -1,0 +1,541 @@
+{
+ "title": "catalog-service",
+ "subtitle": "Products, conditional edits, cache-aside, direct uploads",
+ "nodes": [
+  {
+   "id": "staffA",
+   "label": "Staff A",
+   "kind": "client",
+   "tech": "merchandiser",
+   "x": 130,
+   "y": 90
+  },
+  {
+   "id": "staffB",
+   "label": "Staff B",
+   "kind": "client",
+   "tech": "merchandiser",
+   "x": 130,
+   "y": 290
+  },
+  {
+   "id": "shop",
+   "label": "Shopper",
+   "kind": "client",
+   "tech": "product page",
+   "x": 130,
+   "y": 500
+  },
+  {
+   "id": "cat",
+   "label": "catalog-service",
+   "kind": "service",
+   "tech": "Java 25",
+   "x": 470,
+   "y": 290
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL",
+   "kind": "db",
+   "tech": "products · outbox",
+   "x": 820,
+   "y": 90
+  },
+  {
+   "id": "redis",
+   "label": "Redis",
+   "kind": "cache",
+   "tech": "product:id · 10 min",
+   "x": 820,
+   "y": 290
+  },
+  {
+   "id": "s3",
+   "label": "MinIO",
+   "kind": "storage",
+   "tech": "product-images",
+   "x": 470,
+   "y": 500
+  },
+  {
+   "id": "kafka",
+   "label": "Kafka",
+   "kind": "queue",
+   "tech": "catalog.events",
+   "x": 820,
+   "y": 500
+  },
+  {
+   "id": "search",
+   "label": "search-service",
+   "kind": "service",
+   "tech": "index",
+   "x": 1150,
+   "y": 500
+  }
+ ],
+ "edges": [
+  {
+   "from": "staffA",
+   "to": "cat"
+  },
+  {
+   "from": "staffB",
+   "to": "cat"
+  },
+  {
+   "from": "shop",
+   "to": "cat"
+  },
+  {
+   "from": "cat",
+   "to": "db"
+  },
+  {
+   "from": "cat",
+   "to": "redis"
+  },
+  {
+   "from": "cat",
+   "to": "s3"
+  },
+  {
+   "from": "staffA",
+   "to": "s3",
+   "dashed": true
+  },
+  {
+   "from": "db",
+   "to": "kafka",
+   "dashed": true
+  },
+  {
+   "from": "kafka",
+   "to": "search"
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "etag",
+   "title": "Two editors, one product",
+   "summary": "No lost update: 412 for the stale write",
+   "steps": [
+    {
+     "say": "Two merchandisers open the same product, Trail Runner 2, priced 89 euros 90. Both receive version 3 as the entity tag.",
+     "active": [
+      "staffA",
+      "staffB",
+      "cat"
+     ],
+     "packets": [
+      {
+       "from": "cat",
+       "to": "staffA",
+       "label": "200 · ETag \"3\"",
+       "kind": "res"
+      },
+      {
+       "from": "cat",
+       "to": "staffB",
+       "label": "200 · ETag \"3\"",
+       "kind": "res"
+      }
+     ],
+     "state": {
+      "title": "Product 42",
+      "rows": {
+       "price": "89.90 €",
+       "version": 3
+      }
+     }
+    },
+    {
+     "say": "Staff A lowers the price to 79 euros 90 and sends the tag back in the If-Match header.",
+     "active": [
+      "staffA",
+      "cat"
+     ],
+     "packets": [
+      {
+       "from": "staffA",
+       "to": "cat",
+       "label": "PUT 79.90 · If-Match \"3\"",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The update only touches the row if its version is still 3. It is, so one row changes, the version becomes 4, and the outbox row is written in the same transaction.",
+     "active": [
+      "cat",
+      "db"
+     ],
+     "ok": [
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "cat",
+       "to": "db",
+       "label": "UPDATE … WHERE version = 3 → 1 row",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Product 42",
+      "rows": {
+       "price": "79.90 €",
+       "version": 4,
+       "outbox": "ProductChanged v4"
+      }
+     }
+    },
+    {
+     "say": "Only after the commit is the cached copy deleted, so no reader can put the old price back from an open transaction.",
+     "active": [
+      "cat",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "cat",
+       "to": "redis",
+       "label": "DEL product:42",
+       "kind": "req"
+      }
+     ],
+     "log": "Cache evicted after commit"
+    },
+    {
+     "say": "Staff B, still holding version 3, saves a price of 99 euros 90. The version no longer matches, so the service refuses with 412 Precondition Failed. Staff B reloads and sees A's change first.",
+     "active": [
+      "staffB",
+      "cat"
+     ],
+     "bad": [
+      "staffB"
+     ],
+     "packets": [
+      {
+       "from": "cat",
+       "to": "staffB",
+       "label": "412 VERSION_MISMATCH",
+       "kind": "error"
+      }
+     ],
+     "badges": [
+      {
+       "node": "staffB",
+       "text": "412",
+       "tone": "bad"
+      }
+     ],
+     "state": {
+      "title": "Product 42",
+      "rows": {
+       "price": "79.90 €",
+       "version": 4
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "read",
+   "title": "Shoppers read through the cache",
+   "summary": "Cache-aside, Redis optional",
+   "steps": [
+    {
+     "say": "A shopper opens the product page. The service looks in Redis first.",
+     "active": [
+      "shop",
+      "cat",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "shop",
+       "to": "cat",
+       "label": "GET /products/42",
+       "kind": "req"
+      },
+      {
+       "from": "cat",
+       "to": "redis",
+       "label": "GET product:42",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Cache",
+      "rows": {
+       "product:42": "(empty)"
+      }
+     }
+    },
+    {
+     "say": "It is a miss, so the product and its images are read from PostgreSQL, and a copy is stored in Redis for ten minutes.",
+     "active": [
+      "cat",
+      "db",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "cat",
+       "to": "db",
+       "label": "SELECT product + images",
+       "kind": "req"
+      },
+      {
+       "from": "cat",
+       "to": "redis",
+       "label": "SET … EX 600",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Cache",
+      "rows": {
+       "product:42": "v4 · 10 min"
+      }
+     }
+    },
+    {
+     "say": "The next thousand shoppers are served from Redis. PostgreSQL is not touched.",
+     "active": [
+      "shop",
+      "cat",
+      "redis"
+     ],
+     "ok": [
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "cat",
+       "to": "shop",
+       "label": "200 · ETag \"4\"",
+       "kind": "res"
+      }
+     ],
+     "badges": [
+      {
+       "node": "redis",
+       "text": "hit",
+       "tone": "ok"
+      }
+     ]
+    },
+    {
+     "say": "If Redis fails, the error is logged and treated as a miss. Pages still load, straight from PostgreSQL.",
+     "active": [
+      "cat",
+      "db"
+     ],
+     "bad": [
+      "redis"
+     ],
+     "dim": [
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "cat",
+       "to": "db",
+       "label": "SELECT (fallback)",
+       "kind": "req"
+      }
+     ],
+     "log": "Redis down: reads fall through"
+    }
+   ]
+  },
+  {
+   "id": "image",
+   "title": "Upload an image",
+   "summary": "Bytes go straight to storage",
+   "steps": [
+    {
+     "say": "Staff A wants to add a photo. The browser asks the catalog for permission to upload a 120 kilobyte WebP image.",
+     "active": [
+      "staffA",
+      "cat"
+     ],
+     "packets": [
+      {
+       "from": "staffA",
+       "to": "cat",
+       "label": "POST /images {image/webp, 120 KB}",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The catalog checks the type, the size and the ten-image limit, then signs an upload URL that is valid for fifteen minutes.",
+     "active": [
+      "cat",
+      "s3"
+     ],
+     "packets": [
+      {
+       "from": "cat",
+       "to": "staffA",
+       "label": "201 uploadUrl · objectKey",
+       "kind": "res"
+      }
+     ],
+     "state": {
+      "title": "Upload",
+      "rows": {
+       "key": "products/42/…webp",
+       "valid": "15 min"
+      }
+     }
+    },
+    {
+     "say": "The browser sends the file directly to MinIO. The catalog's threads and memory are never used for the bytes.",
+     "active": [
+      "staffA",
+      "s3"
+     ],
+     "ok": [
+      "s3"
+     ],
+     "packets": [
+      {
+       "from": "staffA",
+       "to": "s3",
+       "label": "PUT file (signed)",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The browser confirms. The catalog checks that the object really exists, then adds it to the product, raising the version to 5 and writing the outbox event.",
+     "active": [
+      "cat",
+      "s3",
+      "db"
+     ],
+     "packets": [
+      {
+       "from": "cat",
+       "to": "s3",
+       "label": "stat → 120 KB",
+       "kind": "req"
+      },
+      {
+       "from": "cat",
+       "to": "db",
+       "label": "add image · v5 · outbox",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Product 42",
+      "rows": {
+       "images": 1,
+       "version": 5
+      }
+     }
+    },
+    {
+     "say": "Confirming a key that was never uploaded is refused with 422 Image Missing, so the product never points at nothing.",
+     "active": [
+      "cat"
+     ],
+     "bad": [
+      "staffA"
+     ],
+     "packets": [
+      {
+       "from": "cat",
+       "to": "staffA",
+       "label": "422 IMAGE_MISSING",
+       "kind": "error"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "event",
+   "title": "Every change reaches search",
+   "summary": "Outbox → Kafka → index",
+   "steps": [
+    {
+     "say": "Each committed change left a row in the outbox table, in the same transaction as the product row.",
+     "active": [
+      "db"
+     ],
+     "state": {
+      "title": "Outbox",
+      "rows": {
+       "v4": "unpublished",
+       "v5": "unpublished"
+      }
+     }
+    },
+    {
+     "say": "The relay in every replica takes a batch with FOR UPDATE SKIP LOCKED, so replicas never take the same rows, and sends them to Kafka keyed by product id.",
+     "active": [
+      "cat",
+      "db",
+      "kafka"
+     ],
+     "packets": [
+      {
+       "from": "db",
+       "to": "kafka",
+       "label": "ProductChanged v4, v5",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "Once Kafka acknowledges, the rows are marked published.",
+     "ok": [
+      "kafka"
+     ],
+     "active": [
+      "db"
+     ],
+     "state": {
+      "title": "Outbox",
+      "rows": {
+       "v4": "published",
+       "v5": "published"
+      }
+     }
+    },
+    {
+     "say": "search-service receives the whole product with its catalog version. It keeps only the newest version, so a late or repeated event can never overwrite newer data.",
+     "active": [
+      "kafka",
+      "search"
+     ],
+     "ok": [
+      "search"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "search",
+       "label": "ProductChanged (catalogVersion 5)",
+       "kind": "event"
+      }
+     ],
+     "badges": [
+      {
+       "node": "search",
+       "text": "v5",
+       "tone": "ok"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

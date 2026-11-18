@@ -1,0 +1,18 @@
+sequenceDiagram
+    autonumber
+    participant A as Staff A
+    participant B as Staff B
+    participant C as catalog-service
+    participant DB as PostgreSQL
+    participant R as Redis
+    A->>C: GET /admin/products/42
+    C-->>A: 200 price 89.90 · ETag "3"
+    B->>C: GET /admin/products/42
+    C-->>B: 200 price 89.90 · ETag "3"
+    A->>C: PUT price 79.90 · If-Match "3"
+    C->>DB: BEGIN · UPDATE … SET version = 4 WHERE id = 42 AND version = 3 → 1 row · INSERT outbox · COMMIT
+    C->>R: DEL product:42 (after commit)
+    C-->>A: 200 · ETag "4"
+    B->>C: PUT price 99.90 · If-Match "3"
+    C->>DB: version is 4, not 3
+    C-->>B: 412 VERSION_MISMATCH (reload and apply again)

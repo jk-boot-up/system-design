@@ -1,0 +1,16 @@
+sequenceDiagram
+    autonumber
+    participant S as Shopper
+    participant C as catalog-service
+    participant R as Redis
+    participant DB as PostgreSQL
+    S->>C: GET /api/v1/products/42
+    C->>R: GET product:42
+    R-->>C: (miss)
+    C->>DB: SELECT product + images
+    C->>R: SET product:42 … EX 600
+    C-->>S: 200 · ETag "4" · Cache-Control max-age=60
+    S->>C: GET /api/v1/products/42 (another shopper)
+    C->>R: GET product:42
+    R-->>C: hit
+    C-->>S: 200 (no database read)

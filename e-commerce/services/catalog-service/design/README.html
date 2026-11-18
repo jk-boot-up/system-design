@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>catalog-service: low-level design</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="catalog-service-low-level-design">catalog-service: low-level design<a class="headerlink" href="#catalog-service-low-level-design" title="Permanent link">#</a></h1>
+<p>Part of the <a href="../../../design/README.html">e-commerce system design</a>. Animated version: <a href="walkthrough/index.html">walkthrough</a>.</p>
+<h2 id="1-responsibilities">1. Responsibilities<a class="headerlink" href="#1-responsibilities" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Does</th>
+<th>Does not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Own products, categories, prices, attributes and image references</td>
+<td>Search or filter across products (search-service does)</td>
+</tr>
+<tr>
+<td>Let staff edit products without overwriting each other's changes</td>
+<td>Hold stock (inventory-service does)</td>
+</tr>
+<tr>
+<td>Sign short-lived upload URLs; record images once they exist</td>
+<td>Receive image bytes: they go straight to object storage</td>
+</tr>
+<tr>
+<td>Publish every change as <code>catalog.ProductChanged</code></td>
+<td>Call any other service</td>
+</tr>
+<tr>
+<td>Answer price lookups for carts</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-guarantees">2. Guarantees<a class="headerlink" href="#2-guarantees" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>No lost updates</strong></td>
+<td>Every product has a <code>version</code>. Reads return it as a strong ETag; <code>PUT</code> requires <code>If-Match</code> (428 without it) and runs <code>UPDATE … WHERE id = ? AND version = ?</code>. Zero rows updated → 412</td>
+</tr>
+<tr>
+<td><strong>A change and its event are never separated</strong></td>
+<td>The product row and the outbox row are written in one transaction; the relay publishes afterwards (at least once)</td>
+</tr>
+<tr>
+<td><strong>Consumers can order events</strong></td>
+<td><code>ProductChanged</code> carries the whole product and its <code>catalogVersion</code>; search keeps only the highest version</td>
+</tr>
+<tr>
+<td><strong>The cache never outlives a committed change by more than an instant</strong></td>
+<td>Cache-aside: entries are evicted <strong>after</strong> the transaction commits, and expire after 10 minutes in any case</td>
+</tr>
+<tr>
+<td><strong>Redis is optional</strong></td>
+<td>Any cache error is logged and read as a miss; reads fall through to PostgreSQL</td>
+</tr>
+<tr>
+<td><strong>Only real uploads are attached</strong></td>
+<td>Confirm checks the object exists in storage (422 <code>IMAGE_MISSING</code> otherwise), its key belongs to the product, and its size is at most 5 MB</td>
+</tr>
+<tr>
+<td><strong>Shoppers see only ACTIVE products</strong></td>
+<td>The public API answers 404 for drafts and archived products</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-module-diagram">3. Module diagram<a class="headerlink" href="#3-module-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Module diagram diagram" src="diagrams/catalog-service--module-diagram.light.svg" data-light="diagrams/catalog-service--module-diagram.light.svg" data-dark="diagrams/catalog-service--module-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="4-interaction-diagram">4. Interaction diagram<a class="headerlink" href="#4-interaction-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Interaction diagram diagram" src="diagrams/catalog-service--interaction-diagram.light.svg" data-light="diagrams/catalog-service--interaction-diagram.light.svg" data-dark="diagrams/catalog-service--interaction-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="5-sequences">5. Sequences<a class="headerlink" href="#5-sequences" title="Permanent link">#</a></h2>
+<h3 id="edit-a-product-without-overwriting-a-colleague">Edit a product without overwriting a colleague<a class="headerlink" href="#edit-a-product-without-overwriting-a-colleague" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Edit a product without overwriting a colleague diagram" src="diagrams/catalog-service--edit-a-product-without-overwriting-a-colleague.light.svg" data-light="diagrams/catalog-service--edit-a-product-without-overwriting-a-colleague.light.svg" data-dark="diagrams/catalog-service--edit-a-product-without-overwriting-a-colleague.dark.svg" loading="lazy"></figure></p>
+<h3 id="read-a-product-cache-aside">Read a product (cache-aside)<a class="headerlink" href="#read-a-product-cache-aside" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Read a product (cache-aside) diagram" src="diagrams/catalog-service--read-a-product-cache-aside.light.svg" data-light="diagrams/catalog-service--read-a-product-cache-aside.light.svg" data-dark="diagrams/catalog-service--read-a-product-cache-aside.dark.svg" loading="lazy"></figure></p>
+<h3 id="upload-an-image">Upload an image<a class="headerlink" href="#upload-an-image" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Upload an image diagram" src="diagrams/catalog-service--upload-an-image.light.svg" data-light="diagrams/catalog-service--upload-an-image.light.svg" data-dark="diagrams/catalog-service--upload-an-image.dark.svg" loading="lazy"></figure></p>
+<h2 id="6-state-diagram">6. State diagram<a class="headerlink" href="#6-state-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="State diagram diagram" src="diagrams/catalog-service--state-diagram.light.svg" data-light="diagrams/catalog-service--state-diagram.light.svg" data-dark="diagrams/catalog-service--state-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="7-data-model-postgresql">7. Data model (PostgreSQL)<a class="headerlink" href="#7-data-model-postgresql" title="Permanent link">#</a></h2>
+<p>Schema: <a href="../src/main/resources/db/migration/V1__catalog_schema.sql">V1__catalog_schema.sql</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Key</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>categories</code></td>
+<td><code>id</code></td>
+<td><code>parent_id</code> forms the tree; <code>slug</code> unique</td>
+</tr>
+<tr>
+<td><code>products</code></td>
+<td><code>id</code></td>
+<td><code>sku</code> unique; <code>attributes</code> JSONB with a GIN index (<code>jsonb_path_ops</code>); partial index on <code>category_id</code> for ACTIVE products; <code>version</code> for optimistic locking</td>
+</tr>
+<tr>
+<td><code>product_images</code></td>
+<td><code>(product_id, position)</code></td>
+<td>Object keys in MinIO; deleted with the product</td>
+</tr>
+<tr>
+<td><code>outbox</code></td>
+<td><code>id</code> (UUIDv7, the event id)</td>
+<td>Partial index on unpublished rows; published rows purged after 7 days</td>
+</tr>
+<tr>
+<td><code>shedlock</code></td>
+<td><code>name</code></td>
+<td>One replica runs the purge job</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-scaling-and-performance">8. Scaling and performance<a class="headerlink" href="#8-scaling-and-performance" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Pods:</strong> stateless, 2–10 replicas. Reads dominate (product pages); writes are staff edits, a few per second at most.</li>
+<li><strong>Reads:</strong> a cache hit is one Redis <code>GET</code>; the 60-second <code>Cache-Control</code> lets the edge cache popular products too. A miss is two
+  indexed queries (product, images).</li>
+<li><strong>Price lookups:</strong> cart-service batches up to 100 SKUs into one <code>sku IN (…)</code> query and caches the answers for 30 s itself.</li>
+<li><strong>Outbox relay:</strong> every replica polls every 100 ms; <code>FOR UPDATE SKIP LOCKED</code> gives each a separate batch of up to 500 rows.</li>
+<li><strong>Images:</strong> bytes never pass through the service, so uploads do not consume its threads or memory.</li>
+</ul>
+<h2 id="9-failure-handling">9. Failure handling<a class="headerlink" href="#9-failure-handling" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Redis down</td>
+<td>Cache reads and evictions log a warning; reads go to PostgreSQL. Stale entries left by a failed eviction expire within 10 minutes</td>
+</tr>
+<tr>
+<td>Kafka down</td>
+<td>Writes still succeed; outbox rows wait and are published when Kafka returns (search is behind, not wrong)</td>
+</tr>
+<tr>
+<td>MinIO down</td>
+<td>Upload start and confirm fail with 500; products and reads are unaffected</td>
+</tr>
+<tr>
+<td>Upload never happens</td>
+<td>Nothing is recorded; the signed URL expires after 15 minutes</td>
+</tr>
+<tr>
+<td>Two editors at once</td>
+<td>One gets 200, the other 412 and must reload</td>
+</tr>
+<tr>
+<td>Crash after publish, before marking</td>
+<td>The relay re-sends the batch; consumers ignore duplicates by event id and older versions by <code>catalogVersion</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="10-tests">10. Tests<a class="headerlink" href="#10-tests" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Kind</th>
+<th>Proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ProductTest</code></td>
+<td>domain</td>
+<td>Versions go up by one per change; lifecycle transitions; price rules; SKU and slug formats; images ordered, idempotent, limited to 10</td>
+</tr>
+<tr>
+<td><code>CatalogServiceTest</code></td>
+<td>application</td>
+<td>Create writes product and event in one transaction; cache hits avoid the database; drafts hidden from shoppers; eviction happens after commit; a stale version is rejected with no event; a write that commits between the check and the update is still caught; upload confirmed only when the object exists</td>
+</tr>
+<tr>
+<td><code>HexagonalArchitectureTest</code></td>
+<td>ArchUnit</td>
+<td>Layering</td>
+</tr>
+<tr>
+<td><code>CatalogContainersIT</code></td>
+<td>PostgreSQL + Redis + Kafka + S3 (RustFS)</td>
+<td>428 without If-Match, 200 with the current ETag, 412 with a stale one; cache entry evicted; events with versions 1 and 2 on Kafka; real presigned upload to MinIO then confirm; price lookup; 401 and 403 for non-staff; SKU uniqueness</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

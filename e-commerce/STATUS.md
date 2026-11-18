@@ -3,7 +3,7 @@
 Current progress of the e-commerce platform. Updated with every change of state; the detailed work lists are in
 [design/DESIGN-PLAN.md](design/DESIGN-PLAN.md) and [design/IMPLEMENTATION-PLAN.md](design/IMPLEMENTATION-PLAN.md).
 
-**Last updated:** 2026-11-01 · **Branch:** `system-design-e-commerce-draft-1` (fast-forwarded to `main`)
+**Last updated:** 2026-11-18 · **Branch:** `system-design-e-commerce-draft-1` (fast-forwarded to `main`)
 
 ## At a glance
 
@@ -12,8 +12,8 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Specification and plans | ██████████ 100% | SPEC, PLAN, design plan, implementation plan, prerequisites | Keep in step with changes |
 | System design documents | ███████░░░ 70% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, 11 ADRs | System/module/service diagrams; security, observability, capacity, runbooks |
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
-| Services (11) | █████░░░░░ 45% | inventory, order, payment, cart complete | catalog-service, then search, review, gateway, notification, recommendation, analytics |
-| Walkthroughs | ████░░░░░░ 40% | inventory, order, payment, cart | Each new service, system walkthrough |
+| Services (11) | █████░░░░░ 55% | inventory, order, payment, cart, catalog complete | search-service, then review, gateway, notification, recommendation, analytics |
+| Walkthroughs | █████░░░░░ 50% | inventory, order, payment, cart, catalog | Each new service, system walkthrough |
 | Local stack and Kubernetes overlays | ░░░░░░░░░░ 0% | inventory-service `k8s/` base | Compose stack, overlays |
 | End-to-end and performance tests | ░░░░░░░░░░ 0% | — | After checkout works end to end |
 
@@ -25,7 +25,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | order-service | ✅ | ✅ 29 passing (incl. PostgreSQL + Kafka + HTTP) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | payment-service | ✅ | ✅ 17 passing (incl. PostgreSQL + Kafka) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | cart-service | ✅ | ✅ 16 passing (incl. Redis + Kafka) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| catalog-service | ⏳ | | | | | | |
+| catalog-service | ✅ | ✅ 22 passing (incl. PostgreSQL + Redis + Kafka + S3) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | search-service | ⏳ | | | | | | |
 | review-service | ⏳ | | | | | | |
 | api-gateway + NGINX | ⏳ | | | | | | |
@@ -34,6 +34,10 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | analytics (ClickHouse) | ⏳ | | | | | | |
 
 ## Recently completed
+
+* catalog-service: products and categories (PostgreSQL + JSONB), conditional edits with ETag / If-Match (428 without, 412 when
+  stale, proved against a write that commits between the check and the update), Redis cache-aside evicted after commit, presigned
+  uploads straight to S3 storage with confirm-only-if-present, ProductChanged outbox carrying the catalogue version.
 
 * cart-service: Redis carts with atomic line + expiry writes, guest merge on sign-in, prices re-read from the catalogue with a
   degraded "pricing pending" mode, checkout snapshot that refuses stale prices, cart emptied once per confirmed order.
@@ -53,7 +57,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* catalog-service: products and categories (PostgreSQL + JSONB), ETag concurrency, Redis cache-aside, presigned MinIO uploads, ProductChanged outbox.
+* search-service: OpenSearch index behind an alias, ProductChanged and StockChanged consumers with external versioning, faceted search.
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

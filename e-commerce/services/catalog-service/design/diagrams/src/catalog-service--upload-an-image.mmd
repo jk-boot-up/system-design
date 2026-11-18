@@ -1,0 +1,14 @@
+sequenceDiagram
+    autonumber
+    participant B as Staff browser
+    participant C as catalog-service
+    participant S3 as MinIO
+    participant DB as PostgreSQL
+    B->>C: POST /admin/products/42/images {image/webp, 120 KB}
+    C->>C: check type and size, ≤ 10 images
+    C-->>B: 201 {uploadUrl (15 min), objectKey products/42/…webp}
+    B->>S3: PUT file (presigned, Content-Type image/webp)
+    B->>C: POST /admin/products/42/images/confirm {objectKey}
+    C->>S3: stat object → exists, 120 KB
+    C->>DB: add image, version + 1, outbox ProductChanged
+    C-->>B: 200 product with image · ETag "5"

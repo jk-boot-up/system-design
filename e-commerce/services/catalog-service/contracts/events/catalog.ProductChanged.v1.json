@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jkbootup.dev/e-commerce/events/catalog.ProductChanged.v1.json",
+  "title": "catalog.ProductChanged v1",
+  "description": "Published on topic catalog.events (key = product id) on every create, update, status change or image change. Carries the whole product; consumers keep the highest catalogVersion they have seen and ignore older events.",
+  "type": "object",
+  "required": ["eventId", "type", "version", "occurredAt", "aggregateId", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "type": { "const": "catalog.ProductChanged" },
+    "version": { "const": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "aggregateId": { "type": "string", "format": "uuid", "description": "the product id" },
+    "traceparent": { "type": "string" },
+    "payload": {
+      "type": "object",
+      "required": ["productId", "sku", "name", "categorySlug", "brand", "price", "attributes", "status", "imageKeys", "catalogVersion"],
+      "properties": {
+        "productId": { "type": "string", "format": "uuid" },
+        "sku": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "categorySlug": { "type": "string" },
+        "brand": { "type": "string" },
+        "price": {
+          "type": "object", "required": ["amount", "currency"],
+          "properties": { "amount": { "type": "string", "pattern": "^\\d+\\.\\d{2}$" }, "currency": { "type": "string", "pattern": "^[A-Z]{3}$" } }
+        },
+        "attributes": { "type": "object" },
+        "status": { "enum": ["DRAFT", "ACTIVE", "ARCHIVED"] },
+        "imageKeys": { "type": "array", "items": { "type": "string" } },
+        "catalogVersion": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

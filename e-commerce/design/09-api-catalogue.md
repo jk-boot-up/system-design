@@ -27,7 +27,7 @@ The OpenAPI documents live with each service: `services/<service>/contracts/open
 | POST | `/api/v1/admin/products` | staff | `ProductCreate` | `201 Product` + `ETag` |
 | PUT | `/api/v1/admin/products/{id}` | staff | `ProductUpdate` + `If-Match` | `200 Product` · `412` · `428` |
 | POST | `/api/v1/admin/products/{id}/images` | staff | `{contentType, sizeBytes}` | `201 {uploadUrl, objectKey, expiresAt}` |
-| POST | `/api/v1/admin/products/{id}/images/{objectKey}/confirm` | staff | | `200 Product` · `422` if the object is missing |
+| POST | `/api/v1/admin/products/{id}/images/confirm` | staff | `{objectKey}` | `200 Product` · `422 IMAGE_MISSING` if nothing was uploaded |
 | POST | `/api/v1/admin/categories` | staff | `{slug, name, parentId?}` | `201 Category` |
 
 ```json

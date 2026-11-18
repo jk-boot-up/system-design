@@ -1,0 +1,99 @@
+openapi: 3.1.0
+info:
+  title: catalog-service API
+  version: 1.0.0
+  description: >
+    Public product and category reads (through the gateway), the staff API for products, categories and images, and the
+    internal price lookup for cart-service. Staff updates are conditional: send the ETag you read in If-Match.
+paths:
+  /api/v1/products/{id}:
+    get:
+      operationId: getProduct
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '200': { $ref: '#/components/responses/Product' }, '404': { $ref: '#/components/responses/Problem' } }
+  /api/v1/categories:
+    get:
+      operationId: listCategories
+      responses: { '200': { description: Category tree, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Category' } } } } } }
+  /api/v1/admin/products:
+    post:
+      operationId: createProduct
+      security: [ { bearer: [staff] } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductWrite' } } } }
+      responses: { '201': { $ref: '#/components/responses/Product' }, '400': { $ref: '#/components/responses/Problem' }, '409': { description: SKU_TAKEN }, '422': { description: UNKNOWN_CATEGORY } }
+  /api/v1/admin/products/{id}:
+    get:
+      operationId: getProductForStaff
+      security: [ { bearer: [staff] } ]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '200': { $ref: '#/components/responses/Product' }, '404': { $ref: '#/components/responses/Problem' } }
+    put:
+      operationId: updateProduct
+      security: [ { bearer: [staff] } ]
+      parameters: [ { $ref: '#/components/parameters/Id' }, { name: If-Match, in: header, required: true, schema: { type: string, example: '"3"' } } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductWrite' } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Product' }
+        '409': { description: INVALID_TRANSITION }
+        '412': { description: 'VERSION_MISMATCH: someone else changed the product; reload and retry' }
+        '428': { description: 'PRECONDITION_REQUIRED: If-Match missing' }
+  /api/v1/admin/products/{id}/images:
+    post:
+      operationId: startImageUpload
+      security: [ { bearer: [staff] } ]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [contentType, sizeBytes], properties: { contentType: { enum: [image/jpeg, image/png, image/webp] }, sizeBytes: { type: integer, minimum: 1, maximum: 5242880 } } } } } }
+      responses:
+        '201': { description: 'PUT the file to uploadUrl with the same Content-Type before expiresAt', content: { application/json: { schema: { type: object, properties: { uploadUrl: { type: string }, objectKey: { type: string }, expiresAt: { type: string, format: date-time } } } } } }
+  /api/v1/admin/products/{id}/images/confirm:
+    post:
+      operationId: confirmImage
+      security: [ { bearer: [staff] } ]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [objectKey], properties: { objectKey: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Product' }, '422': { description: 'IMAGE_MISSING: nothing uploaded under that key' } }
+  /api/v1/admin/categories:
+    post:
+      operationId: createCategory
+      security: [ { bearer: [staff] } ]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [slug, name], properties: { slug: { type: string }, name: { type: string }, parentId: { type: string, format: uuid } } } } } }
+      responses: { '201': { description: Created }, '409': { description: SLUG_TAKEN } }
+  /internal/products/prices:
+    post:
+      operationId: prices
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [skus], properties: { skus: { type: array, maxItems: 100, items: { type: string } } } } } } }
+      responses:
+        '200': { description: 'Known SKUs only', content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, properties: { sku: { type: string }, name: { type: string }, price: { $ref: '#/components/schemas/Money' }, status: { type: string } } } } } } } } }
+components:
+  securitySchemes: { bearer: { type: http, scheme: bearer, bearerFormat: JWT } }
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Product: { description: 'Product, with its version as a strong ETag', headers: { ETag: { schema: { type: string } } }, content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } } }
+    Problem: { description: Problem details, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  schemas:
+    Money: { type: object, required: [amount, currency], properties: { amount: { type: string, example: '89.90' }, currency: { type: string, example: EUR } } }
+    ProductWrite:
+      type: object
+      required: [name, categoryId, brand, price]
+      properties:
+        sku: { type: string, description: 'Create only; 3-40 of A-Z, 0-9, dash' }
+        name: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 10000 }
+        categoryId: { type: string, format: uuid }
+        brand: { type: string, maxLength: 100 }
+        price: { $ref: '#/components/schemas/Money' }
+        attributes: { type: object, maxProperties: 50 }
+        status: { enum: [DRAFT, ACTIVE, ARCHIVED] }
+    Product:
+      allOf:
+        - $ref: '#/components/schemas/ProductWrite'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            images: { type: array, items: { type: object, properties: { url: { type: string }, position: { type: integer } } } }
+            version: { type: integer }
+    Category:
+      type: object
+      properties: { id: { type: string, format: uuid }, slug: { type: string }, name: { type: string }, children: { type: array, items: { $ref: '#/components/schemas/Category' } } }
+    Problem: { type: object, properties: { title: { type: string }, status: { type: integer }, detail: { type: string }, code: { type: string } } }

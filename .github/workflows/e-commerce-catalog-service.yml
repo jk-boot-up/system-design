@@ -1,0 +1,28 @@
+name: e-commerce / catalog-service
+
+on:
+  push:
+    paths: ['e-commerce/services/catalog-service/**', '.github/workflows/e-commerce-catalog-service.yml']
+  pull_request:
+    paths: ['e-commerce/services/catalog-service/**', '.github/workflows/e-commerce-catalog-service.yml']
+
+defaults:
+  run:
+    working-directory: e-commerce/services/catalog-service
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '25' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit, architecture and container tests (PostgreSQL, Redis, Kafka, MinIO)
+        run: ./gradlew build -PwithContainers
+      - name: Container image
+        run: docker build -t e-commerce/catalog-service:${{ github.sha }} .
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: catalog-service-test-reports, path: e-commerce/services/catalog-service/build/reports }

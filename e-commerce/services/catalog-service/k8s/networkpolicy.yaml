@@ -1,0 +1,17 @@
+# Callers: the gateway (public and staff API) and cart-service (prices). Egress: PostgreSQL, Redis, MinIO, Kafka, Keycloak.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: catalog-service
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: api-gateway } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: cart-service } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-platform } }
+      ports: [ { port: 8081 } ]
+  egress:
+    - to: [ { namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-platform } } } ]
+    - ports: [ { port: 53, protocol: UDP }, { port: 53, protocol: TCP } ]

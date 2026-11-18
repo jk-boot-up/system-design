@@ -1,0 +1,9 @@
+flowchart LR
+    GW[api-gateway] -- "GET /api/v1/products/{id}, /categories<br/>staff: /api/v1/admin/…" --> CAT((catalog-service))
+    CART[cart-service] -- "POST /internal/products/prices" --> CAT
+    CAT -- "products, categories, images, outbox" --> PG[(PostgreSQL)]
+    CAT -- "product:id (cache-aside)" --> R[(Redis)]
+    CAT -- "presign PUT, stat object" --> S3[(MinIO<br/>product-images)]
+    STAFF[Staff browser] -- "PUT file (presigned URL)" --> S3
+    CAT -- "ProductChanged (outbox relay)" --> K{{Kafka catalog.events}}
+    K --> SEARCH[search-service]
