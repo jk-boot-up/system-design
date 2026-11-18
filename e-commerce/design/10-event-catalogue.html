@@ -133,8 +133,9 @@ so consumers never call catalog-service back.</p>
   "attributes": {"size": "42"}, "status": "ACTIVE", "imageKeys": ["products/0193…/a.webp"], "catalogVersion": 3 }</code></pre>
 <h3 id="inventorystockchanged-v1">inventory.StockChanged (v1)<a class="headerlink" href="#inventorystockchanged-v1" title="Permanent link">#</a></h3>
 <p>Published when available stock for a SKU changes: reserve, release, expire, return or restock. It is coalesced: at most one per SKU per
-transaction.</p>
-<pre class="highlight"><code class="language-json">{ "sku": "SKU-1001", "available": 17, "inStock": true }</code></pre>
+transaction. <code>stockVersion</code> is the stock row's version: outbox relays in several replicas can publish two changes of one SKU out of
+order, and consumers keep the higher version.</p>
+<pre class="highlight"><code class="language-json">{ "sku": "SKU-1001", "available": 17, "inStock": true, "stockVersion": 42 }</code></pre>
 <h3 id="orderorderplaced-v1">order.OrderPlaced (v1)<a class="headerlink" href="#orderorderplaced-v1" title="Permanent link">#</a></h3>
 <pre class="highlight"><code class="language-json">{ "orderId": "0193…", "customerId": "0193…", "total": {"amount": "179.80", "currency": "EUR"},
   "lines": [{"sku": "SKU-1001", "quantity": 2, "unitPrice": {"amount": "89.90", "currency": "EUR"}}] }</code></pre>

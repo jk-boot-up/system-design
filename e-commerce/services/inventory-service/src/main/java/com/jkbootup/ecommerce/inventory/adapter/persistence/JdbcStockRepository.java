@@ -65,9 +65,9 @@ public class JdbcStockRepository implements StockRepository {
 
     @Override
     public Optional<StockLevel> find(Sku sku) {
-        return jdbc.sql("select available, reserved from stock where sku = :sku and warehouse = :wh")
+        return jdbc.sql("select available, reserved, version from stock where sku = :sku and warehouse = :wh")
                 .param("sku", sku.value()).param("wh", WAREHOUSE)
-                .query((rs, n) -> new StockLevel(sku, rs.getInt("available"), rs.getInt("reserved")))
+                .query((rs, n) -> new StockLevel(sku, rs.getInt("available"), rs.getInt("reserved"), rs.getLong("version")))
                 .optional();
     }
 

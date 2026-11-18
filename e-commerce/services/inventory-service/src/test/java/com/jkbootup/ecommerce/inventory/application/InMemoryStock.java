@@ -23,7 +23,7 @@ import java.util.function.Supplier;
 /** Test doubles for the ports: in-memory, with snapshot/rollback to mimic a transaction. */
 final class InMemoryStock implements StockRepository, ReservationRepository, StockEvents, Transactions {
 
-    final Map<Sku, int[]> stock = new HashMap<>();          // [available, reserved]
+    final Map<Sku, int[]> stock = new HashMap<>();          // [available, reserved, version]
     final Map<String, Reservation> reservations = new HashMap<>();
     final List<StockLevel> published = new ArrayList<>();
 
@@ -53,25 +53,26 @@ final class InMemoryStock implements StockRepository, ReservationRepository, Sto
         if (s == null || s[0] < q.value()) return false;
         s[0] -= q.value();
         s[1] += q.value();
+        s[2]++;
         return true;
     }
 
     @Override
-    public void commitReserved(Sku sku, Quantity q) { stock.get(sku)[1] -= q.value(); }
+    public void commitReserved(Sku sku, Quantity q) { int[] s = stock.get(sku); s[1] -= q.value(); s[2]++; }
 
     @Override
-    public void releaseReserved(Sku sku, Quantity q) { int[] s = stock.get(sku); s[0] += q.value(); s[1] -= q.value(); }
+    public void releaseReserved(Sku sku, Quantity q) { int[] s = stock.get(sku); s[0] += q.value(); s[1] -= q.value(); s[2]++; }
 
     @Override
-    public void returnSold(Sku sku, Quantity q) { stock.get(sku)[0] += q.value(); }
+    public void returnSold(Sku sku, Quantity q) { int[] s = stock.get(sku); s[0] += q.value(); s[2]++; }
 
     @Override
-    public void setAvailable(Sku sku, int available) { stock.computeIfAbsent(sku, k -> new int[2])[0] = available; }
+    public void setAvailable(Sku sku, int available) { int[] s = stock.computeIfAbsent(sku, k -> new int[3]); s[0] = available; s[2]++; }
 
     @Override
     public Optional<StockLevel> find(Sku sku) {
         int[] s = stock.get(sku);
-        return s == null ? Optional.empty() : Optional.of(new StockLevel(sku, s[0], s[1]));
+        return s == null ? Optional.empty() : Optional.of(new StockLevel(sku, s[0], s[1], s[2]));
     }
 
     @Override

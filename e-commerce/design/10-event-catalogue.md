@@ -47,10 +47,11 @@ so consumers never call catalog-service back.
 ### inventory.StockChanged (v1)
 
 Published when available stock for a SKU changes: reserve, release, expire, return or restock. It is coalesced: at most one per SKU per
-transaction.
+transaction. `stockVersion` is the stock row's version: outbox relays in several replicas can publish two changes of one SKU out of
+order, and consumers keep the higher version.
 
 ```json
-{ "sku": "SKU-1001", "available": 17, "inStock": true }
+{ "sku": "SKU-1001", "available": 17, "inStock": true, "stockVersion": 42 }
 ```
 
 ### order.OrderPlaced (v1)

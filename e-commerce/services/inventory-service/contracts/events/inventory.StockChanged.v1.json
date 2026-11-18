@@ -18,7 +18,8 @@
       "properties": {
         "sku": { "type": "string" },
         "available": { "type": "integer", "minimum": 0 },
-        "inStock": { "type": "boolean" }
+        "inStock": { "type": "boolean" },
+        "stockVersion": { "type": "integer", "minimum": 0, "description": "version of the stock row; higher is newer (added in a backward-compatible way)" }
       }
     }
   }

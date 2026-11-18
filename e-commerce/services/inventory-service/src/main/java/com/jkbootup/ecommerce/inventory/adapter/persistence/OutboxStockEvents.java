@@ -31,7 +31,8 @@ public class OutboxStockEvents implements StockEvents {
         envelope.put("version", 1);
         envelope.put("occurredAt", Instant.now().toString());
         envelope.put("aggregateId", level.sku().value());
-        envelope.put("payload", Map.of("sku", level.sku().value(), "available", level.available(), "inStock", level.inStock()));
+        envelope.put("payload", Map.of("sku", level.sku().value(), "available", level.available(), "inStock", level.inStock(),
+                "stockVersion", level.version()));
         jdbc.sql("""
                         insert into outbox (id, aggregate_type, aggregate_id, event_type, topic, payload)
                         values (:id, 'Stock', :agg, 'inventory.StockChanged', :topic, cast(:payload as jsonb))""")

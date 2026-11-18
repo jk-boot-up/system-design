@@ -7,7 +7,7 @@ customers check out the same item at the same moment.
 |---|---|
 | Language / framework | Java 25, Spring Boot 4.0 (virtual threads) |
 | Store | PostgreSQL (`stock`, `reservations`, `outbox`, `processed_events`, `shedlock`) |
-| Publishes | `inventory.StockChanged` on `inventory.events` |
+| Publishes | `inventory.StockChanged` on `inventory.events`, with the stock row's `stockVersion` so consumers can drop out-of-order updates |
 | Consumes | `order.OrderCancelled` from `order.events` (safety-net release) |
 | Called by | order-service (checkout saga) |
 | Port | 8084 |
