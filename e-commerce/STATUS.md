@@ -12,8 +12,8 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Specification and plans | ██████████ 100% | SPEC, PLAN, design plan, implementation plan, prerequisites | Keep in step with changes |
 | System design documents | ███████░░░ 70% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, 11 ADRs | System/module/service diagrams; security, observability, capacity, runbooks |
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
-| Services (11) | █████████░ 91% | inventory, order, payment, cart, catalog, search, review, gateway, notification complete | recommendation, analytics |
-| Walkthroughs | █████████░ 90% | inventory, order, payment, cart, catalog, search, review, gateway, notification | Each new service, system walkthrough |
+| Services (11) | █████████░ 95% | inventory, order, payment, cart, catalog, search, review, gateway, notification, recommendation complete | analytics |
+| Walkthroughs | █████████░ 92% | every service except analytics | Each new service, system walkthrough |
 | Local stack and Kubernetes overlays | ░░░░░░░░░░ 0% | inventory-service `k8s/` base | Compose stack, overlays |
 | End-to-end and performance tests | ░░░░░░░░░░ 0% | — | After checkout works end to end |
 
@@ -30,10 +30,14 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | review-service | ✅ | ✅ 15 passing (incl. Cassandra + Kafka) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | api-gateway + NGINX | ✅ | ✅ 15 passing (incl. Redis + stub services + NGINX image) | — (routes in README) | ✅ | ✅ | ✅ | ✅ |
 | notification-service (Go) | ✅ | ✅ 13 passing (incl. Kafka + RabbitMQ + Redis + Mailpit) | ✅ (consumed) | ✅ | ✅ | ✅ | ✅ |
-| recommendation-service (Python) | ⏳ | | | | | | |
+| recommendation-service (Python) | ✅ | ✅ 16 passing (incl. Redis + Kafka) | ✅ (consumed) | ✅ | ✅ | ✅ | ✅ |
 | analytics (ClickHouse) | ⏳ | | | | | | |
 
 ## Recently completed
+
+* recommendation-service (Python 3.14, FastAPI): co-purchase counts in Redis sorted sets, with the seen check and every increment
+  in one Lua script so an order counts exactly once (three deliveries and 20 concurrent duplicates count once) and is never marked
+  seen without being counted; top-200 trimming; 503 problem when Redis is down; offsets committed only after counting.
 
 * notification-service (Go 1.27): router commits Kafka offsets only after RabbitMQ confirms the job; worker with a Redis sent log
   and claim (three copies of one event → one email, 20 concurrent duplicates → one send), delayed retries through TTL quorum queues
@@ -76,7 +80,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* recommendation-service (Python): co-purchase counts in Redis sorted sets, counted once per order.
+* analytics (ClickHouse): Kafka engine tables, materialised views, revenue rollups, Grafana dashboard.
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

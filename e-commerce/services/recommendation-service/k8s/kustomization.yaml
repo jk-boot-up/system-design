@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/name: recommendation-service
+      app.kubernetes.io/part-of: e-commerce
+    includeSelectors: true
+resources: [deployment.yaml, service.yaml, hpa.yaml, pdb.yaml, networkpolicy.yaml]
+configMapGenerator:
+  - name: recommendation-service
+    literals:
+      - KAFKA_BOOTSTRAP=kafka-bootstrap:9092
+      - REDIS_URL=redis://redis-reco:6379

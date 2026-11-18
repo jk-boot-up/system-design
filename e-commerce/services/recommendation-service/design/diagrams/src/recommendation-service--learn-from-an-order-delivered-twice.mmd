@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant K as Kafka
+    participant C as consumer
+    participant R as Redis
+    K->>C: OrderConfirmed e1: TENT, STOVE, MUG
+    C->>R: EVALSHA record(seen:e1, also:TENT, also:STOVE, also:MUG)
+    Note over R: SET seen:e1 NX ok → 6 × ZINCRBY, trim each to 200
+    R-->>C: 1 (counted)
+    C->>K: commit offset
+    K->>C: OrderConfirmed e1 (again)
+    C->>R: EVALSHA record(…)
+    Note over R: SET seen:e1 NX fails → nothing else runs
+    R-->>C: 0 (duplicate)
+    C->>K: commit offset

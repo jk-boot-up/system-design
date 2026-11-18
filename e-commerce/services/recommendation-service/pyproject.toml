@@ -1,0 +1,42 @@
+[project]
+name = "recommendation-service"
+version = "0.1.0"
+description = "Customers who bought this also bought: co-purchase counts in Redis sorted sets"
+requires-python = ">=3.14"
+dependencies = [
+  "fastapi==0.164.0",
+  "uvicorn==0.54.0",
+  "redis==8.1.0",
+  "aiokafka==0.15.0",
+  "prometheus-client==0.26.0",
+  "pydantic==2.14.3",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest==9.2.0",
+  "pytest-asyncio==1.5.0",
+  "httpx2==2.16.2",
+  "testcontainers[redis,kafka]==4.15.0",
+  "ruff==0.17.5",
+]
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["containers: needs Docker (run with -m containers)"]
+addopts = "-m 'not containers'"
+
+[tool.ruff]
+line-length = 130
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]

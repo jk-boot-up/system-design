@@ -1,9 +1,14 @@
 flowchart TD
-    A([OrderConfirmed]) --> B{reco:seen:eventId set NX?}
-    B -- no --> Z([Skip duplicate])
-    B -- yes --> C[Distinct SKUs in order]
+    A([OrderConfirmed]) --> C[Distinct SKUs in order, at most 50]
     C --> D{At least 2 SKUs?}
-    D -- no --> Z2([Nothing to learn])
-    D -- yes --> E[For every ordered pair a ≠ b:<br/>ZINCRBY reco:also:a 1 b]
-    E --> F[Trim each set to top 200]
-    F --> Z3([Done])
+    D -- no --> Z2([Nothing to learn; commit offset])
+    D -- yes --> S[[One Lua script, atomic in Redis]]
+    subgraph S1[script]
+        B{SET reco:seen:eventId NX EX 14d?}
+        B -- no --> Z([Duplicate: return 0])
+        B -- yes --> E[For every ordered pair a ≠ b:<br/>ZINCRBY reco:also:a 1 b]
+        E --> F[Trim each set to top 200]
+    end
+    S --> B
+    F --> Z3([Commit offset])
+    Z --> Z3

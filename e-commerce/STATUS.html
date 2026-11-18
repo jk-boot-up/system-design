@@ -79,14 +79,14 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>Services (11)</td>
-<td>█████████░ 91%</td>
-<td>inventory, order, payment, cart, catalog, search, review, gateway, notification complete</td>
-<td>recommendation, analytics</td>
+<td>█████████░ 95%</td>
+<td>inventory, order, payment, cart, catalog, search, review, gateway, notification, recommendation complete</td>
+<td>analytics</td>
 </tr>
 <tr>
 <td>Walkthroughs</td>
-<td>█████████░ 90%</td>
-<td>inventory, order, payment, cart, catalog, search, review, gateway, notification</td>
+<td>█████████░ 92%</td>
+<td>every service except analytics</td>
 <td>Each new service, system walkthrough</td>
 </tr>
 <tr>
@@ -210,13 +210,13 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>recommendation-service (Python)</td>
-<td>⏳</td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
+<td>✅</td>
+<td>✅ 16 passing (incl. Redis + Kafka)</td>
+<td>✅ (consumed)</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>analytics (ClickHouse)</td>
@@ -232,6 +232,11 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </table>
 <h2 id="recently-completed">Recently completed<a class="headerlink" href="#recently-completed" title="Permanent link">#</a></h2>
 <ul>
+<li>
+<p>recommendation-service (Python 3.14, FastAPI): co-purchase counts in Redis sorted sets, with the seen check and every increment
+  in one Lua script so an order counts exactly once (three deliveries and 20 concurrent duplicates count once) and is never marked
+  seen without being counted; top-200 trimming; 503 problem when Redis is down; offsets committed only after counting.</p>
+</li>
 <li>
 <p>notification-service (Go 1.27): router commits Kafka offsets only after RabbitMQ confirms the job; worker with a Redis sent log
   and claim (three copies of one event → one email, 20 concurrent duplicates → one send), delayed retries through TTL quorum queues
@@ -283,7 +288,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>recommendation-service (Python): co-purchase counts in Redis sorted sets, counted once per order.</li>
+<li>analytics (ClickHouse): Kafka engine tables, materialised views, revenue rollups, Grafana dashboard.</li>
 <li>System, module and service diagrams (design document 11).</li>
 </ul>
 <h2 id="risks-and-notes">Risks and notes<a class="headerlink" href="#risks-and-notes" title="Permanent link">#</a></h2>

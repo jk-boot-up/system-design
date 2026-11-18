@@ -1,0 +1,7 @@
+flowchart LR
+    O[order-service] -- "OrderConfirmed" --> K{{Kafka order.events}}
+    K --> REC((recommendation-service))
+    REC -- "EVALSHA record" --> R[(Redis<br/>reco:also:*, reco:seen:*)]
+    G[api-gateway] -- "GET /api/v1/products/{sku}/recommendations" --> REC
+    REC -- "ZRANGE … REV" --> R
+    REC -- "unreadable" --> DLQ{{order.events.dlq}}

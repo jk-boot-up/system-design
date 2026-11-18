@@ -1,0 +1,9 @@
+flowchart LR
+    K[adapters.kafka_consumer] --> L[app.learn]
+    H[adapters.http<br/>FastAPI] --> R[app.recommend]
+    L --> D[domain.parse_event<br/>pairs]
+    L --> S[(CoPurchaseStore port)]
+    R --> S
+    L --> DL[(DeadEvents port)]
+    S -.implemented by.-> RS[adapters.redis_store<br/>Lua script]
+    DL -.implemented by.-> KD[KafkaDeadEvents]

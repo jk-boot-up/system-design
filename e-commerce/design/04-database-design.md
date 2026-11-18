@@ -306,8 +306,8 @@ Consistency levels: writes and reads use `LOCAL_QUORUM`; lightweight transaction
 | `request_rate_limiter.{key}.tokens` / `.timestamp` | String | api-gateway | Seconds | Token bucket via a Lua script, atomic |
 | `notif:sent:{eventId}` | String | notification-service | 7 days | Written after the email went out; a duplicate job that finds it is acknowledged without sending |
 | `notif:claim:{eventId}` | String | notification-service | 2 min | `SET NX PX` before sending, so concurrent duplicates cannot both send; released on failure, expires after a crash |
-| `reco:also:{sku}` | Sorted set `otherSku → count` | recommendation-service | none (trimmed to top 200) | `ZINCRBY` for every pair in a confirmed order; `ZREVRANGE 0 9` to read |
-| `reco:seen:{eventId}` | String | recommendation-service | 14 days | `SET NX EX` dedupe |
+| `reco:also:{sku}` | Sorted set `otherSku → count` | recommendation-service | none (trimmed to top 200) | `ZINCRBY` for every pair in a confirmed order, inside the same Lua script as the seen check; `ZRANGE 0 9 REV` to read |
+| `reco:seen:{eventId}` | String | recommendation-service | 14 days | `SET NX EX` as the first step of the script: a duplicate stops there, and the order is never marked seen without being counted |
 
 ## 4.8 OpenSearch mapping (`products-v1`, alias `products`)
 

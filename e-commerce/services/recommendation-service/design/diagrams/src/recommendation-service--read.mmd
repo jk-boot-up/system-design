@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant G as api-gateway
+    participant A as API
+    participant R as Redis
+    G->>A: GET /api/v1/products/TENT/recommendations?limit=3
+    A->>R: ZRANGE reco:also:TENT 0 2 REV WITHSCORES
+    R-->>A: STOVE 2, MUG 1
+    A-->>G: 200 {sku: TENT, items: [{STOVE, 2}, {MUG, 1}]}, max-age 300

@@ -1,0 +1,289 @@
+{
+ "title": "recommendation-service",
+ "subtitle": "Bought together, counted once",
+ "nodes": [
+  {
+   "id": "order",
+   "label": "order-service",
+   "kind": "service",
+   "tech": "OrderConfirmed",
+   "x": 120,
+   "y": 150
+  },
+  {
+   "id": "kafka",
+   "label": "Kafka",
+   "kind": "queue",
+   "tech": "order.events",
+   "x": 360,
+   "y": 150
+  },
+  {
+   "id": "reco",
+   "label": "recommendation-service",
+   "kind": "service",
+   "tech": "Python · FastAPI",
+   "x": 640,
+   "y": 290
+  },
+  {
+   "id": "redis",
+   "label": "Redis",
+   "kind": "cache",
+   "tech": "sorted sets",
+   "x": 960,
+   "y": 290
+  },
+  {
+   "id": "gw",
+   "label": "api-gateway",
+   "kind": "edge",
+   "tech": "product page",
+   "x": 360,
+   "y": 440
+  },
+  {
+   "id": "shop",
+   "label": "Shopper",
+   "kind": "client",
+   "tech": "browser",
+   "x": 120,
+   "y": 440
+  }
+ ],
+ "edges": [
+  {
+   "from": "order",
+   "to": "kafka"
+  },
+  {
+   "from": "kafka",
+   "to": "reco"
+  },
+  {
+   "from": "reco",
+   "to": "redis"
+  },
+  {
+   "from": "shop",
+   "to": "gw"
+  },
+  {
+   "from": "gw",
+   "to": "reco"
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "learn",
+   "title": "Learning from orders",
+   "summary": "Each order counts once, atomically",
+   "steps": [
+    {
+     "say": "Ada buys a tent, a stove and a mug. Her order is confirmed, and the event arrives on Kafka.",
+     "active": [
+      "order",
+      "kafka"
+     ],
+     "packets": [
+      {
+       "from": "order",
+       "to": "kafka",
+       "label": "OrderConfirmed e1",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "Three distinct products make six ordered pairs: stove and mug go up in the tent's list, tent and mug in the stove's, and so on.",
+     "active": [
+      "kafka",
+      "reco"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "reco",
+       "label": "TENT · STOVE · MUG",
+       "kind": "event"
+      }
+     ],
+     "state": {
+      "title": "pairs",
+      "rows": {
+       "TENT": "+STOVE +MUG",
+       "STOVE": "+TENT +MUG",
+       "MUG": "+TENT +STOVE"
+      }
+     }
+    },
+    {
+     "say": "One Lua script does everything. It first marks event e1 as seen with set if not exists. Only if that works does it run the six increments and trim each list to its top two hundred. Redis runs the script as one step.",
+     "active": [
+      "reco",
+      "redis"
+     ],
+     "ok": [
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "reco",
+       "to": "redis",
+       "label": "EVALSHA record(e1, …)",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "reco:also:TENT",
+      "rows": {
+       "STOVE": 1,
+       "MUG": 1
+      }
+     },
+     "log": "Offset committed after the script returns"
+    },
+    {
+     "say": "The relay delivers the same event again. Set if not exists fails, so nothing else runs. The order was counted exactly once.",
+     "active": [
+      "kafka",
+      "reco",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "reco",
+       "to": "redis",
+       "label": "EVALSHA record(e1) → 0",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "reco",
+       "text": "duplicate",
+       "tone": "ok"
+      }
+     ]
+    },
+    {
+     "say": "Bob buys a tent and a stove. Now the stove leads the tent's list with two.",
+     "active": [
+      "reco",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "reco",
+       "to": "redis",
+       "label": "EVALSHA record(e2)",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "reco:also:TENT",
+      "rows": {
+       "STOVE": 2,
+       "MUG": 1
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "read",
+   "title": "On the product page",
+   "summary": "One sorted-set read, cached for 5 minutes",
+   "steps": [
+    {
+     "say": "A shopper opens the tent's page. The page asks for up to three partners through the gateway.",
+     "active": [
+      "shop",
+      "gw",
+      "reco"
+     ],
+     "packets": [
+      {
+       "from": "shop",
+       "to": "gw",
+       "label": "GET …/TENT/recommendations?limit=3",
+       "kind": "req"
+      },
+      {
+       "from": "gw",
+       "to": "reco",
+       "label": "forward",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "One read returns the top of the sorted set, highest counts first.",
+     "active": [
+      "reco",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "reco",
+       "to": "redis",
+       "label": "ZRANGE also:TENT 0 2 REV",
+       "kind": "req"
+      },
+      {
+       "from": "redis",
+       "to": "reco",
+       "label": "STOVE 2 · MUG 1",
+       "kind": "res"
+      }
+     ]
+    },
+    {
+     "say": "The answer can be cached for five minutes: recommendations move slowly.",
+     "active": [
+      "reco",
+      "gw",
+      "shop"
+     ],
+     "ok": [
+      "shop"
+     ],
+     "packets": [
+      {
+       "from": "reco",
+       "to": "shop",
+       "label": "200 · max-age 300",
+       "kind": "res"
+      }
+     ]
+    },
+    {
+     "say": "If Redis is down, the service answers 503 in milliseconds and the product page simply renders without the strip. Learning waits: the event is retried, and its offset is not committed until it counts.",
+     "active": [
+      "reco",
+      "redis",
+      "shop"
+     ],
+     "bad": [
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "reco",
+       "to": "shop",
+       "label": "503 DEPENDENCY_UNAVAILABLE",
+       "kind": "error"
+      }
+     ],
+     "badges": [
+      {
+       "node": "redis",
+       "text": "down",
+       "tone": "bad"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

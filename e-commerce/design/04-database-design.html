@@ -389,14 +389,14 @@ CREATE TABLE reviews.review_guard (
 <td>Sorted set <code>otherSku → count</code></td>
 <td>recommendation-service</td>
 <td>none (trimmed to top 200)</td>
-<td><code>ZINCRBY</code> for every pair in a confirmed order; <code>ZREVRANGE 0 9</code> to read</td>
+<td><code>ZINCRBY</code> for every pair in a confirmed order, inside the same Lua script as the seen check; <code>ZRANGE 0 9 REV</code> to read</td>
 </tr>
 <tr>
 <td><code>reco:seen:{eventId}</code></td>
 <td>String</td>
 <td>recommendation-service</td>
 <td>14 days</td>
-<td><code>SET NX EX</code> dedupe</td>
+<td><code>SET NX EX</code> as the first step of the script: a duplicate stops there, and the order is never marked seen without being counted</td>
 </tr>
 </tbody>
 </table>

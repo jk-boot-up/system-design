@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>recommendation-service: low-level design</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="recommendation-service-low-level-design">recommendation-service: low-level design<a class="headerlink" href="#recommendation-service-low-level-design" title="Permanent link">#</a></h1>
+<p>Part of the <a href="../../../design/README.html">e-commerce system design</a>. Animated version: <a href="walkthrough/index.html">walkthrough</a>.</p>
+<h2 id="1-responsibilities">1. Responsibilities<a class="headerlink" href="#1-responsibilities" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Does</th>
+<th>Does not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Learn which products are bought together from confirmed orders</td>
+<td>Personalise per customer (a later model can, from the same events)</td>
+</tr>
+<tr>
+<td>Answer the top N partners of a product in one Redis read</td>
+<td>Filter out-of-stock or archived products (the shop front hides them when it loads the products)</td>
+</tr>
+<tr>
+<td>Count each order once, however often it is delivered</td>
+<td>Store orders or customers</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-guarantees">2. Guarantees<a class="headerlink" href="#2-guarantees" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Each order counts exactly once</strong></td>
+<td>One Lua script: <code>SET reco:seen:&lt;eventId&gt; NX EX 14d</code>, and only if that succeeds, every <code>ZINCRBY</code>. Redis runs a script atomically, so a duplicate (or 20 concurrent ones) changes nothing and a crash cannot leave the order half counted or marked seen without being counted</td>
+</tr>
+<tr>
+<td><strong>No order is skipped</strong></td>
+<td>The Kafka offset is committed after the script returns. Redis down holds the partition and retries with back-off</td>
+</tr>
+<tr>
+<td><strong>Bounded memory</strong></td>
+<td>Each list keeps its 200 strongest partners (<code>ZREMRANGEBYRANK</code> in the same script); orders count at most 50 distinct products</td>
+</tr>
+<tr>
+<td><strong>Fast reads</strong></td>
+<td><code>ZRANGE reco:also:&lt;sku&gt; 0 N-1 REV WITHSCORES</code>: O(log n + N); the response is cacheable for 5 minutes</td>
+</tr>
+<tr>
+<td><strong>Optional by design</strong></td>
+<td>Redis down → 503 in milliseconds; the gateway's breaker and the product page treat recommendations as optional</td>
+</tr>
+</tbody>
+</table>
+<p>The script touches one key per product in the order. On a single Redis primary (with a replica and Sentinel) that is fine. In
+Redis Cluster the keys would need one hash tag, which puts the whole data set on one shard: at ~600 MB for 100 000 products that is
+acceptable, and a sharded design would count per-product with idempotent increments instead.</p>
+<h2 id="3-module-diagram">3. Module diagram<a class="headerlink" href="#3-module-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Module diagram diagram" src="diagrams/recommendation-service--module-diagram.light.svg" data-light="diagrams/recommendation-service--module-diagram.light.svg" data-dark="diagrams/recommendation-service--module-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="4-interaction-diagram">4. Interaction diagram<a class="headerlink" href="#4-interaction-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Interaction diagram diagram" src="diagrams/recommendation-service--interaction-diagram.light.svg" data-light="diagrams/recommendation-service--interaction-diagram.light.svg" data-dark="diagrams/recommendation-service--interaction-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="5-sequences">5. Sequences<a class="headerlink" href="#5-sequences" title="Permanent link">#</a></h2>
+<h3 id="learn-from-an-order-delivered-twice">Learn from an order (delivered twice)<a class="headerlink" href="#learn-from-an-order-delivered-twice" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Learn from an order (delivered twice) diagram" src="diagrams/recommendation-service--learn-from-an-order-delivered-twice.light.svg" data-light="diagrams/recommendation-service--learn-from-an-order-delivered-twice.light.svg" data-dark="diagrams/recommendation-service--learn-from-an-order-delivered-twice.dark.svg" loading="lazy"></figure></p>
+<h3 id="read">Read<a class="headerlink" href="#read" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Read diagram" src="diagrams/recommendation-service--read.light.svg" data-light="diagrams/recommendation-service--read.light.svg" data-dark="diagrams/recommendation-service--read.dark.svg" loading="lazy"></figure></p>
+<h2 id="6-data-model-redis">6. Data model (Redis)<a class="headerlink" href="#6-data-model-redis" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Content</th>
+<th>Expiry</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reco:also:&lt;sku&gt;</code></td>
+<td>Sorted set</td>
+<td>member = other SKU, score = orders containing both</td>
+<td>None; trimmed to the top 200 at each update</td>
+</tr>
+<tr>
+<td><code>reco:seen:&lt;eventId&gt;</code></td>
+<td>String</td>
+<td><code>1</code></td>
+<td>14 days (twice Kafka's retention)</td>
+</tr>
+</tbody>
+</table>
+<p>Ties are returned in Redis order: equal scores by SKU, descending.</p>
+<h2 id="7-scaling-and-performance">7. Scaling and performance<a class="headerlink" href="#7-scaling-and-performance" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Writes:</strong> an order with k distinct products costs k·(k−1) increments in one script; a typical order (k ≤ 5) is under 20
+  operations, well under a millisecond.</li>
+<li><strong>Reads:</strong> one Redis round trip; 2–6 pods behind the gateway, plus a 5-minute cache at the edge and in browsers.</li>
+<li><strong>Consumer:</strong> one consumer per pod in group <code>recommendation-service</code>, up to the 12 partitions of <code>order.events</code>.</li>
+</ul>
+<h2 id="8-failure-handling">8. Failure handling<a class="headerlink" href="#8-failure-handling" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Redis down</td>
+<td>Reads: 503 at once. Learning: the event is retried with back-off up to 30 s; the offset waits</td>
+</tr>
+<tr>
+<td>Kafka down</td>
+<td>Reads unaffected; learning resumes from the committed offset</td>
+</tr>
+<tr>
+<td>Crash mid-script</td>
+<td>Impossible to observe half: Redis applies the whole script or none of it</td>
+</tr>
+<tr>
+<td>Unreadable event</td>
+<td><code>order.events.dlq</code> with an <code>x-reason</code> header</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-tests">9. Tests<a class="headerlink" href="#9-tests" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Kind</th>
+<th>Proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_domain.py</code></td>
+<td>domain</td>
+<td>Distinct SKUs and all ordered pairs; single-product orders and other events teach nothing; broken events rejected; huge orders capped at 50</td>
+</tr>
+<tr>
+<td><code>test_app.py</code></td>
+<td>use cases with fakes</td>
+<td>Same event twice counts once; ranking by count; bad events dead-lettered; store errors propagate (so the offset is not committed); limit bounded</td>
+</tr>
+<tr>
+<td><code>test_http.py</code></td>
+<td>API</td>
+<td>Shape and cache header; empty list for unknown products; 400 for bad SKU and limit; 503 problem with <code>Retry-After</code> when Redis is down</td>
+</tr>
+<tr>
+<td><code>test_architecture.py</code></td>
+<td>import boundaries</td>
+<td>Domain and use cases import no framework or adapter; adapters independent</td>
+</tr>
+<tr>
+<td><code>test_containers.py</code></td>
+<td>Redis + Kafka</td>
+<td>Three copies of one order count once; ranking; single-product order ignored; garbage on the DLQ with its reason; API reads the same sets; 20 concurrent duplicate scripts count once; seen key expires; lists trimmed</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>
