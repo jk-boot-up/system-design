@@ -1,0 +1,19 @@
+<!-- Read-only user for the Grafana datasource; the password comes from the environment (a Kubernetes secret). -->
+<clickhouse>
+    <profiles>
+        <dashboards>
+            <readonly>1</readonly>
+            <max_execution_time>30</max_execution_time>
+            <max_memory_usage>2000000000</max_memory_usage>
+        </dashboards>
+    </profiles>
+    <users>
+        <grafana>
+            <password from_env="CLICKHOUSE_GRAFANA_PASSWORD"/>
+            <profile>dashboards</profile>
+            <quota>default</quota>
+            <networks><ip>::/0</ip></networks>
+            <grants><query>GRANT SELECT ON analytics.*</query></grants>
+        </grafana>
+    </users>
+</clickhouse>

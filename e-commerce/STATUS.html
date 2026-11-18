@@ -79,15 +79,15 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>Services (11)</td>
-<td>█████████░ 95%</td>
-<td>inventory, order, payment, cart, catalog, search, review, gateway, notification, recommendation complete</td>
-<td>analytics</td>
+<td>██████████ 100%</td>
+<td>all eleven complete</td>
+<td>—</td>
 </tr>
 <tr>
 <td>Walkthroughs</td>
 <td>█████████░ 92%</td>
-<td>every service except analytics</td>
-<td>Each new service, system walkthrough</td>
+<td>every service</td>
+<td>System walkthrough</td>
 </tr>
 <tr>
 <td>Local stack and Kubernetes overlays</td>
@@ -220,18 +220,24 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>analytics (ClickHouse)</td>
-<td>⏳</td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
+<td>✅</td>
+<td>✅ 1 end-to-end (ClickHouse image + Kafka) + Grafana check</td>
+<td>✅ (consumed)</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
 </tr>
 </tbody>
 </table>
 <h2 id="recently-completed">Recently completed<a class="headerlink" href="#recently-completed" title="Permanent link">#</a></h2>
 <ul>
+<li>
+<p>analytics (ClickHouse 26.8): Kafka engine table with a named collection and error streaming, facts deduplicated by event id,
+  rollups as refreshable views over <code>FINAL</code> so a re-delivered event never doubles revenue (the design's insert-triggered rollup would
+  have), unreadable messages kept with reasons, hashed customer ids, read-only Grafana user, provisioned Grafana 13.2 dashboard
+  whose every query is tested.</p>
+</li>
 <li>
 <p>recommendation-service (Python 3.14, FastAPI): co-purchase counts in Redis sorted sets, with the seen check and every increment
   in one Lua script so an order counts exactly once (three deliveries and 20 concurrent duplicates count once) and is never marked
@@ -288,7 +294,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>analytics (ClickHouse): Kafka engine tables, materialised views, revenue rollups, Grafana dashboard.</li>
+<li>Platform: local compose stack (P1), then system diagrams, security, observability, capacity and runbooks (S13–S17), system walkthrough (S19).</li>
 <li>System, module and service diagrams (design document 11).</li>
 </ul>
 <h2 id="risks-and-notes">Risks and notes<a class="headerlink" href="#risks-and-notes" title="Permanent link">#</a></h2>

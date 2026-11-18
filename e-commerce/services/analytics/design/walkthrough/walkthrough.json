@@ -1,0 +1,281 @@
+{
+ "title": "analytics (ClickHouse)",
+ "subtitle": "Exact numbers, straight from Kafka",
+ "nodes": [
+  {
+   "id": "order",
+   "label": "order-service",
+   "kind": "service",
+   "tech": "events",
+   "x": 110,
+   "y": 140
+  },
+  {
+   "id": "kafka",
+   "label": "Kafka",
+   "kind": "queue",
+   "tech": "order.events",
+   "x": 340,
+   "y": 140
+  },
+  {
+   "id": "queue",
+   "label": "Kafka engine",
+   "kind": "analytics",
+   "tech": "analytics-orders",
+   "x": 590,
+   "y": 140
+  },
+  {
+   "id": "facts",
+   "label": "order_facts",
+   "kind": "analytics",
+   "tech": "ReplacingMergeTree",
+   "x": 590,
+   "y": 330
+  },
+  {
+   "id": "errors",
+   "label": "order_event_errors",
+   "kind": "analytics",
+   "tech": "30 days",
+   "x": 860,
+   "y": 140
+  },
+  {
+   "id": "rollup",
+   "label": "revenue_per_minute",
+   "kind": "analytics",
+   "tech": "refresh 30 s",
+   "x": 860,
+   "y": 330
+  },
+  {
+   "id": "grafana",
+   "label": "Grafana",
+   "kind": "client",
+   "tech": "dashboard",
+   "x": 1110,
+   "y": 330
+  }
+ ],
+ "edges": [
+  {
+   "from": "order",
+   "to": "kafka"
+  },
+  {
+   "from": "kafka",
+   "to": "queue"
+  },
+  {
+   "from": "queue",
+   "to": "facts"
+  },
+  {
+   "from": "queue",
+   "to": "errors"
+  },
+  {
+   "from": "facts",
+   "to": "rollup",
+   "dashed": true
+  },
+  {
+   "from": "rollup",
+   "to": "grafana"
+  },
+  {
+   "from": "facts",
+   "to": "grafana"
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "ingest",
+   "title": "From event to dashboard",
+   "summary": "Exact revenue within a minute",
+   "steps": [
+    {
+     "say": "Ada's order is confirmed for one hundred euros. order-service publishes the event to Kafka.",
+     "active": [
+      "order",
+      "kafka"
+     ],
+     "packets": [
+      {
+       "from": "order",
+       "to": "kafka",
+       "label": "OrderConfirmed e1 · 100.00",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "ClickHouse itself is the consumer. A Kafka engine table reads the topic in group analytics-orders and hands each block of messages to the views attached to it.",
+     "active": [
+      "kafka",
+      "queue"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "queue",
+       "label": "block of messages",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "A materialised view parses the JSON into a fact row: event id, type, time, amount, currency. The customer id is hashed, so no personal data is stored.",
+     "active": [
+      "queue",
+      "facts"
+     ],
+     "ok": [
+      "facts"
+     ],
+     "packets": [
+      {
+       "from": "queue",
+       "to": "facts",
+       "label": "fact e1",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "order_facts",
+      "rows": {
+       "e1": "Confirmed · 100.00 EUR",
+       "customer_key": "cityHash64(…)"
+      }
+     }
+    },
+    {
+     "say": "Every thirty seconds a refreshable view recomputes revenue per minute for the last two days, and swaps the result in.",
+     "active": [
+      "facts",
+      "rollup"
+     ],
+     "packets": [
+      {
+       "from": "facts",
+       "to": "rollup",
+       "label": "SELECT … FINAL",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "revenue_per_minute",
+      "rows": {
+       "10:15": "1 order · 100.00 EUR"
+      }
+     }
+    },
+    {
+     "say": "Grafana reads the rollup with a read-only user. The order shows up on the dashboard well within a minute.",
+     "active": [
+      "rollup",
+      "grafana"
+     ],
+     "ok": [
+      "grafana"
+     ],
+     "packets": [
+      {
+       "from": "rollup",
+       "to": "grafana",
+       "label": "revenue per minute",
+       "kind": "res"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dupes",
+   "title": "Duplicates and garbage",
+   "summary": "Counted once; bad messages set aside",
+   "steps": [
+    {
+     "say": "The outbox relay times out and publishes e1 a second time. A second fact row with the same key lands in the table.",
+     "active": [
+      "kafka",
+      "queue",
+      "facts"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "queue",
+       "label": "OrderConfirmed e1 again",
+       "kind": "event"
+      },
+      {
+       "from": "queue",
+       "to": "facts",
+       "label": "fact e1 (copy)",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "order_facts (raw)",
+      "rows": {
+       "e1": "2 rows"
+      }
+     }
+    },
+    {
+     "say": "Reads with FINAL collapse rows with the same key at once; a background merge removes the copy later. Because the rollup is recomputed from FINAL, revenue stays one hundred euros, not two hundred.",
+     "active": [
+      "facts",
+      "rollup"
+     ],
+     "ok": [
+      "rollup"
+     ],
+     "packets": [
+      {
+       "from": "facts",
+       "to": "rollup",
+       "label": "FINAL → 1 row",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "revenue_per_minute",
+      "rows": {
+       "10:15": "1 order · 100.00 EUR"
+      }
+     },
+     "log": "An insert-triggered rollup would have counted it twice"
+    },
+    {
+     "say": "A message that is not JSON arrives. In stream error mode it becomes a row with the error text instead of stopping the consumer; it is kept for thirty days for inspection.",
+     "active": [
+      "queue",
+      "errors"
+     ],
+     "bad": [
+      "errors"
+     ],
+     "packets": [
+      {
+       "from": "queue",
+       "to": "errors",
+       "label": "not json · _error",
+       "kind": "error"
+      }
+     ],
+     "badges": [
+      {
+       "node": "errors",
+       "text": "1",
+       "tone": "bad"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

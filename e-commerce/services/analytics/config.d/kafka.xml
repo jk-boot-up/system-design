@@ -1,0 +1,15 @@
+<!-- Connection settings for the Kafka engine tables, kept out of the DDL. The broker list comes from the environment. -->
+<clickhouse>
+    <named_collections>
+        <order_events>
+            <kafka_broker_list from_env="KAFKA_BROKERS"/>
+            <kafka_topic_list>order.events</kafka_topic_list>
+            <kafka_group_name>analytics-orders</kafka_group_name>
+            <kafka_format>JSONAsString</kafka_format>
+            <!-- Unparseable messages become rows with _error set instead of stopping the consumer. -->
+            <kafka_handle_error_mode>stream</kafka_handle_error_mode>
+            <kafka_num_consumers>1</kafka_num_consumers>
+            <kafka_flush_interval_ms>1000</kafka_flush_interval_ms>
+        </order_events>
+    </named_collections>
+</clickhouse>

@@ -12,8 +12,8 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Specification and plans | ██████████ 100% | SPEC, PLAN, design plan, implementation plan, prerequisites | Keep in step with changes |
 | System design documents | ███████░░░ 70% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, 11 ADRs | System/module/service diagrams; security, observability, capacity, runbooks |
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
-| Services (11) | █████████░ 95% | inventory, order, payment, cart, catalog, search, review, gateway, notification, recommendation complete | analytics |
-| Walkthroughs | █████████░ 92% | every service except analytics | Each new service, system walkthrough |
+| Services (11) | ██████████ 100% | all eleven complete | — |
+| Walkthroughs | █████████░ 92% | every service | System walkthrough |
 | Local stack and Kubernetes overlays | ░░░░░░░░░░ 0% | inventory-service `k8s/` base | Compose stack, overlays |
 | End-to-end and performance tests | ░░░░░░░░░░ 0% | — | After checkout works end to end |
 
@@ -31,9 +31,14 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | api-gateway + NGINX | ✅ | ✅ 15 passing (incl. Redis + stub services + NGINX image) | — (routes in README) | ✅ | ✅ | ✅ | ✅ |
 | notification-service (Go) | ✅ | ✅ 13 passing (incl. Kafka + RabbitMQ + Redis + Mailpit) | ✅ (consumed) | ✅ | ✅ | ✅ | ✅ |
 | recommendation-service (Python) | ✅ | ✅ 16 passing (incl. Redis + Kafka) | ✅ (consumed) | ✅ | ✅ | ✅ | ✅ |
-| analytics (ClickHouse) | ⏳ | | | | | | |
+| analytics (ClickHouse) | ✅ | ✅ 1 end-to-end (ClickHouse image + Kafka) + Grafana check | ✅ (consumed) | ✅ | ✅ | ✅ | ✅ |
 
 ## Recently completed
+
+* analytics (ClickHouse 26.8): Kafka engine table with a named collection and error streaming, facts deduplicated by event id,
+  rollups as refreshable views over `FINAL` so a re-delivered event never doubles revenue (the design's insert-triggered rollup would
+  have), unreadable messages kept with reasons, hashed customer ids, read-only Grafana user, provisioned Grafana 13.2 dashboard
+  whose every query is tested.
 
 * recommendation-service (Python 3.14, FastAPI): co-purchase counts in Redis sorted sets, with the seen check and every increment
   in one Lua script so an order counts exactly once (three deliveries and 20 concurrent duplicates count once) and is never marked
@@ -80,7 +85,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* analytics (ClickHouse): Kafka engine tables, materialised views, revenue rollups, Grafana dashboard.
+* Platform: local compose stack (P1), then system diagrams, security, observability, capacity and runbooks (S13–S17), system walkthrough (S19).
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

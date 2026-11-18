@@ -1,0 +1,8 @@
+flowchart LR
+    Q[order_events_queue<br/>Kafka engine] --> MV1[order_facts_mv<br/>parse, filter valid]
+    Q --> MV2[order_event_errors_mv<br/>unparseable or incomplete]
+    MV1 --> F[(order_facts<br/>ReplacingMergeTree)]
+    MV2 --> E[(order_event_errors)]
+    F -- "FINAL, every 30 s" --> R1[revenue_per_minute_mv] --> T1[(revenue_per_minute)]
+    F -- "FINAL, every hour" --> R2[orders_per_day_mv] --> T2[(orders_per_day)]
+    T1 & T2 & F & E --> G[Grafana dashboard]

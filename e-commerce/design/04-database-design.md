@@ -367,8 +367,7 @@ Document id = SKU, because both event streams know it. Full mapping:
 ```sql
 -- 1. Kafka engine tables read the topics (one consumer group per table)
 CREATE TABLE analytics.order_events_queue (raw String)
-ENGINE = Kafka SETTINGS kafka_broker_list = 'kafka:9092', kafka_topic_list = 'order.events',
-  kafka_group_name = 'analytics-orders', kafka_format = 'JSONAsString';
+ENGINE = Kafka(order_events);   -- named collection: brokers, topic, group analytics-orders, JSONAsString, error mode 'stream'
 
 -- 2. Storage table: one row per order event
 CREATE TABLE analytics.order_facts (
@@ -398,11 +397,15 @@ SELECT toUUID(JSONExtractString(raw, 'eventId'))                              AS
        toUInt16(JSONLength(raw, 'payload', 'lines'))                          AS line_count
 FROM analytics.order_events_queue;
 
--- 4. Pre-aggregated rollup for dashboards
-CREATE MATERIALIZED VIEW analytics.revenue_per_minute
-ENGINE = SummingMergeTree ORDER BY (minute, currency) AS
+-- 4. Exact rollups for dashboards: refreshable views recomputed from the deduplicated facts. (An insert-triggered
+--    SummingMergeTree view would count a re-delivered event twice: ReplacingMergeTree removes the duplicate fact only at
+--    merge time, after the view has already added it.)
+CREATE MATERIALIZED VIEW analytics.revenue_per_minute_mv
+REFRESH EVERY 30 SECOND TO analytics.revenue_per_minute AS
 SELECT toStartOfMinute(occurred_at) AS minute, currency, count() AS orders, sum(total) AS revenue
-FROM analytics.order_facts WHERE event_type = 'order.OrderConfirmed' GROUP BY minute, currency;
+FROM analytics.order_facts FINAL
+WHERE event_type = 'order.OrderConfirmed' AND occurred_at >= now() - INTERVAL 2 DAY
+GROUP BY minute, currency;
 ```
 
 ## 4.11 Retention and data lifecycle

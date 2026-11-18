@@ -1,0 +1,25 @@
+name: e-commerce / analytics
+
+on:
+  push:
+    paths: ['e-commerce/services/analytics/**', '.github/workflows/e-commerce-analytics.yml']
+  pull_request:
+    paths: ['e-commerce/services/analytics/**', '.github/workflows/e-commerce-analytics.yml']
+
+defaults:
+  run:
+    working-directory: e-commerce/services/analytics
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.14', cache: pip, cache-dependency-path: e-commerce/services/analytics/tests/requirements.txt }
+      - run: pip install -r tests/requirements.txt
+      - name: Dashboard JSON is valid
+        run: python -m json.tool grafana/dashboards/orders.json > /dev/null
+      - name: ClickHouse image + Kafka containers (schema, dedupe, rollups, dashboard queries)
+        run: pytest

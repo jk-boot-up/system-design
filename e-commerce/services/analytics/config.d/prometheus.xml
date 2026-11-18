@@ -1,0 +1,10 @@
+<!-- Metrics for Prometheus on :9363/metrics (Kafka consumer lag, inserts, merges, query latency). -->
+<clickhouse>
+    <prometheus>
+        <endpoint>/metrics</endpoint>
+        <port>9363</port>
+        <metrics>true</metrics>
+        <events>true</events>
+        <asynchronous_metrics>true</asynchronous_metrics>
+    </prometheus>
+</clickhouse>

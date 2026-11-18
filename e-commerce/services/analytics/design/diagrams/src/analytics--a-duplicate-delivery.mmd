@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant K as Kafka
+    participant Q as Kafka engine
+    participant F as order_facts
+    participant R as revenue_per_minute
+    K->>Q: OrderConfirmed e1 (100.00)
+    Q->>F: fact e1
+    K->>Q: OrderConfirmed e1 again (relay retry)
+    Q->>F: fact e1 (second row, same key)
+    Note over F: FINAL reads one row now, a merge removes the other later
+    R->>F: every 30 s: SELECT … FROM order_facts FINAL
+    Note over R: revenue 100.00, orders 1

@@ -1,0 +1,190 @@
+{
+  "uid": "e-commerce-orders",
+  "title": "E-commerce \u00b7 Orders and revenue",
+  "tags": [
+    "e-commerce",
+    "analytics"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 41,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Revenue per minute",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 0,
+          "queryType": "table",
+          "rawSql": "SELECT minute AS time, currency, revenue FROM analytics.revenue_per_minute WHERE $__timeFilter(minute) ORDER BY time"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Orders, last hour",
+      "type": "stat",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT sum(orders) AS orders FROM analytics.revenue_per_minute WHERE minute >= now() - INTERVAL 1 HOUR"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Revenue, last hour",
+      "type": "stat",
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT currency, sum(revenue) AS revenue FROM analytics.revenue_per_minute WHERE minute >= now() - INTERVAL 1 HOUR GROUP BY currency"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Cancellations by reason, last day",
+      "type": "piechart",
+      "gridPos": {
+        "x": 16,
+        "y": 4,
+        "w": 8,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT reason, count() AS orders FROM analytics.order_facts FINAL WHERE event_type = 'order.OrderCancelled' AND occurred_at >= now() - INTERVAL 1 DAY GROUP BY reason ORDER BY orders DESC"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Daily revenue and orders",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT day, currency, confirmed, cancelled, round(cancelled / greatest(confirmed + cancelled, 1) * 100, 1) AS cancel_pct, revenue, avg_order, customers FROM analytics.orders_per_day WHERE $__timeFilter(day) ORDER BY day DESC"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Unreadable events, last day",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT count() AS errors FROM analytics.order_event_errors WHERE received_at >= now() - INTERVAL 1 DAY"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Ingestion delay (seconds, p95, last 15 min)",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 16,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT round(quantile(0.95)(dateDiff('millisecond', occurred_at, ingested_at)) / 1000, 1) AS p95 FROM analytics.order_facts WHERE ingested_at >= now() - INTERVAL 15 MINUTE"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    }
+  ]
+}

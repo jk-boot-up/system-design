@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/name: analytics
+      app.kubernetes.io/part-of: e-commerce
+    includeSelectors: true
+resources: [clickhouse.yaml, networkpolicy.yaml]
+configMapGenerator:
+  - name: analytics
+    literals:
+      - KAFKA_BROKERS=kafka-bootstrap:9092
+  - name: grafana-dashboards-e-commerce
+    files: [../grafana/dashboards/orders.json]
+# CLICKHOUSE_PASSWORD (default user) and CLICKHOUSE_GRAFANA_PASSWORD come from the analytics secret (see deploy/k8s overlays).

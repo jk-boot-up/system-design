@@ -1,0 +1,5 @@
+flowchart LR
+    O[order-service] -- "OrderPlaced / Confirmed / Cancelled" --> K{{Kafka order.events}}
+    K -- "group analytics-orders" --> CH((ClickHouse))
+    GF[Grafana] -- "read-only user, native protocol" --> CH
+    P[Prometheus] -- ":9363/metrics" --> CH

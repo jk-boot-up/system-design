@@ -1,0 +1,33 @@
+# One ClickHouse replica with persistent storage. The data can be rebuilt from Kafka within its 7-day retention, and
+# from the order database beyond that, so a single replica is acceptable; add ClickHouse Keeper and a second replica
+# (ReplicatedReplacingMergeTree) when dashboards become business-critical.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: analytics
+spec:
+  serviceName: analytics
+  replicas: 1
+  template:
+    metadata:
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "9363", prometheus.io/path: /metrics }
+    spec:
+      containers:
+        - name: clickhouse
+          image: e-commerce/analytics:0.1.0
+          envFrom: [ { configMapRef: { name: analytics } }, { secretRef: { name: analytics } } ]
+          ports: [ { name: http, containerPort: 8123 }, { name: native, containerPort: 9000 } ]
+          resources: { requests: { cpu: "1", memory: 4Gi }, limits: { memory: 4Gi } }
+          readinessProbe: { httpGet: { path: /ping, port: http }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /ping, port: http }, periodSeconds: 10, failureThreshold: 6 }
+          volumeMounts: [ { name: data, mountPath: /var/lib/clickhouse } ]
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 100Gi } } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics
+spec:
+  ports: [ { name: http, port: 8123, targetPort: http }, { name: native, port: 9000, targetPort: native } ]

@@ -74,7 +74,7 @@ Each service also has its own `README.md` (build, run, configure, operate) and `
 | api-gateway (+ NGINX edge) | Java | ✅ | ✅ | ✅ |
 | notification-service | Go | ✅ | ✅ | ✅ |
 | recommendation-service | Python | ✅ | ✅ | ✅ |
-| analytics | ClickHouse SQL | ⏳ | ⏳ | ⏳ |
+| analytics | ClickHouse SQL | ✅ | ✅ | ✅ |
 
 ## 4. Order of work
 

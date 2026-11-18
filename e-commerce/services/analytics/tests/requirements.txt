@@ -1,0 +1,5 @@
+# Test harness only: the analytics "service" is ClickHouse SQL; these run it against Kafka in containers.
+pytest==9.2.0
+pytest-asyncio==1.5.0
+aiokafka==0.15.0
+testcontainers[kafka]==4.15.0

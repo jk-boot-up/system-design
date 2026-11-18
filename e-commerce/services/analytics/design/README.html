@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>analytics: low-level design</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="analytics-low-level-design">analytics: low-level design<a class="headerlink" href="#analytics-low-level-design" title="Permanent link">#</a></h1>
+<p>Part of the <a href="../../../design/README.html">e-commerce system design</a>. Animated version: <a href="walkthrough/index.html">walkthrough</a>.</p>
+<h2 id="1-responsibilities">1. Responsibilities<a class="headerlink" href="#1-responsibilities" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Does</th>
+<th>Does not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keep every order event as a fact for 25 months</td>
+<td>Serve the shop: nothing on the request path reads ClickHouse</td>
+</tr>
+<tr>
+<td>Show revenue per minute within a minute of an order</td>
+<td>Replace the order database as the record of truth</td>
+</tr>
+<tr>
+<td>Daily revenue, orders, cancellations, average order, distinct customers</td>
+<td>Store personal data (customer ids are hashed)</td>
+</tr>
+<tr>
+<td>Keep unreadable messages for inspection</td>
+<td>Stop ingesting because of one bad message</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-guarantees">2. Guarantees<a class="headerlink" href="#2-guarantees" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Exact numbers despite duplicate deliveries</strong></td>
+<td>Facts share an <code>event_id</code> in the sorting key; <code>ReplacingMergeTree</code> collapses duplicates and <code>FINAL</code> reads are exact before the merge happens. Rollups are <em>refreshable</em> views computed from <code>order_facts FINAL</code>, so they never add a duplicate twice</td>
+</tr>
+<tr>
+<td><strong>Fresh</strong></td>
+<td>Kafka engine flushes every second; <code>revenue_per_minute</code> refreshes every 30 s over the last two days</td>
+</tr>
+<tr>
+<td><strong>One bad message never blocks</strong></td>
+<td><code>kafka_handle_error_mode = 'stream'</code> turns unparseable messages into rows with <code>_error</code>; non-throwing <code>…OrZero/OrNull</code> parsing; anything incomplete goes to <code>order_event_errors</code></td>
+</tr>
+<tr>
+<td><strong>Read-only dashboards</strong></td>
+<td>Grafana connects as <code>grafana</code>, which has <code>SELECT</code> on <code>analytics.*</code>, a read-only profile, 30 s and 2 GB limits</td>
+</tr>
+<tr>
+<td><strong>Rebuildable</strong></td>
+<td>All state derives from Kafka (7 days) and, beyond that, from the order database export</td>
+</tr>
+</tbody>
+</table>
+<p>Why not the insert-triggered <code>SummingMergeTree</code> rollup: a materialised view fires on every insert, so a re-delivered event would
+add its revenue twice; the duplicate fact disappears only later, at merge time, and the rollup never learns about it.</p>
+<h2 id="3-module-diagram">3. Module diagram<a class="headerlink" href="#3-module-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Module diagram diagram" src="diagrams/analytics--module-diagram.light.svg" data-light="diagrams/analytics--module-diagram.light.svg" data-dark="diagrams/analytics--module-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="4-interaction-diagram">4. Interaction diagram<a class="headerlink" href="#4-interaction-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Interaction diagram diagram" src="diagrams/analytics--interaction-diagram.light.svg" data-light="diagrams/analytics--interaction-diagram.light.svg" data-dark="diagrams/analytics--interaction-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="5-sequences">5. Sequences<a class="headerlink" href="#5-sequences" title="Permanent link">#</a></h2>
+<h3 id="a-duplicate-delivery">A duplicate delivery<a class="headerlink" href="#a-duplicate-delivery" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="A duplicate delivery diagram" src="diagrams/analytics--a-duplicate-delivery.light.svg" data-light="diagrams/analytics--a-duplicate-delivery.light.svg" data-dark="diagrams/analytics--a-duplicate-delivery.dark.svg" loading="lazy"></figure></p>
+<h2 id="6-data-model">6. Data model<a class="headerlink" href="#6-data-model" title="Permanent link">#</a></h2>
+<p>Schema: <a href="../sql/001_order_events.sql">001_order_events.sql</a>, <a href="../sql/002_rollups.sql">002_rollups.sql</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Engine</th>
+<th>Key</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>order_facts</code></td>
+<td>ReplacingMergeTree</td>
+<td><code>(event_type, occurred_at, event_id)</code>, monthly partitions</td>
+<td>25-month TTL; <code>customer_key</code> = <code>cityHash64(customerId)</code></td>
+</tr>
+<tr>
+<td><code>order_event_errors</code></td>
+<td>MergeTree</td>
+<td><code>received_at</code></td>
+<td>30-day TTL; the raw message and the reason</td>
+</tr>
+<tr>
+<td><code>revenue_per_minute</code></td>
+<td>MergeTree, replaced every 30 s</td>
+<td><code>(minute, currency)</code></td>
+<td>Last two days of confirmed orders</td>
+</tr>
+<tr>
+<td><code>orders_per_day</code></td>
+<td>MergeTree, replaced every hour</td>
+<td><code>(day, currency)</code></td>
+<td>Placed, confirmed, cancelled, revenue, average order, customers</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-scaling-and-performance">7. Scaling and performance<a class="headerlink" href="#7-scaling-and-performance" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Volume:</strong> at 100 orders a second (a sale peak), about 300 events a second: trivial for one ClickHouse node.</li>
+<li><strong>Rollup cost:</strong> <code>revenue_per_minute</code> scans two days of confirmed facts (a few million rows at peak) every 30 s; <code>FINAL</code> is
+  parallel across partitions. <code>orders_per_day</code> scans all history hourly; past ~1 billion facts it should switch to an
+  <code>APPEND</code> refresh of the last two days only.</li>
+<li><strong>Growth:</strong> add a replica (ReplicatedReplacingMergeTree + Keeper) for availability, then shards keyed by <code>event_id</code> if needed.</li>
+</ul>
+<h2 id="8-failure-handling">8. Failure handling<a class="headerlink" href="#8-failure-handling" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kafka down</td>
+<td>Ingestion pauses; dashboards show the last data; consumption resumes from the committed offset</td>
+</tr>
+<tr>
+<td>ClickHouse down</td>
+<td>No effect on the shop; Kafka keeps 7 days; on restart the engine catches up</td>
+</tr>
+<tr>
+<td>Bad message</td>
+<td>Row in <code>order_event_errors</code>; ingestion continues</td>
+</tr>
+<tr>
+<td>Refresh fails</td>
+<td>The previous rollup stays; <code>system.view_refreshes</code> shows the exception; the next refresh retries</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-tests">9. Tests<a class="headerlink" href="#9-tests" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Kind</th>
+<th>Proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tests/test_analytics.py</code></td>
+<td>The image + Kafka on a Docker network</td>
+<td>Schema applies on first start; placed, confirmed (twice, same id), confirmed, cancelled and two bad messages → 4 exact facts and 2 error rows with reasons; no personal columns; revenue per minute 179.90 from 2 orders (duplicate counted once); daily row 1 placed / 2 confirmed / 1 cancelled / 2 customers; every dashboard query runs</td>
+</tr>
+<tr>
+<td>Manual check (README)</td>
+<td>Grafana 13.2 + plugin</td>
+<td>Datasource healthy with the read-only user; dashboard provisioned into the E-commerce folder; the read-only user cannot drop tables</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

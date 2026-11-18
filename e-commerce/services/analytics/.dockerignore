@@ -1,0 +1,7 @@
+tests
+.venv
+design
+k8s
+grafana
+*.md
+*.html
