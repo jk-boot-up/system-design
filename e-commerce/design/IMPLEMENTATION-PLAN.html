@@ -175,7 +175,7 @@ consumers come after it.</p>
 <td><strong>notification-service</strong> (Go)</td>
 <td>Kafka router → RabbitMQ quorum priority queue → email worker (SMTP to Mailpit), retries via TTL and dead-letter exchanges, Redis dedupe</td>
 <td>Each email sent once even with duplicate events; poison jobs dead-lettered</td>
-<td>⏳</td>
+<td>✅ D1–D9</td>
 </tr>
 <tr>
 <td>10</td>

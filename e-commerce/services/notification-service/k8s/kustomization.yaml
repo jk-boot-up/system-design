@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/name: notification-service
+      app.kubernetes.io/part-of: e-commerce
+    includeSelectors: true
+resources: [deployment.yaml, hpa.yaml, networkpolicy.yaml]
+configMapGenerator:
+  - name: notification-service
+    literals:
+      - KAFKA_BROKERS=kafka-bootstrap:9092
+      - REDIS_URL=redis://redis-cache:6379
+      - SMTP_ADDR=mailpit:1025
+      - MAIL_FROM=Shop <orders@shop.example>
+      - RETRY_DELAYS=30s,2m,10m
+# RABBITMQ_URL (with credentials) comes from the notification-service secret (see deploy/k8s overlays).

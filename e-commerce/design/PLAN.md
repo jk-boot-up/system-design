@@ -30,7 +30,7 @@ All components are open source. See [SPEC.md §9](SPEC.md#9-technology-choices) 
 
 | Concern | Choice |
 |---|---|
-| Languages / build | Java 25 with Gradle 9 (Kotlin DSL, version catalog) as the main stack; Go 1.24 (notification); Python 3.12 + FastAPI (recommendations) |
+| Languages / build | Java 25 with Gradle 9 (Kotlin DSL, version catalog) as the main stack; Go 1.27 (notification); Python 3.12 + FastAPI (recommendations) |
 | Service framework | Spring Boot 4.0, Spring Cloud 2025.1 |
 | API gateway | Spring Cloud Gateway |
 | Identity | Keycloak (OIDC / OAuth 2.1, JWT) |

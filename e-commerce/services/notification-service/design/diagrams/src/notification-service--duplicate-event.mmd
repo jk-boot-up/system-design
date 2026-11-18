@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant K as Kafka
+    participant R as router
+    participant Q as email.send
+    participant W as worker
+    participant D as Redis
+    participant M as SMTP
+    K->>R: OrderConfirmed evt-1 (again, after a relay retry)
+    R->>Q: job evt-1 (confirmed)
+    R->>K: commit offset
+    Q->>W: job evt-1
+    W->>D: EXISTS notif:sent:evt-1
+    D-->>W: 1
+    W->>Q: ack (duplicate, nothing sent)

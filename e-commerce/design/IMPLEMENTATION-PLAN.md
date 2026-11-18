@@ -37,7 +37,7 @@ consumers come after it.
 | 6 | **search-service** (Java) | OpenSearch index and alias, consumers for `ProductChanged` and `StockChanged` with external versioning, faceted search with `search_after` cursors | Out-of-order events never overwrite newer data | ✅ D1–D9 |
 | 7 | **review-service** (Java) | Cassandra tables per query, LWT guard (one review per customer per product), counters, verified purchases from `OrderConfirmed` | Second review rejected; verified badge only after a purchase | ✅ D1–D9 |
 | 8 | **api-gateway** (Java) + **NGINX edge** | Spring Cloud Gateway routes, JWT validation, Redis token-bucket rate limits, request ids, circuit-breaker fallbacks; NGINX TLS, compression, micro-caching and static documentation | 429 with `Retry-After` past the limit; 503 fallback when a service is down | ✅ D1–D9 |
-| 9 | **notification-service** (Go) | Kafka router → RabbitMQ quorum priority queue → email worker (SMTP to Mailpit), retries via TTL and dead-letter exchanges, Redis dedupe | Each email sent once even with duplicate events; poison jobs dead-lettered | ⏳ |
+| 9 | **notification-service** (Go) | Kafka router → RabbitMQ quorum priority queue → email worker (SMTP to Mailpit), retries via TTL and dead-letter exchanges, Redis dedupe | Each email sent once even with duplicate events; poison jobs dead-lettered | ✅ D1–D9 |
 | 10 | **recommendation-service** (Python) | FastAPI, Kafka consumer for `OrderConfirmed`, Redis sorted-set co-purchase counts, top-N endpoint | Pairs counted once per order event | ⏳ |
 | 11 | **analytics** (ClickHouse) | Kafka engine tables, materialised views, rollups, Grafana dashboard | Revenue per minute available within a minute of an order | ⏳ |
 

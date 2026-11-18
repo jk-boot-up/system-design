@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant Q as email.send
+    participant W as worker
+    participant D as Redis
+    participant M as SMTP
+    participant RQ as email.retry.30s
+    Q->>W: job evt-3, attempt 1
+    W->>D: SET notif:claim:evt-3 NX PX 120000
+    W->>M: send
+    M-->>W: 451 try again later
+    W->>D: DEL claim
+    W->>RQ: job, attempt 2 (confirmed)
+    W->>Q: ack
+    Note over RQ: 30 s TTL, then dead-lettered back
+    RQ->>Q: job evt-3, attempt 2
+    Q->>W: job evt-3, attempt 2
+    W->>M: send
+    M-->>W: 250 OK
+    W->>D: SET notif:sent:evt-3 EX 7d

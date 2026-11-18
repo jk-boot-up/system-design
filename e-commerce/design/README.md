@@ -33,7 +33,7 @@ the design, then read these documents in order.
 | payment-service | Java 25 | 8086 | PostgreSQL | [payment-service](../services/payment-service/design/README.md) |
 | review-service | Java 25 | 8087 | Cassandra | [review-service](../services/review-service/design/README.md) |
 | recommendation-service | Python 3.12 | 8089 | Redis | [recommendation-service](../services/recommendation-service/design/README.md) |
-| notification-service | Go 1.24 | 8088 | RabbitMQ, Redis | [notification-service](../services/notification-service/design/README.md) |
+| notification-service | Go 1.27 | 8088 | RabbitMQ, Redis | [notification-service](../services/notification-service/design/README.md) |
 | analytics | ClickHouse SQL | 8123 | ClickHouse | [analytics](../services/analytics/design/README.md) |
 
 All diagrams are written in [Mermaid](https://mermaid.js.org), which GitHub renders in place. The animated walkthroughs of the same

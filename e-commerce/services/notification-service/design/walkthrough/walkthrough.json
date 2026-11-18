@@ -1,0 +1,424 @@
+{
+ "title": "notification-service",
+ "subtitle": "Events to emails, once, with delayed retries",
+ "nodes": [
+  {
+   "id": "order",
+   "label": "order-service",
+   "kind": "service",
+   "tech": "Java",
+   "x": 110,
+   "y": 110
+  },
+  {
+   "id": "kafka",
+   "label": "Kafka",
+   "kind": "queue",
+   "tech": "order.events",
+   "x": 330,
+   "y": 110
+  },
+  {
+   "id": "router",
+   "label": "router",
+   "kind": "job",
+   "tech": "Go",
+   "x": 560,
+   "y": 110
+  },
+  {
+   "id": "send",
+   "label": "email.send",
+   "kind": "queue",
+   "tech": "quorum · priorities",
+   "x": 560,
+   "y": 300
+  },
+  {
+   "id": "worker",
+   "label": "worker",
+   "kind": "job",
+   "tech": "Go · prefetch 20",
+   "x": 820,
+   "y": 300
+  },
+  {
+   "id": "redis",
+   "label": "Redis",
+   "kind": "cache",
+   "tech": "sent log",
+   "x": 1080,
+   "y": 170
+  },
+  {
+   "id": "smtp",
+   "label": "Mailpit",
+   "kind": "external",
+   "tech": "SMTP",
+   "x": 1080,
+   "y": 430
+  },
+  {
+   "id": "retry",
+   "label": "email.retry",
+   "kind": "queue",
+   "tech": "30s · 2m · 10m TTL",
+   "x": 560,
+   "y": 500
+  },
+  {
+   "id": "dead",
+   "label": "email.dead",
+   "kind": "queue",
+   "tech": "alert on depth",
+   "x": 820,
+   "y": 540
+  }
+ ],
+ "edges": [
+  {
+   "from": "order",
+   "to": "kafka"
+  },
+  {
+   "from": "kafka",
+   "to": "router"
+  },
+  {
+   "from": "router",
+   "to": "send"
+  },
+  {
+   "from": "send",
+   "to": "worker"
+  },
+  {
+   "from": "worker",
+   "to": "redis"
+  },
+  {
+   "from": "worker",
+   "to": "smtp"
+  },
+  {
+   "from": "worker",
+   "to": "retry"
+  },
+  {
+   "from": "retry",
+   "to": "send",
+   "dashed": true
+  },
+  {
+   "from": "worker",
+   "to": "dead"
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "once",
+   "title": "One event, one email",
+   "summary": "Duplicates absorbed by the sent log",
+   "steps": [
+    {
+     "say": "Ada's order is confirmed. order-service publishes OrderConfirmed with event id e-1. Its outbox relay retries after a timeout, so the same event lands on Kafka twice.",
+     "active": [
+      "order",
+      "kafka"
+     ],
+     "packets": [
+      {
+       "from": "order",
+       "to": "kafka",
+       "label": "OrderConfirmed e-1 × 2",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "The router turns each copy into an email job, priority eight, and waits for RabbitMQ to confirm it is stored before committing the Kafka offset. Nothing can be lost between the two.",
+     "active": [
+      "kafka",
+      "router",
+      "send"
+     ],
+     "packets": [
+      {
+       "from": "router",
+       "to": "send",
+       "label": "job e-1 · confirmed",
+       "kind": "req"
+      },
+      {
+       "from": "router",
+       "to": "send",
+       "label": "job e-1 · confirmed",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "email.send",
+      "rows": {
+       "ready": 2,
+       "priority": "8 (high)"
+      }
+     }
+    },
+    {
+     "say": "A worker takes the first copy. The sent log has no entry for e-1, so it takes a two minute claim with set if not exists, and sends.",
+     "active": [
+      "send",
+      "worker",
+      "redis",
+      "smtp"
+     ],
+     "packets": [
+      {
+       "from": "worker",
+       "to": "redis",
+       "label": "SET claim:e-1 NX",
+       "kind": "req"
+      },
+      {
+       "from": "worker",
+       "to": "smtp",
+       "label": "To: ada · order confirmed",
+       "kind": "req"
+      }
+     ],
+     "ok": [
+      "smtp"
+     ],
+     "state": {
+      "title": "Redis",
+      "rows": {
+       "notif:claim:e-1": "held · 2 min"
+      }
+     }
+    },
+    {
+     "say": "Sent. The worker records notif sent e-1 for seven days, as long as Kafka keeps events, and acknowledges the job.",
+     "active": [
+      "worker",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "worker",
+       "to": "redis",
+       "label": "SET sent:e-1 EX 7d",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "Redis",
+      "rows": {
+       "notif:sent:e-1": "7 days"
+      }
+     }
+    },
+    {
+     "say": "The second copy finds the sent key and is acknowledged without sending. Ada gets exactly one email.",
+     "active": [
+      "send",
+      "worker",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "worker",
+       "to": "redis",
+       "label": "EXISTS sent:e-1 → 1",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "worker",
+       "text": "duplicate",
+       "tone": "ok"
+      }
+     ],
+     "log": "notification_emails_total{result=duplicate}"
+    }
+   ]
+  },
+  {
+   "id": "retry",
+   "title": "Mail server says later",
+   "summary": "Delayed retries without a scheduler",
+   "steps": [
+    {
+     "say": "The mail server is overloaded and answers 451: try again later. That is a temporary failure.",
+     "active": [
+      "worker",
+      "smtp"
+     ],
+     "bad": [
+      "smtp"
+     ],
+     "packets": [
+      {
+       "from": "smtp",
+       "to": "worker",
+       "label": "451 try again later",
+       "kind": "error"
+      }
+     ]
+    },
+    {
+     "say": "The worker releases its claim and publishes the job with attempt two to the thirty second delay queue. Nobody consumes that queue.",
+     "active": [
+      "worker",
+      "retry",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "worker",
+       "to": "redis",
+       "label": "DEL claim:e-3",
+       "kind": "req"
+      },
+      {
+       "from": "worker",
+       "to": "retry",
+       "label": "job e-3 · attempt 2",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "email.retry.30s",
+      "rows": {
+       "waiting": "e-3",
+       "x-message-ttl": "30 s"
+      }
+     }
+    },
+    {
+     "say": "After thirty seconds the message expires, and RabbitMQ dead-letters it straight back to email send. The delay costs no timer, no polling and no database.",
+     "active": [
+      "retry",
+      "send"
+     ],
+     "packets": [
+      {
+       "from": "retry",
+       "to": "send",
+       "label": "TTL expired → back",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "This time the server accepts it. Failures climb thirty seconds, two minutes, ten minutes; after the fifth failure the job goes to email dead.",
+     "active": [
+      "send",
+      "worker",
+      "smtp"
+     ],
+     "ok": [
+      "smtp"
+     ],
+     "packets": [
+      {
+       "from": "worker",
+       "to": "smtp",
+       "label": "attempt 2",
+       "kind": "req"
+      },
+      {
+       "from": "smtp",
+       "to": "worker",
+       "label": "250 OK",
+       "kind": "res"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dead",
+   "title": "Poison and outages",
+   "summary": "Set aside what can never work; wait out what will",
+   "steps": [
+    {
+     "say": "An address that does not exist: the server answers 550. Retrying cannot help, so the job goes to email dead at once, with the reason in a header. An alert fires when that queue is not empty.",
+     "active": [
+      "worker",
+      "smtp",
+      "dead"
+     ],
+     "bad": [
+      "dead"
+     ],
+     "packets": [
+      {
+       "from": "smtp",
+       "to": "worker",
+       "label": "550 no such mailbox",
+       "kind": "error"
+      },
+      {
+       "from": "worker",
+       "to": "dead",
+       "label": "job · x-reason 550",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "dead",
+       "text": "1",
+       "tone": "bad"
+      }
+     ]
+    },
+    {
+     "say": "An event that is not even valid JSON is sent to order events dlq by the router, so the partition keeps moving.",
+     "active": [
+      "kafka",
+      "router"
+     ],
+     "packets": [
+      {
+       "from": "router",
+       "to": "kafka",
+       "label": "→ order.events.dlq",
+       "kind": "error"
+      }
+     ]
+    },
+    {
+     "say": "Redis goes down. Without the sent log a worker cannot tell a duplicate from a first try, so it does not send: it parks the job in the thirty second queue and tries again later.",
+     "active": [
+      "worker",
+      "redis",
+      "retry"
+     ],
+     "bad": [
+      "redis"
+     ],
+     "dim": [
+      "smtp"
+     ],
+     "packets": [
+      {
+       "from": "worker",
+       "to": "redis",
+       "label": "EXISTS → timeout",
+       "kind": "error"
+      },
+      {
+       "from": "worker",
+       "to": "retry",
+       "label": "park · attempt unchanged",
+       "kind": "req"
+      }
+     ],
+     "log": "Late is better than twice"
+    }
+   ]
+  }
+ ]
+}

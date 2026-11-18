@@ -1,0 +1,12 @@
+flowchart LR
+    O[order-service] -- "OrderConfirmed / OrderCancelled" --> K{{Kafka order.events}}
+    K --> R((router))
+    R -- "job, confirmed" --> X{{exchange email}}
+    X --> Q[(email.send<br/>quorum, priorities)]
+    Q --> W((worker))
+    W -- "sent? claim, mark" --> RD[(Redis)]
+    W -- "SMTP" --> M[Mailpit / provider]
+    W -- "temporary failure" --> RX{{email.retry}} --> RQ[(email.retry.30s / 2m / 10m<br/>TTL, no consumer)]
+    RQ -- "TTL expired, dead-lettered" --> X
+    W -- "permanent or 5th failure" --> DX{{email.dlx}} --> DQ[(email.dead)]
+    R -- "unreadable" --> DLQ{{order.events.dlq}}

@@ -1,0 +1,13 @@
+# Workers scale on queue depth (KEDA reads email.send from RabbitMQ); routers stay at 2 (12 partitions are plenty).
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: notification-worker
+spec:
+  scaleTargetRef: { name: notification-worker }
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  triggers:
+    - type: rabbitmq
+      metadata: { queueName: email.send, mode: QueueLength, value: "200" }
+      authenticationRef: { name: notification-rabbitmq }

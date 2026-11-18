@@ -79,14 +79,14 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>Services (11)</td>
-<td>████████░░ 82%</td>
-<td>inventory, order, payment, cart, catalog, search, review, gateway complete</td>
-<td>notification, recommendation, analytics</td>
+<td>█████████░ 91%</td>
+<td>inventory, order, payment, cart, catalog, search, review, gateway, notification complete</td>
+<td>recommendation, analytics</td>
 </tr>
 <tr>
 <td>Walkthroughs</td>
-<td>████████░░ 80%</td>
-<td>inventory, order, payment, cart, catalog, search, review, gateway</td>
+<td>█████████░ 90%</td>
+<td>inventory, order, payment, cart, catalog, search, review, gateway, notification</td>
 <td>Each new service, system walkthrough</td>
 </tr>
 <tr>
@@ -200,13 +200,13 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>notification-service (Go)</td>
-<td>⏳</td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
+<td>✅</td>
+<td>✅ 13 passing (incl. Kafka + RabbitMQ + Redis + Mailpit)</td>
+<td>✅ (consumed)</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>recommendation-service (Python)</td>
@@ -232,6 +232,12 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </table>
 <h2 id="recently-completed">Recently completed<a class="headerlink" href="#recently-completed" title="Permanent link">#</a></h2>
 <ul>
+<li>
+<p>notification-service (Go 1.27): router commits Kafka offsets only after RabbitMQ confirms the job; worker with a Redis sent log
+  and claim (three copies of one event → one email, 20 concurrent duplicates → one send), delayed retries through TTL quorum queues
+  (30 s, 2 min, 10 min), 5xx and fifth failures to <code>email.dead</code>, unreadable events to <code>order.events.dlq</code>; distroless image,
+  router and worker deployed separately, workers scaled by queue depth.</p>
+</li>
 <li>
 <p>api-gateway + NGINX edge: routes for every public API (reviews and recommendations before the catalogue route), JWT checks with
   issuer and audience, request ids end to end, token buckets shared through one Redis Lua script that fall back to a stricter local
@@ -277,7 +283,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>notification-service (Go): Kafka → RabbitMQ quorum priority queue → SMTP, TTL retries, dead letters, Redis dedupe.</li>
+<li>recommendation-service (Python): co-purchase counts in Redis sorted sets, counted once per order.</li>
 <li>System, module and service diagrams (design document 11).</li>
 </ul>
 <h2 id="risks-and-notes">Risks and notes<a class="headerlink" href="#risks-and-notes" title="Permanent link">#</a></h2>

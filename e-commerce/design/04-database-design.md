@@ -304,7 +304,8 @@ Consistency levels: writes and reads use `LOCAL_QUORUM`; lightweight transaction
 | `cart:c:{customerId}` / `cart:g:{guestId}` | Hash `sku → quantity` | cart-service | 30 days, refreshed on write | `HSET`, `HDEL`, `HGETALL`; merge on sign-in |
 | `product:{id}` | String (JSON) | catalog-service | 10 min | Cache-aside; deleted on change |
 | `request_rate_limiter.{key}.tokens` / `.timestamp` | String | api-gateway | Seconds | Token bucket via a Lua script, atomic |
-| `notif:sent:{eventId}` | String | notification-service | 7 days | `SET NX EX`; the first writer sends the email |
+| `notif:sent:{eventId}` | String | notification-service | 7 days | Written after the email went out; a duplicate job that finds it is acknowledged without sending |
+| `notif:claim:{eventId}` | String | notification-service | 2 min | `SET NX PX` before sending, so concurrent duplicates cannot both send; released on failure, expires after a crash |
 | `reco:also:{sku}` | Sorted set `otherSku → count` | recommendation-service | none (trimmed to top 200) | `ZINCRBY` for every pair in a confirmed order; `ZREVRANGE 0 9` to read |
 | `reco:seen:{eventId}` | String | recommendation-service | 14 days | `SET NX EX` dedupe |
 
@@ -355,8 +356,8 @@ Document id = SKU, because both event streams know it. Full mapping:
 
 | Element | Settings | Why |
 |---|---|---|
-| `email.send` | Quorum queue (Raft-replicated), priority 0–10 | Order confirmations (priority 8) overtake bulk mail |
-| Retry queues | `x-message-ttl` 30 s, 2 min, 10 min, then dead-letter back to `email` | Delayed retries without a scheduler |
+| `email.send` | Quorum queue (Raft-replicated); RabbitMQ 4 delivers priority ≥ 5 before the rest (quorum queues ignore `x-max-priority`) | Order emails (priority 8) overtake bulk mail (priority 1) |
+| Retry queues `email.retry.<delay>` | Quorum, `x-message-ttl` 30 s, 2 min, 10 min, `at-least-once` dead-lettering back to `email` | Delayed retries without a scheduler; never dropped on the way back |
 | `email.dead` | Holds failed jobs; alerting on depth | Poison jobs never block the queue |
 | Worker prefetch | 20 | Bounded in-flight work per worker; fair dispatch |
 | Message properties | `message_id` = event id, persistent delivery | Dedupe and durability |

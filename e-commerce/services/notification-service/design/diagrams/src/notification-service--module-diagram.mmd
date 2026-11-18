@@ -1,0 +1,26 @@
+flowchart LR
+    subgraph adapters_in[Driving adapters]
+        K[kafka.Consumer]
+        RC[rabbit consumer<br/>prefetch 20]
+    end
+    subgraph app[app]
+        RT[Router]
+        WK[Worker]
+    end
+    subgraph domain[domain]
+        PE[ParseEvent → EmailJob]
+        AF[AfterFailure: retry ladder]
+    end
+    subgraph adapters_out[Driven adapters]
+        PUB[rabbit publisher<br/>confirms]
+        SL[dedupe.RedisSentLog]
+        ML[smtp.Mailer]
+        DLQ[kafka dead letters]
+    end
+    K --> RT --> PE
+    RT --> PUB
+    RT --> DLQ
+    RC --> WK --> AF
+    WK --> SL
+    WK --> ML
+    WK --> PUB

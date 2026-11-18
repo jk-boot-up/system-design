@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>notification-service: low-level design</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="notification-service-low-level-design">notification-service: low-level design<a class="headerlink" href="#notification-service-low-level-design" title="Permanent link">#</a></h1>
+<p>Part of the <a href="../../../design/README.html">e-commerce system design</a>. Animated version: <a href="walkthrough/index.html">walkthrough</a>.</p>
+<h2 id="1-responsibilities">1. Responsibilities<a class="headerlink" href="#1-responsibilities" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Does</th>
+<th>Does not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Turn <code>OrderConfirmed</code> and <code>OrderCancelled</code> into emails</td>
+<td>Decide anything about orders</td>
+</tr>
+<tr>
+<td>Send transactional email before bulk email</td>
+<td>Store emails (the provider and Mailpit do)</td>
+</tr>
+<tr>
+<td>Retry temporary failures with growing delays; set aside the rest</td>
+<td>Retry forever: 5 attempts, then <code>email.dead</code></td>
+</tr>
+<tr>
+<td>Send each event's email once, even when the event arrives several times</td>
+<td>Promise exactly once: see §2</td>
+</tr>
+</tbody>
+</table>
+<p>Email jobs are <strong>tasks</strong>, not facts. A work queue with acknowledgements, priorities and delayed retries fits better than a Kafka
+topic, where one slow email would hold up a whole partition.</p>
+<h2 id="2-guarantees">2. Guarantees<a class="headerlink" href="#2-guarantees" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>No event is lost</strong></td>
+<td>The router commits a Kafka offset only after RabbitMQ confirms the job (persistent, quorum queue). If RabbitMQ is down the router retries with back-off and the offset waits</td>
+</tr>
+<tr>
+<td><strong>One email per event, in practice</strong></td>
+<td>Before sending, the worker checks <code>notif:sent:&lt;eventId&gt;</code>, then takes a 2-minute claim <code>notif:claim:&lt;eventId&gt;</code> with <code>SET NX PX</code>, sends, and records <code>notif:sent</code> for 7 days (Kafka's retention). Duplicates find the sent key; concurrent duplicates lose the claim and are retried later</td>
+</tr>
+<tr>
+<td><strong>Never zero emails</strong></td>
+<td>A failed send releases the claim. A crash after sending but before recording can send a second email (SMTP has no idempotency key): at least once, with a very small duplicate window</td>
+</tr>
+<tr>
+<td><strong>Redis down never causes duplicates</strong></td>
+<td>Without the sent log the worker cannot tell a duplicate apart, so it parks the job in the first delay queue rather than send</td>
+</tr>
+<tr>
+<td><strong>Order emails first</strong></td>
+<td>Quorum queues (RabbitMQ 4) deliver priority ≥ 5 before the rest; order emails are priority 8, bulk mail 1</td>
+</tr>
+<tr>
+<td><strong>Poison never blocks</strong></td>
+<td>Unreadable events → <code>order.events.dlq</code>; permanent SMTP rejections (5xx) and jobs failing 5 times → <code>email.dead</code>; unreadable jobs → <code>email.dead</code> as they are</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-module-diagram">3. Module diagram<a class="headerlink" href="#3-module-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Module diagram diagram" src="diagrams/notification-service--module-diagram.light.svg" data-light="diagrams/notification-service--module-diagram.light.svg" data-dark="diagrams/notification-service--module-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="4-interaction-diagram">4. Interaction diagram<a class="headerlink" href="#4-interaction-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Interaction diagram diagram" src="diagrams/notification-service--interaction-diagram.light.svg" data-light="diagrams/notification-service--interaction-diagram.light.svg" data-dark="diagrams/notification-service--interaction-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="5-sequences">5. Sequences<a class="headerlink" href="#5-sequences" title="Permanent link">#</a></h2>
+<h3 id="duplicate-event">Duplicate event<a class="headerlink" href="#duplicate-event" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Duplicate event diagram" src="diagrams/notification-service--duplicate-event.light.svg" data-light="diagrams/notification-service--duplicate-event.light.svg" data-dark="diagrams/notification-service--duplicate-event.dark.svg" loading="lazy"></figure></p>
+<h3 id="temporary-failure-then-success">Temporary failure, then success<a class="headerlink" href="#temporary-failure-then-success" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Temporary failure, then success diagram" src="diagrams/notification-service--temporary-failure-then-success.light.svg" data-light="diagrams/notification-service--temporary-failure-then-success.light.svg" data-dark="diagrams/notification-service--temporary-failure-then-success.dark.svg" loading="lazy"></figure></p>
+<h2 id="6-retry-ladder">6. Retry ladder<a class="headerlink" href="#6-retry-ladder" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Attempt fails</th>
+<th>Next</th>
+<th>Waits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>attempt 2</td>
+<td><code>email.retry.30s</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>attempt 3</td>
+<td><code>email.retry.2m0s</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>attempt 4</td>
+<td><code>email.retry.10m0s</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>attempt 5</td>
+<td><code>email.retry.10m0s</code></td>
+</tr>
+<tr>
+<td>5, or any 5xx</td>
+<td>—</td>
+<td><code>email.dead</code></td>
+</tr>
+</tbody>
+</table>
+<p>Delay queues have no consumer: a message waits out the queue's <code>x-message-ttl</code>, then RabbitMQ dead-letters it back to the <code>email</code>
+exchange (<code>at-least-once</code> dead-lettering, so it cannot be dropped on the way). No scheduler, no polling.</p>
+<h2 id="7-scaling-and-performance">7. Scaling and performance<a class="headerlink" href="#7-scaling-and-performance" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Router:</strong> cheap; bounded by the 12 partitions of <code>order.events</code>, so 2 replicas are plenty.</li>
+<li><strong>Worker:</strong> bounded by SMTP latency. 20 jobs in flight per pod (prefetch 20, 20 goroutines); KEDA adds pods when <code>email.send</code>
+  holds more than 200 jobs per pod. About 30 MB of memory per pod; starts in milliseconds.</li>
+<li><strong>Redis:</strong> two small keys per email; 7-day expiry keeps the set bounded by a week of orders.</li>
+</ul>
+<h2 id="8-failure-handling">8. Failure handling<a class="headerlink" href="#8-failure-handling" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RabbitMQ down</td>
+<td>Router retries the record with back-off (offset not committed); the process exits on a lost connection and Kubernetes restarts it</td>
+</tr>
+<tr>
+<td>Redis down</td>
+<td>Jobs wait in the first delay queue; no emails sent, none duplicated</td>
+</tr>
+<tr>
+<td>SMTP down or 4xx</td>
+<td>Retry ladder; after 5 attempts <code>email.dead</code></td>
+</tr>
+<tr>
+<td>SMTP 5xx (bad address)</td>
+<td><code>email.dead</code> at once</td>
+</tr>
+<tr>
+<td>Worker crash mid-send</td>
+<td>Unacknowledged job is redelivered; the claim expires within 2 minutes; at worst one duplicate email</td>
+</tr>
+<tr>
+<td>Unreadable event</td>
+<td><code>order.events.dlq</code> with an <code>x-reason</code> header; the partition moves on</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-tests">9. Tests<a class="headerlink" href="#9-tests" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Kind</th>
+<th>Proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>domain_test.go</code></td>
+<td>domain</td>
+<td>Event to email (lines, totals, reason text); other events ignored; broken events and header-injection addresses rejected; retry ladder then dead</td>
+</tr>
+<tr>
+<td><code>app_test.go</code></td>
+<td>use cases with fakes</td>
+<td>Same event twice sends once; 20 concurrent duplicates send once; temporary failures climb the ladder with attempts incremented and claims released; 5xx dead at once; Redis down means wait, not send</td>
+</tr>
+<tr>
+<td><code>mailer_test.go</code></td>
+<td>adapter</td>
+<td>5xx permanent, 4xx and network temporary; headers and CRLF line endings</td>
+</tr>
+<tr>
+<td><code>test/containers_test.go</code></td>
+<td>Kafka + RabbitMQ + Redis + Mailpit</td>
+<td>Three copies of one event → exactly one email; cancellation email; a recipient failing twice delivered after two delayed retries (3 attempts); a 5xx tried once and a never-working address tried 5 times, both in <code>email.dead</code>; an unreadable event on <code>order.events.dlq</code> with its reason</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

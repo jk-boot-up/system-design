@@ -375,7 +375,14 @@ CREATE TABLE reviews.review_guard (
 <td>String</td>
 <td>notification-service</td>
 <td>7 days</td>
-<td><code>SET NX EX</code>; the first writer sends the email</td>
+<td>Written after the email went out; a duplicate job that finds it is acknowledged without sending</td>
+</tr>
+<tr>
+<td><code>notif:claim:{eventId}</code></td>
+<td>String</td>
+<td>notification-service</td>
+<td>2 min</td>
+<td><code>SET NX PX</code> before sending, so concurrent duplicates cannot both send; released on failure, expires after a crash</td>
 </tr>
 <tr>
 <td><code>reco:also:{sku}</code></td>
@@ -440,13 +447,13 @@ CREATE TABLE reviews.review_guard (
 <tbody>
 <tr>
 <td><code>email.send</code></td>
-<td>Quorum queue (Raft-replicated), priority 0–10</td>
-<td>Order confirmations (priority 8) overtake bulk mail</td>
+<td>Quorum queue (Raft-replicated); RabbitMQ 4 delivers priority ≥ 5 before the rest (quorum queues ignore <code>x-max-priority</code>)</td>
+<td>Order emails (priority 8) overtake bulk mail (priority 1)</td>
 </tr>
 <tr>
-<td>Retry queues</td>
-<td><code>x-message-ttl</code> 30 s, 2 min, 10 min, then dead-letter back to <code>email</code></td>
-<td>Delayed retries without a scheduler</td>
+<td>Retry queues <code>email.retry.&lt;delay&gt;</code></td>
+<td>Quorum, <code>x-message-ttl</code> 30 s, 2 min, 10 min, <code>at-least-once</code> dead-lettering back to <code>email</code></td>
+<td>Delayed retries without a scheduler; never dropped on the way back</td>
 </tr>
 <tr>
 <td><code>email.dead</code></td>

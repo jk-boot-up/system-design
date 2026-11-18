@@ -1,0 +1,28 @@
+name: e-commerce / notification-service
+
+on:
+  push:
+    paths: ['e-commerce/services/notification-service/**', '.github/workflows/e-commerce-notification-service.yml']
+  pull_request:
+    paths: ['e-commerce/services/notification-service/**', '.github/workflows/e-commerce-notification-service.yml']
+
+defaults:
+  run:
+    working-directory: e-commerce/services/notification-service
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: e-commerce/services/notification-service/go.mod, cache-dependency-path: e-commerce/services/notification-service/go.sum }
+      - name: Format and vet
+        run: test -z "$(gofmt -l .)" && go vet -tags containers ./...
+      - name: Unit tests
+        run: go test -race ./internal/...
+      - name: Container tests (Kafka, RabbitMQ, Redis, Mailpit)
+        run: go test -tags containers -timeout 6m ./test/
+      - name: Container image
+        run: docker build -t e-commerce/notification-service:${{ github.sha }} .

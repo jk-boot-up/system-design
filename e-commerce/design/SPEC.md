@@ -368,7 +368,7 @@ The `check (available >= 0)` constraint is a second line of defence against over
 | Need | Choice | Why | Alternatives considered |
 |---|---|---|---|
 | Main language | Java 25 | Virtual threads simplify blocking I/O at high concurrency; records and sealed types model the domain; LTS | Kotlin |
-| Lightweight event workers | Go 1.24 | Small static binaries, fast start, low memory per pod for I/O-bound consumers | Rust |
+| Lightweight event workers | Go 1.27 | Small static binaries, fast start, low memory per pod for I/O-bound consumers | Rust |
 | Data and ML-style services | Python 3.12 + FastAPI | The natural ecosystem for recommendation and analytics work; async I/O | — |
 | Framework | Spring Boot 4 | Mature ecosystem (data, security, Kafka, observability), first-class virtual threads | Quarkus, Micronaut |
 | Build | Gradle 9 (Kotlin DSL) per Java service | Fast incremental builds; each service has its own wrapper and version catalog, so it builds and upgrades on its own schedule | Maven |
@@ -567,7 +567,7 @@ container images.
 | Language | Services | Why there |
 |---|---|---|
 | Java 25 (Spring Boot 4) | gateway, catalog, search, cart, inventory, order, payment, review | Rich transactional domain logic, mature data and messaging libraries, virtual threads |
-| Go 1.24 | notification-service (event router + email worker) | I/O-bound event processing with tiny memory per pod and instant start, so it scales out cheaply under bursts |
+| Go 1.27 | notification-service (event router + email worker) | I/O-bound event processing with tiny memory per pod and instant start, so it scales out cheaply under bursts |
 | Python 3.12 (FastAPI) | recommendation-service | Data-oriented logic; easy path to richer models (implicit-feedback collaborative filtering) later |
 | SQL (ClickHouse) | analytics | Ingestion and aggregation expressed as materialised views; no service code needed |
 

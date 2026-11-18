@@ -50,7 +50,7 @@ this.
 
 | Concern | Technology |
 |---|---|
-| Runtime | Java 25 (virtual threads), Spring Boot 4.0, Spring Cloud 2025.1; Go 1.24 for notification-service; Python 3.12 + FastAPI for recommendation-service (ADR 0007) |
+| Runtime | Java 25 (virtual threads), Spring Boot 4.0, Spring Cloud 2025.1; Go 1.27 for notification-service; Python 3.12 + FastAPI for recommendation-service (ADR 0007) |
 | Build | One independent build per service: Gradle 9 (Java), Go modules, Python packaging |
 | Edge | CDN + WAF (provider choice), Spring Cloud Gateway |
 | Identity | Keycloak, OAuth 2.1 / OIDC, JWT access tokens |
