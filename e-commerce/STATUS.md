@@ -12,8 +12,8 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Specification and plans | ██████████ 100% | SPEC, PLAN, design plan, implementation plan, prerequisites | Keep in step with changes |
 | System design documents | ███████░░░ 70% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, 11 ADRs | System/module/service diagrams; security, observability, capacity, runbooks |
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
-| Services (11) | █████░░░░░ 55% | inventory, order, payment, cart, catalog complete | search-service, then review, gateway, notification, recommendation, analytics |
-| Walkthroughs | █████░░░░░ 50% | inventory, order, payment, cart, catalog | Each new service, system walkthrough |
+| Services (11) | ██████░░░░ 64% | inventory, order, payment, cart, catalog, search complete | review-service, then gateway, notification, recommendation, analytics |
+| Walkthroughs | ██████░░░░ 60% | inventory, order, payment, cart, catalog, search | Each new service, system walkthrough |
 | Local stack and Kubernetes overlays | ░░░░░░░░░░ 0% | inventory-service `k8s/` base | Compose stack, overlays |
 | End-to-end and performance tests | ░░░░░░░░░░ 0% | — | After checkout works end to end |
 
@@ -26,7 +26,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | payment-service | ✅ | ✅ 17 passing (incl. PostgreSQL + Kafka) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | cart-service | ✅ | ✅ 16 passing (incl. Redis + Kafka) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | catalog-service | ✅ | ✅ 22 passing (incl. PostgreSQL + Redis + Kafka + S3) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| search-service | ⏳ | | | | | | |
+| search-service | ✅ | ✅ 13 passing (incl. OpenSearch + Kafka) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | review-service | ⏳ | | | | | | |
 | api-gateway + NGINX | ⏳ | | | | | | |
 | notification-service (Go) | ⏳ | | | | | | |
@@ -34,6 +34,11 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | analytics (ClickHouse) | ⏳ | | | | | | |
 
 ## Recently completed
+
+* search-service: OpenSearch read model keyed by SKU with two version guards in one scripted upsert (catalogue and stock), so
+  late, repeated and reordered events are no-ops (proved with stock-before-product, v2-before-v1 and stock 9-before-8); multi-select
+  brand facets, cursor pages with `search_after`, retry-forever indexing and a dead-letter topic for unreadable events.
+  inventory-service now adds `stockVersion` to `StockChanged`.
 
 * catalog-service: products and categories (PostgreSQL + JSONB), conditional edits with ETag / If-Match (428 without, 412 when
   stale, proved against a write that commits between the check and the update), Redis cache-aside evicted after commit, presigned
@@ -57,7 +62,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* search-service: OpenSearch index behind an alias, ProductChanged and StockChanged consumers with external versioning, faceted search.
+* review-service: Cassandra tables per query, one review per customer and product (lightweight transaction), counters, verified purchases.
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

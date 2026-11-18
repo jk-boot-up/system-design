@@ -1,0 +1,370 @@
+{
+ "title": "search-service",
+ "subtitle": "A read model that can't go backwards",
+ "nodes": [
+  {
+   "id": "relay1",
+   "label": "catalog relay A",
+   "kind": "job",
+   "tech": "outbox replica 1",
+   "x": 130,
+   "y": 90
+  },
+  {
+   "id": "relay2",
+   "label": "catalog relay B",
+   "kind": "job",
+   "tech": "outbox replica 2",
+   "x": 130,
+   "y": 290
+  },
+  {
+   "id": "inv",
+   "label": "inventory-service",
+   "kind": "service",
+   "tech": "StockChanged",
+   "x": 130,
+   "y": 490
+  },
+  {
+   "id": "kafka",
+   "label": "Kafka",
+   "kind": "queue",
+   "tech": "catalog · inventory",
+   "x": 470,
+   "y": 290
+  },
+  {
+   "id": "search",
+   "label": "search-service",
+   "kind": "service",
+   "tech": "Java 25",
+   "x": 820,
+   "y": 290
+  },
+  {
+   "id": "os",
+   "label": "OpenSearch",
+   "kind": "search",
+   "tech": "alias products",
+   "x": 820,
+   "y": 490
+  },
+  {
+   "id": "shop",
+   "label": "Shopper",
+   "kind": "client",
+   "tech": "search page",
+   "x": 820,
+   "y": 90
+  },
+  {
+   "id": "dlq",
+   "label": "Dead letters",
+   "kind": "queue",
+   "tech": "<topic>.dlq",
+   "x": 470,
+   "y": 490
+  }
+ ],
+ "edges": [
+  {
+   "from": "relay1",
+   "to": "kafka"
+  },
+  {
+   "from": "relay2",
+   "to": "kafka"
+  },
+  {
+   "from": "inv",
+   "to": "kafka"
+  },
+  {
+   "from": "kafka",
+   "to": "search"
+  },
+  {
+   "from": "search",
+   "to": "os"
+  },
+  {
+   "from": "shop",
+   "to": "search"
+  },
+  {
+   "from": "search",
+   "to": "dlq",
+   "dashed": true
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "order",
+   "title": "Events out of order",
+   "summary": "The newest version always wins",
+   "steps": [
+    {
+     "say": "A merchandiser changed the price of SKU 1001 twice: version 1 at 89 euros 90, then version 2 at 79 euros 90. Two outbox relays publish them, and version 2 happens to reach Kafka first.",
+     "active": [
+      "relay1",
+      "relay2",
+      "kafka"
+     ],
+     "packets": [
+      {
+       "from": "relay2",
+       "to": "kafka",
+       "label": "v2 · 79.90",
+       "kind": "event"
+      },
+      {
+       "from": "relay1",
+       "to": "kafka",
+       "label": "v1 · 89.90 (late)",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "Version 2 arrives. The document stores no catalog version yet, so the script writes the product and records version 2.",
+     "active": [
+      "kafka",
+      "search",
+      "os"
+     ],
+     "packets": [
+      {
+       "from": "search",
+       "to": "os",
+       "label": "_update · v2",
+       "kind": "req"
+      }
+     ],
+     "ok": [
+      "os"
+     ],
+     "state": {
+      "title": "SKU-1001",
+      "rows": {
+       "price": "79.90 €",
+       "catalogVersion": 2
+      }
+     }
+    },
+    {
+     "say": "Version 1 arrives late. The script compares: the stored version 2 is not lower than 1, so it sets the operation to none. OpenSearch answers no-op, and the event is counted as stale.",
+     "active": [
+      "search",
+      "os"
+     ],
+     "packets": [
+      {
+       "from": "search",
+       "to": "os",
+       "label": "_update · v1",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "os",
+       "text": "noop",
+       "tone": "ok"
+      }
+     ],
+     "state": {
+      "title": "SKU-1001",
+      "rows": {
+       "price": "79.90 €",
+       "catalogVersion": 2
+      }
+     }
+    },
+    {
+     "say": "Stock works the same way with its own version. Version 9 says zero left; version 8, with four left, arrives after it and is ignored.",
+     "active": [
+      "inv",
+      "kafka",
+      "search",
+      "os"
+     ],
+     "packets": [
+      {
+       "from": "inv",
+       "to": "kafka",
+       "label": "stock v9: 0, v8: 4",
+       "kind": "event"
+      }
+     ],
+     "state": {
+      "title": "SKU-1001",
+      "rows": {
+       "price": "79.90 €",
+       "stockVersion": 9,
+       "inStock": "false"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "query",
+   "title": "Search with facets",
+   "summary": "Filters, facets, cursor pages",
+   "steps": [
+    {
+     "say": "A shopper searches for trail, picks the brand Acme, and sorts by price, twenty per page.",
+     "active": [
+      "shop",
+      "search"
+     ],
+     "packets": [
+      {
+       "from": "shop",
+       "to": "search",
+       "label": "q=trail · brand=Acme · price_asc",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Only active products that the catalogue has described are considered. The brand choice is applied as a post filter, so the brand list still shows every brand with its count.",
+     "active": [
+      "search",
+      "os"
+     ],
+     "packets": [
+      {
+       "from": "search",
+       "to": "os",
+       "label": "bool + post_filter + aggs · size 21",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Twenty one hits are asked for. Twenty are shown; the twenty-first only proves there is another page, and the sort values of item twenty become the cursor.",
+     "active": [
+      "os",
+      "search",
+      "shop"
+     ],
+     "packets": [
+      {
+       "from": "search",
+       "to": "shop",
+       "label": "20 items · facets · nextCursor",
+       "kind": "res"
+      }
+     ],
+     "state": {
+      "title": "Page 1",
+      "rows": {
+       "items": 20,
+       "nextCursor": "[54.90, SKU-1207]"
+      }
+     }
+    },
+    {
+     "say": "The next page continues after that exact price and SKU with search after. No offsets, so page fifty costs the same as page one, and nothing is shown twice.",
+     "active": [
+      "shop",
+      "search",
+      "os"
+     ],
+     "packets": [
+      {
+       "from": "shop",
+       "to": "search",
+       "label": "cursor=…",
+       "kind": "req"
+      },
+      {
+       "from": "search",
+       "to": "os",
+       "label": "search_after [54.90, SKU-1207]",
+       "kind": "req"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "failure",
+   "title": "When things break",
+   "summary": "Pause, don't skip; dead-letter the unreadable",
+   "steps": [
+    {
+     "say": "OpenSearch goes down. Searches answer 503 Search Unavailable with Retry After five seconds. Product pages still work, because they read the catalogue.",
+     "bad": [
+      "os"
+     ],
+     "active": [
+      "shop",
+      "search"
+     ],
+     "packets": [
+      {
+       "from": "search",
+       "to": "shop",
+       "label": "503 SEARCH_UNAVAILABLE",
+       "kind": "error"
+      }
+     ]
+    },
+    {
+     "say": "Indexing does not skip anything: the same event is retried with growing pauses, up to thirty seconds apart, and the partition waits.",
+     "active": [
+      "kafka",
+      "search"
+     ],
+     "bad": [
+      "os"
+     ],
+     "log": "retry in 0.5 s, 1 s, 2 s … 30 s"
+    },
+    {
+     "say": "OpenSearch comes back, and indexing resumes from exactly the event it stopped at.",
+     "ok": [
+      "os"
+     ],
+     "active": [
+      "search",
+      "os"
+     ],
+     "packets": [
+      {
+       "from": "search",
+       "to": "os",
+       "label": "_update (resumed)",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "A message that can never be read, for example one without a product id, is not retried. It goes straight to the dead-letter topic, where operators can inspect and replay it.",
+     "active": [
+      "search",
+      "dlq"
+     ],
+     "packets": [
+      {
+       "from": "search",
+       "to": "dlq",
+       "label": "bad event",
+       "kind": "error"
+      }
+     ],
+     "badges": [
+      {
+       "node": "dlq",
+       "text": "1",
+       "tone": "bad"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

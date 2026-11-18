@@ -1,0 +1,54 @@
+openapi: 3.1.0
+info:
+  title: search-service API
+  version: 1.0.0
+  description: >
+    Full-text, faceted product search over a read model built from catalog.ProductChanged and inventory.StockChanged.
+    Only ACTIVE products are returned. Pages are read with the opaque nextCursor (search_after), never with offsets.
+paths:
+  /api/v1/search:
+    get:
+      operationId: search
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: category, in: query, schema: { type: string }, description: category slug }
+        - { name: brand, in: query, schema: { type: array, items: { type: string }, maxItems: 20 }, style: form, explode: true }
+        - { name: minPrice, in: query, schema: { type: number, minimum: 0 } }
+        - { name: maxPrice, in: query, schema: { type: number, minimum: 0 } }
+        - { name: inStock, in: query, schema: { type: boolean } }
+        - { name: sort, in: query, schema: { enum: [relevance, price_asc, price_desc, newest], default: relevance } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: One page of hits with facet counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/ProductHit' } }
+                  facets:
+                    type: object
+                    properties:
+                      brand: { type: array, items: { $ref: '#/components/schemas/FacetValue' } }
+                      category: { type: array, items: { $ref: '#/components/schemas/FacetValue' } }
+                  total: { type: integer }
+                  nextCursor: { type: [string, 'null'] }
+        '400': { description: 'INVALID_QUERY, INVALID_SORT or INVALID_CURSOR', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+        '503': { description: 'SEARCH_UNAVAILABLE (Retry-After: 5)', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+components:
+  schemas:
+    ProductHit:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        name: { type: string }
+        brand: { type: string }
+        category: { type: string }
+        price: { type: object, properties: { amount: { type: string }, currency: { type: string } } }
+        inStock: { type: boolean }
+        image: { type: [string, 'null'], description: object key of the first image }
+    FacetValue: { type: object, properties: { value: { type: string }, count: { type: integer } } }
+    Problem: { type: object, properties: { title: { type: string }, status: { type: integer }, detail: { type: string }, code: { type: string } } }

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>search-service: low-level design</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="search-service-low-level-design">search-service: low-level design<a class="headerlink" href="#search-service-low-level-design" title="Permanent link">#</a></h1>
+<p>Part of the <a href="../../../design/README.html">e-commerce system design</a>. Animated version: <a href="walkthrough/index.html">walkthrough</a>.</p>
+<h2 id="1-responsibilities">1. Responsibilities<a class="headerlink" href="#1-responsibilities" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Does</th>
+<th>Does not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keep a searchable copy of every product with its availability</td>
+<td>Own product or stock data: the catalogue and inventory do</td>
+</tr>
+<tr>
+<td>Answer full-text queries with filters, facets, sorting and cursor pages</td>
+<td>Show drafts or archived products</td>
+</tr>
+<tr>
+<td>Apply catalogue and stock events in any order, any number of times</td>
+<td>Call other services: everything it needs arrives in events</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-guarantees">2. Guarantees<a class="headerlink" href="#2-guarantees" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Out-of-order events never overwrite newer data</strong></td>
+<td>Each document stores <code>catalogVersion</code> and <code>stockVersion</code>. A painless scripted upsert applies a write only if its version is higher, otherwise the result is <code>noop</code></td>
+</tr>
+<tr>
+<td><strong>No dedupe table needed</strong></td>
+<td>A repeated event carries a version that is not higher, so it is a no-op</td>
+</tr>
+<tr>
+<td><strong>Two sources, one document</strong></td>
+<td>Product and stock events touch different fields of the same document (id = SKU), each guarded by its own version. Plain <code>version_type=external</code> cannot do this: it allows only one version per document</td>
+</tr>
+<tr>
+<td><strong>A stock event before its product is not lost</strong></td>
+<td>It creates the document with stock fields only; queries require <code>productId</code>, so it stays hidden until the product arrives</td>
+</tr>
+<tr>
+<td><strong>No event skipped while OpenSearch is down</strong></td>
+<td>The Kafka error handler retries the same record with back-off (up to 30 s apart) without limit; the partition waits</td>
+</tr>
+<tr>
+<td><strong>Poison events do not block</strong></td>
+<td>Unreadable events go straight to <code>&lt;topic&gt;.dlq</code></td>
+</tr>
+<tr>
+<td><strong>Stable pages</strong></td>
+<td><code>search_after</code> with a tie-breaker on SKU: deep pages cost the same as the first, and no item appears twice</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-module-diagram">3. Module diagram<a class="headerlink" href="#3-module-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Module diagram diagram" src="diagrams/search-service--module-diagram.light.svg" data-light="diagrams/search-service--module-diagram.light.svg" data-dark="diagrams/search-service--module-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="4-interaction-diagram">4. Interaction diagram<a class="headerlink" href="#4-interaction-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Interaction diagram diagram" src="diagrams/search-service--interaction-diagram.light.svg" data-light="diagrams/search-service--interaction-diagram.light.svg" data-dark="diagrams/search-service--interaction-diagram.dark.svg" loading="lazy"></figure></p>
+<h2 id="5-sequences">5. Sequences<a class="headerlink" href="#5-sequences" title="Permanent link">#</a></h2>
+<h3 id="a-late-event-arrives">A late event arrives<a class="headerlink" href="#a-late-event-arrives" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="A late event arrives diagram" src="diagrams/search-service--a-late-event-arrives.light.svg" data-light="diagrams/search-service--a-late-event-arrives.light.svg" data-dark="diagrams/search-service--a-late-event-arrives.dark.svg" loading="lazy"></figure></p>
+<h3 id="search-with-facets-and-a-cursor">Search with facets and a cursor<a class="headerlink" href="#search-with-facets-and-a-cursor" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Search with facets and a cursor diagram" src="diagrams/search-service--search-with-facets-and-a-cursor.light.svg" data-light="diagrams/search-service--search-with-facets-and-a-cursor.light.svg" data-dark="diagrams/search-service--search-with-facets-and-a-cursor.dark.svg" loading="lazy"></figure></p>
+<h2 id="6-index-design">6. Index design<a class="headerlink" href="#6-index-design" title="Permanent link">#</a></h2>
+<p>Mapping: <a href="../src/main/resources/opensearch/products-v1.json">products-v1.json</a> (<code>dynamic: strict</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>From</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>productId</code>, <code>sku</code>, <code>category</code>, <code>brand</code>, <code>status</code>, <code>currency</code></td>
+<td>keyword</td>
+<td>ProductChanged</td>
+</tr>
+<tr>
+<td><code>name</code> (+ <code>name.raw</code>), <code>description</code></td>
+<td>text, English analyser</td>
+<td>ProductChanged</td>
+</tr>
+<tr>
+<td><code>price</code></td>
+<td>scaled_float × 100</td>
+<td>ProductChanged</td>
+</tr>
+<tr>
+<td><code>attributes</code></td>
+<td>flat_object</td>
+<td>ProductChanged</td>
+</tr>
+<tr>
+<td><code>image</code></td>
+<td>keyword, not indexed</td>
+<td>first image key</td>
+</tr>
+<tr>
+<td><code>updatedAt</code></td>
+<td>date</td>
+<td>event <code>occurredAt</code></td>
+</tr>
+<tr>
+<td><code>catalogVersion</code></td>
+<td>long</td>
+<td>ProductChanged</td>
+</tr>
+<tr>
+<td><code>available</code>, <code>inStock</code>, <code>stockVersion</code></td>
+<td>integer, boolean, long</td>
+<td>StockChanged</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Mapping changes:</strong> create <code>products-v2</code>, start a consumer group that replays both topics from the earliest offset into it, then
+move the alias in one <code>_aliases</code> call. Readers and writers only ever use the alias.</p>
+<h2 id="7-scaling-and-performance">7. Scaling and performance<a class="headerlink" href="#7-scaling-and-performance" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Pods:</strong> stateless, 2–10 replicas; listener concurrency 3 per pod, up to the 12 partitions of each topic.</li>
+<li><strong>Index:</strong> 3 shards, 1 replica, 1 s refresh: a change is searchable about a second after it is indexed.</li>
+<li><strong>Queries:</strong> filters run in filter context (cached, not scored); <code>track_total_hits</code> gives exact counts for the facet UI.</li>
+<li><strong>Writes:</strong> one <code>_update</code> per event with <code>retry_on_conflict=5</code>, because product and stock writes for the same SKU can meet.</li>
+</ul>
+<h2 id="8-failure-handling">8. Failure handling<a class="headerlink" href="#8-failure-handling" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OpenSearch down</td>
+<td>Search answers 503 <code>SEARCH_UNAVAILABLE</code> with <code>Retry-After: 5</code>; product pages still work from the catalogue. Indexing pauses and resumes from the same offset</td>
+</tr>
+<tr>
+<td>OpenSearch down at start-up</td>
+<td>The service does not start (the index and alias must exist before any write, or OpenSearch would create an index with a guessed mapping)</td>
+</tr>
+<tr>
+<td>Unreadable event</td>
+<td>Sent to <code>&lt;topic&gt;.dlq</code> at once; the partition moves on</td>
+</tr>
+<tr>
+<td>Duplicate or late event</td>
+<td><code>noop</code>, counted in <code>search_events_stale</code></td>
+</tr>
+<tr>
+<td>Index lost</td>
+<td>Rebuilt by replaying <code>catalog.events</code> (and its compacted mirror) and <code>inventory.events</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-tests">9. Tests<a class="headerlink" href="#9-tests" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Kind</th>
+<th>Proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SearchQueryTest</code></td>
+<td>domain</td>
+<td>Defaults, limits, price range, sort parsing; no text means newest first</td>
+</tr>
+<tr>
+<td><code>EventParserTest</code></td>
+<td>adapter</td>
+<td>Envelopes become documents and stock updates; other types skipped; malformed events marked for the DLQ</td>
+</tr>
+<tr>
+<td><code>IndexerTest</code></td>
+<td>application</td>
+<td>Late and repeated events are dropped and counted</td>
+</tr>
+<tr>
+<td><code>HexagonalArchitectureTest</code></td>
+<td>ArchUnit</td>
+<td>Layering</td>
+</tr>
+<tr>
+<td><code>SearchContainersIT</code></td>
+<td>OpenSearch + Kafka</td>
+<td>Stock before product, product v2 before v1, stock 9 before 8: the newest data wins; brand facet still lists every brand while filtering; price range; five items in three cursor pages, sorted, no duplicates; invalid cursor 400; unreadable event on the DLQ</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

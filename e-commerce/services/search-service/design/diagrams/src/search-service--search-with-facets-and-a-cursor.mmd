@@ -1,0 +1,11 @@
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant S as search-service
+    participant OS as OpenSearch
+    B->>S: GET /search?q=trail&brand=Acme&sort=price_asc&limit=20
+    S->>OS: bool(must: multi_match, filter: ACTIVE, has productId) · post_filter brand · aggs brand, category · size 21
+    OS-->>S: 21 hits, facets
+    S-->>B: 20 items, facets, total, nextCursor = sort values of item 20
+    B->>S: GET /search?…&cursor=…
+    S->>OS: same query + search_after [price, sku]

@@ -1,0 +1,6 @@
+flowchart LR
+    GW[api-gateway] -- "GET /api/v1/search" --> S((search-service))
+    KC{{Kafka catalog.events}} -- "ProductChanged (catalogVersion)" --> S
+    KI{{Kafka inventory.events}} -- "StockChanged (stockVersion)" --> S
+    S -- "_update (scripted upsert), _search" --> OS[(OpenSearch<br/>alias products → products-v1)]
+    S -- "unreadable events" --> DLQ{{catalog.events.dlq<br/>inventory.events.dlq}}

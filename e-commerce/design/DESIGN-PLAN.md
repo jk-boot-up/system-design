@@ -69,7 +69,7 @@ Each service also has its own `README.md` (build, run, configure, operate) and `
 | payment-service | Java | ✅ | ✅ | ✅ |
 | cart-service | Java | ✅ | ✅ | ✅ |
 | catalog-service | Java | ✅ | ✅ | ✅ |
-| search-service | Java | ⏳ | ⏳ | ⏳ |
+| search-service | Java | ✅ | ✅ | ✅ |
 | review-service | Java | ⏳ | ⏳ | ⏳ |
 | api-gateway (+ NGINX edge) | Java | ⏳ | ⏳ | ⏳ |
 | notification-service | Go | ⏳ | ⏳ | ⏳ |

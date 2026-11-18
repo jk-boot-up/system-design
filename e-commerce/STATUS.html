@@ -79,14 +79,14 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>Services (11)</td>
-<td>█████░░░░░ 55%</td>
-<td>inventory, order, payment, cart, catalog complete</td>
-<td>search-service, then review, gateway, notification, recommendation, analytics</td>
+<td>██████░░░░ 64%</td>
+<td>inventory, order, payment, cart, catalog, search complete</td>
+<td>review-service, then gateway, notification, recommendation, analytics</td>
 </tr>
 <tr>
 <td>Walkthroughs</td>
-<td>█████░░░░░ 50%</td>
-<td>inventory, order, payment, cart, catalog</td>
+<td>██████░░░░ 60%</td>
+<td>inventory, order, payment, cart, catalog, search</td>
 <td>Each new service, system walkthrough</td>
 </tr>
 <tr>
@@ -170,13 +170,13 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>search-service</td>
-<td>⏳</td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
+<td>✅</td>
+<td>✅ 13 passing (incl. OpenSearch + Kafka)</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>review-service</td>
@@ -233,6 +233,12 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <h2 id="recently-completed">Recently completed<a class="headerlink" href="#recently-completed" title="Permanent link">#</a></h2>
 <ul>
 <li>
+<p>search-service: OpenSearch read model keyed by SKU with two version guards in one scripted upsert (catalogue and stock), so
+  late, repeated and reordered events are no-ops (proved with stock-before-product, v2-before-v1 and stock 9-before-8); multi-select
+  brand facets, cursor pages with <code>search_after</code>, retry-forever indexing and a dead-letter topic for unreadable events.
+  inventory-service now adds <code>stockVersion</code> to <code>StockChanged</code>.</p>
+</li>
+<li>
 <p>catalog-service: products and categories (PostgreSQL + JSONB), conditional edits with ETag / If-Match (428 without, 412 when
   stale, proved against a write that commits between the check and the update), Redis cache-aside evicted after commit, presigned
   uploads straight to S3 storage with confirm-only-if-present, ProductChanged outbox carrying the catalogue version.</p>
@@ -260,7 +266,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>search-service: OpenSearch index behind an alias, ProductChanged and StockChanged consumers with external versioning, faceted search.</li>
+<li>review-service: Cassandra tables per query, one review per customer and product (lightweight transaction), counters, verified purchases.</li>
 <li>System, module and service diagrams (design document 11).</li>
 </ul>
 <h2 id="risks-and-notes">Risks and notes<a class="headerlink" href="#risks-and-notes" title="Permanent link">#</a></h2>

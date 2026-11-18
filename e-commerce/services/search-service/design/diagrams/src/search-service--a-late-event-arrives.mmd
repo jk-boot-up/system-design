@@ -1,0 +1,13 @@
+sequenceDiagram
+    autonumber
+    participant K as Kafka
+    participant S as search-service
+    participant OS as OpenSearch
+    K->>S: ProductChanged SKU-1001 v2 (79.90)
+    S->>OS: _update SKU-1001 · script: stored v (none) < 2 → write
+    OS-->>S: result updated
+    K->>S: ProductChanged SKU-1001 v1 (89.90, sent earlier by another relay)
+    S->>OS: _update SKU-1001 · script: stored v 2 ≥ 1 → ctx.op = none
+    OS-->>S: result noop (counted as stale)
+    K->>S: StockChanged SKU-1001 v9 (0 left)
+    S->>OS: _update · stockVersion: 7 < 9 → inStock false

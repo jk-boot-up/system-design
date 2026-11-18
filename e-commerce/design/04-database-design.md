@@ -295,32 +295,40 @@ Consistency levels: writes and reads use `LOCAL_QUORUM`; counters use `LOCAL_QUO
 
 ## 4.8 OpenSearch mapping (`products-v1`, alias `products`)
 
+Document id = SKU, because both event streams know it. Full mapping:
+[products-v1.json](../services/search-service/src/main/resources/opensearch/products-v1.json).
+
 ```json
 {
   "settings": { "number_of_shards": 3, "number_of_replicas": 1, "refresh_interval": "1s" },
   "mappings": {
     "dynamic": "strict",
     "properties": {
-      "id":          { "type": "keyword" },
-      "sku":         { "type": "keyword" },
-      "name":        { "type": "text", "analyzer": "english", "fields": { "raw": { "type": "keyword" } } },
-      "description": { "type": "text", "analyzer": "english" },
-      "category":    { "type": "keyword" },
-      "brand":       { "type": "keyword" },
-      "price":       { "type": "scaled_float", "scaling_factor": 100 },
-      "currency":    { "type": "keyword" },
-      "attributes":  { "type": "flat_object" },
-      "inStock":     { "type": "boolean" },
-      "available":   { "type": "integer" },
-      "status":      { "type": "keyword" },
-      "updatedAt":   { "type": "date" },
-      "catalogVersion": { "type": "long" }
+      "productId":      { "type": "keyword" },
+      "sku":            { "type": "keyword" },
+      "name":           { "type": "text", "analyzer": "english", "fields": { "raw": { "type": "keyword" } } },
+      "description":    { "type": "text", "analyzer": "english" },
+      "category":       { "type": "keyword" },
+      "brand":          { "type": "keyword" },
+      "price":          { "type": "scaled_float", "scaling_factor": 100 },
+      "currency":       { "type": "keyword" },
+      "attributes":     { "type": "flat_object" },
+      "status":         { "type": "keyword" },
+      "image":          { "type": "keyword", "index": false },
+      "updatedAt":      { "type": "date" },
+      "catalogVersion": { "type": "long" },
+      "inStock":        { "type": "boolean" },
+      "available":      { "type": "integer" },
+      "stockVersion":   { "type": "long" }
     }
   }
 }
 ```
 
-* **Writes are versioned:** the indexer writes with `version_type=external` using the catalogue version. An older event arriving late can never overwrite newer data.
+* **Writes are versioned:** product fields are guarded by `catalogVersion` (from the catalogue) and stock fields by
+  `stockVersion` (the inventory row version). A painless scripted upsert writes only if the incoming version is higher, otherwise
+  the update is a `noop`. An older event arriving late can never overwrite newer data. (`version_type=external` allows a single
+  version per document, so it cannot merge two independent sources.)
 * **Mapping changes:** create `products-v2`, reindex, then switch the alias atomically.
 
 ## 4.9 RabbitMQ topology (notification-service)

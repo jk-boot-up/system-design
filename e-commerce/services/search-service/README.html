@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>search-service</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="search-service">search-service<a class="headerlink" href="#search-service" title="Permanent link">#</a></h1>
+<p>Full-text and faceted product search. It owns no business data: its OpenSearch index is a <strong>read model</strong> built from
+<code>catalog.ProductChanged</code> and <code>inventory.StockChanged</code>, and can always be rebuilt by replaying those topics. Every write is
+<strong>version-guarded</strong>, so events that arrive late, twice or out of order can never overwrite newer data.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Language / framework</td>
+<td>Java 25, Spring Boot 4.0 (virtual threads), OpenSearch REST API through <code>RestClient</code></td>
+</tr>
+<tr>
+<td>Store</td>
+<td>OpenSearch index <code>products-v1</code> behind the alias <code>products</code>; document id = SKU</td>
+</tr>
+<tr>
+<td>Consumes</td>
+<td><code>catalog.ProductChanged</code> (<code>catalog.events</code>), <code>inventory.StockChanged</code> (<code>inventory.events</code>); unreadable events → <code>&lt;topic&gt;.dlq</code></td>
+</tr>
+<tr>
+<td>Called by</td>
+<td>api-gateway (<code>GET /api/v1/search</code>)</td>
+</tr>
+<tr>
+<td>Port</td>
+<td>8082</td>
+</tr>
+<tr>
+<td>Design</td>
+<td><a href="design/README.html">design/README.md</a> · <a href="design/walkthrough/index.html">walkthrough</a></td>
+</tr>
+<tr>
+<td>Prerequisites</td>
+<td><a href="PREREQUISITES.html">PREREQUISITES.md</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">#</a></h2>
+<pre class="highlight"><code>search-service/
+├─ README.md, PREREQUISITES.md, design/, contracts/ (openapi.yaml, consumed/)
+├─ src/main/java/com/jkbootup/ecommerce/search/
+│  ├─ domain/                   ProductDocument, StockUpdate, SearchQuery, SearchResult, SortOrder, WriteOutcome
+│  ├─ application/              Indexer, ProductSearch + port/SearchIndex
+│  ├─ adapter/opensearch/       OpenSearchIndex (versioned scripted upserts, facets, search_after), IndexBootstrap
+│  ├─ adapter/messaging/        IndexingListeners, EventParser
+│  ├─ adapter/web/              SearchController, ProblemHandler (503 SEARCH_UNAVAILABLE)
+│  └─ config/                   wiring, Kafka error handler (retry forever, dead-letter only unreadable events)
+├─ src/main/resources/opensearch/products-v1.json   index settings and strict mapping
+├─ src/test/java/…              domain, parser, indexer, ArchUnit, OpenSearch + Kafka containers
+├─ Dockerfile, k8s/, build files</code></pre>
+<h2 id="build-test-run">Build, test, run<a class="headerlink" href="#build-test-run" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash">./gradlew build
+./gradlew test -PwithContainers                 # OpenSearch + Kafka containers
+cd ../../deploy/compose &amp;&amp; docker compose up -d opensearch kafka &amp;&amp; cd - &amp;&amp; ./gradlew bootRun</code></pre>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENSEARCH_URL</code></td>
+<td><code>http://localhost:9200</code></td>
+<td>OpenSearch</td>
+</tr>
+<tr>
+<td><code>KAFKA_BOOTSTRAP</code></td>
+<td><code>localhost:9092</code></td>
+<td>Kafka</td>
+</tr>
+<tr>
+<td><code>PORT</code></td>
+<td><code>8082</code></td>
+<td>HTTP port</td>
+</tr>
+</tbody>
+</table>
+<h2 id="try-it">Try it<a class="headerlink" href="#try-it" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash">curl 'localhost:8082/api/v1/search?q=trail&amp;brand=Acme&amp;brand=Bolt&amp;maxPrice=100&amp;inStock=true&amp;sort=price_asc&amp;limit=20'
+curl 'localhost:8082/api/v1/search?q=trail&amp;cursor=&lt;nextCursor from the previous page&gt;'</code></pre>
+<h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Health, metrics</td>
+<td><code>/actuator/health/{liveness,readiness}</code>, <code>/actuator/prometheus</code></td>
+</tr>
+<tr>
+<td>Freshness</td>
+<td>Consumer lag of group <code>search-service</code> on <code>catalog.events</code> and <code>inventory.events</code></td>
+</tr>
+<tr>
+<td>Out-of-order traffic</td>
+<td><code>search_events_stale</code> (events ignored because a newer version was already indexed)</td>
+</tr>
+<tr>
+<td>Poison events</td>
+<td>Depth of <code>catalog.events.dlq</code> and <code>inventory.events.dlq</code></td>
+</tr>
+<tr>
+<td>Rebuild</td>
+<td>Create <code>products-v2</code>, reset the consumer group to the earliest offset, then move the alias</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

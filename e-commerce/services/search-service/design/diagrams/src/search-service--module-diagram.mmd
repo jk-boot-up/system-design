@@ -1,0 +1,32 @@
+flowchart TB
+    subgraph web[adapter.web]
+        SC[SearchController]
+        PH[ProblemHandler<br/>503 SEARCH_UNAVAILABLE]
+    end
+    subgraph msg[adapter.messaging]
+        IL[IndexingListeners]
+        EP[EventParser<br/>bad event → DLQ]
+    end
+    subgraph app[application]
+        IX[Indexer<br/>counts stale events]
+        PS[ProductSearch]
+        subgraph ports[port]
+            SI[[SearchIndex]]
+        end
+    end
+    subgraph dom[domain]
+        PD[ProductDocument]
+        SU[StockUpdate]
+        SQ[SearchQuery]
+        SR[SearchResult]
+    end
+    subgraph os[adapter.opensearch]
+        OI[OpenSearchIndex<br/>scripted upserts · facets · search_after]
+        IB[IndexBootstrap<br/>products-v1 + alias]
+    end
+    SC --> PS
+    IL --> EP
+    IL --> IX
+    IX & PS --> SI
+    IX & PS --> dom
+    SI -.-> OI
