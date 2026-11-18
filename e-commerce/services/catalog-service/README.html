@@ -144,6 +144,11 @@ cd ../../deploy/compose &amp;&amp; docker compose up -d postgres redis kafka min
 <td>MinIO; the endpoint must be reachable by the browser that uploads</td>
 </tr>
 <tr>
+<td><code>S3_PUBLIC_ENDPOINT</code></td>
+<td>(same as <code>S3_ENDPOINT</code>)</td>
+<td>Host put in signed upload URLs, when browsers reach storage under another name (compose: <code>http://localhost:9000</code>)</td>
+</tr>
+<tr>
 <td><code>IMAGE_BASE_URL</code></td>
 <td><code>http://localhost:9000/product-images</code></td>
 <td>Where shoppers load images from (the CDN in production)</td>

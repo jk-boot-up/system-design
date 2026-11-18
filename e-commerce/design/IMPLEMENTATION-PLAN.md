@@ -45,7 +45,7 @@ consumers come after it.
 
 | # | Item | Contents | Status |
 |---|---|---|---|
-| P1 | Local stack `deploy/compose` | Compose project `e-commerce`: PostgreSQL (one database per service), Kafka (KRaft), Redis, RabbitMQ, OpenSearch, Cassandra, ClickHouse, MinIO, Keycloak (realm import), Mailpit, NGINX, OpenTelemetry collector, Prometheus, Grafana, Tempo, Loki, plus every service; health checks and start order | ⏳ |
+| P1 | Local stack `deploy/compose` | Compose project `e-commerce`: PostgreSQL (one database per service), Kafka (KRaft), Redis, RabbitMQ, OpenSearch, Cassandra, ClickHouse, MinIO, Keycloak (realm import), Mailpit, NGINX, OpenTelemetry collector, Prometheus, Grafana, Tempo, Loki, plus every service; health checks and start order | ✅ core + profiles; OpenTelemetry, Tempo and Loki moved to P5 |
 | P2 | Kubernetes overlays `deploy/k8s/overlays` | `dev`, `staging`, `prod` composing every service's `k8s/` base; namespaces `e-commerce-shop`, `e-commerce-platform`; operator manifests for data stores | ⏳ |
 | P3 | End-to-end tests `tests/e2e` | Journeys against the running stack: browse, search, cart, checkout, cancel, review, email received, analytics row present | ⏳ |
 | P4 | Performance tests `tests/performance` | Gatling simulations for browse, search, add to cart and checkout, with p99 budgets from the spec | ⏳ |

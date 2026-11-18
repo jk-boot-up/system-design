@@ -50,9 +50,14 @@ public class CatalogConfiguration {
                                    @Value("${catalog.storage.access-key}") String accessKey,
                                    @Value("${catalog.storage.secret-key}") String secretKey,
                                    @Value("${catalog.storage.bucket}") String bucket,
+                                   @Value("${catalog.storage.public-endpoint:}") String publicEndpoint,
+                                   @Value("${catalog.storage.region:us-east-1}") String region,
                                    @Value("${catalog.storage.create-bucket:true}") boolean createBucket, Clock clock) {
-        var storage = new MinioImageStorage(MinioClient.builder().endpoint(endpoint).credentials(accessKey, secretKey).build(),
-                bucket, clock);
+        var client = MinioClient.builder().endpoint(endpoint).region(region).credentials(accessKey, secretKey).build();
+        // The region is set so signing never asks the storage server for it: the public host may be unreachable from here.
+        var signer = publicEndpoint.isBlank() ? client
+                : MinioClient.builder().endpoint(publicEndpoint).region(region).credentials(accessKey, secretKey).build();
+        var storage = new MinioImageStorage(client, signer, bucket, clock);
         if (createBucket) storage.ensureBucket();
         return storage;
     }

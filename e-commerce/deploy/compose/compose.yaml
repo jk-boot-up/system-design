@@ -1,0 +1,304 @@
+# Local stack for the e-commerce system. Compose project "e-commerce".
+#   docker compose up -d --build                     core: checkout path (fits in about 4 GB)
+#   docker compose --profile search up -d             + OpenSearch and search-service
+#   docker compose --profile all up -d                everything (about 10 GB)
+# Profiles: search, reviews, async (RabbitMQ, notification, recommendation), analytics (ClickHouse, Prometheus, Grafana), all.
+name: e-commerce
+
+x-java: &java
+  restart: unless-stopped
+  mem_limit: 512m
+  environment: &java-env
+    KAFKA_BOOTSTRAP: kafka:29092
+    JWT_ISSUER: http://localhost:8180/realms/shop
+    # Keys from inside the network; the issuer claim is still checked against the public URL above.
+    SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/shop/protocol/openid-connect/certs
+    JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError -XX:TieredStopAtLevel=1
+
+x-kafka-ready: &kafka-ready
+  kafka-init: { condition: service_completed_successfully }
+
+services:
+  # ───────────────────────────── infrastructure ─────────────────────────────
+  postgres:
+    image: postgres:17.12-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    ports: ["5432:5432"]
+    volumes: [ "postgres:/var/lib/postgresql/data", "./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro" ]
+    healthcheck: { test: [CMD, pg_isready, -U, postgres], interval: 3s, retries: 30 }
+    mem_limit: 256m
+
+  kafka:
+    image: apache/kafka:4.1.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx384m
+    ports: ["9092:9092"]
+    volumes: [ "kafka:/var/lib/kafka/data" ]
+    healthcheck:
+      test: [CMD-SHELL, /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null]
+      interval: 5s
+      retries: 30
+    mem_limit: 640m
+
+  kafka-init:
+    image: apache/kafka:4.1.0
+    entrypoint: [/bin/bash, /create-topics.sh]
+    volumes: [ "./kafka/create-topics.sh:/create-topics.sh:ro" ]
+    depends_on: { kafka: { condition: service_healthy } }
+
+  redis:
+    image: redis:8.4.8-alpine
+    command: [redis-server, --maxmemory, 128mb, --maxmemory-policy, noeviction, --appendonly, "yes"]
+    ports: ["6379:6379"]
+    volumes: [ "redis:/data" ]
+    healthcheck: { test: [CMD, redis-cli, ping], interval: 3s, retries: 30 }
+    mem_limit: 192m
+
+  keycloak:
+    image: keycloak/keycloak:26.8.2
+    command: [start-dev, --import-realm]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:8180        # tokens always carry this issuer, however Keycloak is reached
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"   # services fetch keys at keycloak:8080
+      KC_HEALTH_ENABLED: "true"
+      JAVA_OPTS_KC_HEAP: -Xms256m -Xmx512m
+    ports: ["8180:8080"]
+    volumes: [ "./keycloak/shop-realm.json:/opt/keycloak/data/import/shop-realm.json:ro" ]
+    healthcheck:
+      test: [CMD-SHELL, "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 5s
+      retries: 60
+    mem_limit: 768m
+
+  storage:   # S3-compatible object storage (RustFS; MinIO no longer publishes community images)
+    image: rustfs/rustfs:1.0.3
+    environment: { RUSTFS_ACCESS_KEY: minioadmin, RUSTFS_SECRET_KEY: minioadmin }
+    ports: ["9000:9000"]
+    volumes: [ "storage:/data" ]
+    mem_limit: 256m
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ["8025:8025", "1025:1025"]
+    mem_limit: 64m
+    profiles: [async, all]
+
+  opensearch:
+    image: opensearchproject/opensearch:3.3.2
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    ports: ["9200:9200"]
+    volumes: [ "opensearch:/usr/share/opensearch/data" ]
+    healthcheck:
+      test: [CMD-SHELL, "curl -sf localhost:9200/_cluster/health?wait_for_status=yellow\\&timeout=2s"]
+      interval: 5s
+      retries: 60
+    mem_limit: 1536m      # 512 MB heap plus off-heap buffers and plugins; 1 GB gets the container killed
+    profiles: [search, all]
+
+  cassandra:
+    image: cassandra:5.0.6
+    environment: { MAX_HEAP_SIZE: 768M, HEAP_NEWSIZE: 128M, CASSANDRA_DC: datacenter1 }
+    ports: ["9042:9042"]
+    volumes: [ "cassandra:/var/lib/cassandra" ]
+    healthcheck: { test: [CMD-SHELL, "cqlsh -e 'describe keyspaces' > /dev/null"], interval: 10s, retries: 30 }
+    mem_limit: 1536m
+    profiles: [reviews, all]
+
+  rabbitmq:
+    image: rabbitmq:4.2-management-alpine
+    environment: { RABBITMQ_DEFAULT_USER: shop, RABBITMQ_DEFAULT_PASS: shop }
+    ports: ["5672:5672", "15672:15672"]
+    volumes: [ "rabbitmq:/var/lib/rabbitmq" ]
+    healthcheck: { test: [CMD, rabbitmq-diagnostics, -q, ping], interval: 5s, retries: 30 }
+    mem_limit: 512m
+    profiles: [async, all]
+
+  analytics:
+    build: ../../services/analytics
+    environment: { KAFKA_BROKERS: "kafka:29092", CLICKHOUSE_GRAFANA_PASSWORD: grafana }
+    ports: ["8123:8123"]
+    volumes: [ "clickhouse:/var/lib/clickhouse" ]
+    depends_on: *kafka-ready
+    ulimits: { nofile: { soft: 262144, hard: 262144 } }
+    mem_limit: 1536m
+    profiles: [analytics, all]
+
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    ports: ["9090:9090"]
+    volumes: [ "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" ]
+    mem_limit: 256m
+    profiles: [analytics, all]
+
+  grafana:
+    image: grafana/grafana:13.2.6
+    environment:
+      GF_PLUGINS_PREINSTALL_SYNC: grafana-clickhouse-datasource@4.23.5
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports: ["${GRAFANA_PORT:-3001}:3000"]     # 3000 is often taken by other dev tools
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../services/analytics/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on: [prometheus, analytics]
+    mem_limit: 256m
+    profiles: [analytics, all]
+
+  # ───────────────────────────── services ─────────────────────────────
+  catalog-service:
+    <<: *java
+    build: ../../services/catalog-service
+    environment:
+      <<: *java-env
+      DB_URL: jdbc:postgresql://postgres:5432/catalog
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://storage:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000      # browsers upload here
+      IMAGE_BASE_URL: http://localhost:9000/product-images
+    ports: ["8081:8081"]
+    depends_on: { <<: *kafka-ready, postgres: { condition: service_healthy }, redis: { condition: service_healthy }, storage: { condition: service_started } }
+    healthcheck: &java-health
+      test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8081 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 5s
+      retries: 60
+
+  inventory-service:
+    <<: *java
+    build: ../../services/inventory-service
+    environment: { <<: *java-env, DB_URL: "jdbc:postgresql://postgres:5432/inventory" }
+    ports: ["8084:8084"]
+    depends_on: { <<: *kafka-ready, postgres: { condition: service_healthy } }
+    healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8084 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
+
+  payment-service:
+    <<: *java
+    build: ../../services/payment-service
+    environment: { <<: *java-env, DB_URL: "jdbc:postgresql://postgres:5432/payments" }
+    ports: ["8086:8086"]
+    depends_on: { <<: *kafka-ready, postgres: { condition: service_healthy } }
+    healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8086 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
+
+  cart-service:
+    <<: *java
+    build: ../../services/cart-service
+    environment: { <<: *java-env, REDIS_URL: "redis://redis:6379", CATALOG_URL: "http://catalog-service:8081" }
+    ports: ["8083:8083"]
+    depends_on: { <<: *kafka-ready, redis: { condition: service_healthy }, keycloak: { condition: service_healthy } }
+    healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8083 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
+
+  order-service:
+    <<: *java
+    build: ../../services/order-service
+    environment:
+      <<: *java-env
+      DB_URL: jdbc:postgresql://postgres:5432/orders
+      CART_URL: http://cart-service:8083
+      INVENTORY_URL: http://inventory-service:8084
+      PAYMENT_URL: http://payment-service:8086
+    ports: ["8085:8085"]
+    depends_on: { <<: *kafka-ready, postgres: { condition: service_healthy }, keycloak: { condition: service_healthy } }
+    healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8085 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
+
+  search-service:
+    <<: *java
+    build: ../../services/search-service
+    environment: { <<: *java-env, OPENSEARCH_URL: "http://opensearch:9200" }
+    ports: ["8082:8082"]
+    depends_on: { <<: *kafka-ready, opensearch: { condition: service_healthy } }
+    healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8082 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
+    profiles: [search, all]
+
+  review-service:
+    <<: *java
+    build: ../../services/review-service
+    environment: { <<: *java-env, CASSANDRA_CONTACT_POINTS: "cassandra:9042" }
+    ports: ["8087:8087"]
+    depends_on: { <<: *kafka-ready, cassandra: { condition: service_healthy }, keycloak: { condition: service_healthy } }
+    healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8087 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
+    profiles: [reviews, all]
+
+  notification-service:
+    build: ../../services/notification-service
+    restart: unless-stopped
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      RABBITMQ_URL: amqp://shop:shop@rabbitmq:5672/
+      REDIS_URL: redis://redis:6379
+      SMTP_ADDR: mailpit:1025
+    ports: ["8088:8088"]
+    depends_on: { <<: *kafka-ready, rabbitmq: { condition: service_healthy }, redis: { condition: service_healthy }, mailpit: { condition: service_started } }
+    mem_limit: 128m
+    profiles: [async, all]
+
+  recommendation-service:
+    build: ../../services/recommendation-service
+    restart: unless-stopped
+    environment: { KAFKA_BOOTSTRAP: "kafka:29092", REDIS_URL: "redis://redis:6379" }
+    ports: ["8089:8089"]
+    depends_on: { <<: *kafka-ready, redis: { condition: service_healthy } }
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8089/readyz')"]
+      interval: 5s
+      retries: 30
+    mem_limit: 192m
+    profiles: [async, all]
+
+  api-gateway:
+    <<: *java
+    build: ../../services/api-gateway
+    environment:
+      <<: *java-env
+      REDIS_URL: redis://redis:6379
+      JWT_JWK_SET_URI: http://keycloak:8080/realms/shop/protocol/openid-connect/certs
+      # Local JVMs start cold (C1 only, no CDS warm-up): allow 5 s instead of 2 s before the fallback answers 503.
+      RESILIENCE4J_TIMELIMITER_CONFIGS_DEFAULT_TIMEOUTDURATION: 5s
+      SHOP_ORIGINS: http://localhost:5173,https://localhost:8443
+      CATALOG_URL: http://catalog-service:8081
+      SEARCH_URL: http://search-service:8082
+      CART_URL: http://cart-service:8083
+      INVENTORY_URL: http://inventory-service:8084
+      ORDER_URL: http://order-service:8085
+      REVIEW_URL: http://review-service:8087
+      RECOMMENDATION_URL: http://recommendation-service:8089
+    ports: ["8080:8080"]
+    depends_on: { redis: { condition: service_healthy }, keycloak: { condition: service_healthy } }
+    healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
+
+  edge:
+    build: ../../services/api-gateway/edge
+    restart: unless-stopped
+    environment: { GATEWAY_UPSTREAM: "api-gateway:8080" }
+    ports: ["8000:8080", "8443:8443"]
+    volumes: [ "../..:/usr/share/nginx/docs:ro" ]      # the generated HTML documentation at https://localhost:8443/docs/
+    depends_on: { api-gateway: { condition: service_healthy } }
+    mem_limit: 64m
+
+volumes:
+  postgres:
+  kafka:
+  redis:
+  storage:
+  opensearch:
+  cassandra:
+  rabbitmq:
+  clickhouse:

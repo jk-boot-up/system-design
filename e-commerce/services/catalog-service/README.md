@@ -50,6 +50,7 @@ cd ../../deploy/compose && docker compose up -d postgres redis kafka minio && cd
 | `REDIS_URL` | `redis://localhost:6379` | Redis (product cache) |
 | `KAFKA_BOOTSTRAP` | `localhost:9092` | Kafka |
 | `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` | `http://localhost:9000`, `minioadmin`, `minioadmin`, `product-images` | MinIO; the endpoint must be reachable by the browser that uploads |
+| `S3_PUBLIC_ENDPOINT` | (same as `S3_ENDPOINT`) | Host put in signed upload URLs, when browsers reach storage under another name (compose: `http://localhost:9000`) |
 | `IMAGE_BASE_URL` | `http://localhost:9000/product-images` | Where shoppers load images from (the CDN in production) |
 | `JWT_ISSUER` | `http://localhost:8180/realms/shop` | Keycloak realm |
 | `PORT` | `8081` | HTTP port |

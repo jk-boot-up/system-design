@@ -22,11 +22,22 @@ import java.util.Optional;
 public class MinioImageStorage implements ImageStorage {
 
     private final MinioClient client;
+    private final MinioClient signer;
     private final String bucket;
     private final Clock clock;
 
     public MinioImageStorage(MinioClient client, String bucket, Clock clock) {
+        this(client, client, bucket, clock);
+    }
+
+    /**
+     * @param signer signs upload URLs for the browser. It can name a different host from {@code client} (for example
+     *               localhost:9000 outside a container network while the service reaches storage as rustfs:9000). Signing
+     *               is local, so the signer never needs to reach that host itself.
+     */
+    public MinioImageStorage(MinioClient client, MinioClient signer, String bucket, Clock clock) {
         this.client = client;
+        this.signer = signer;
         this.bucket = bucket;
         this.clock = clock;
     }
@@ -44,7 +55,7 @@ public class MinioImageStorage implements ImageStorage {
     @Override
     public UploadTicket presignUpload(String objectKey, String contentType, Duration validFor) {
         try {
-            String url = client.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder().method(Method.PUT).bucket(bucket)
+            String url = signer.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder().method(Method.PUT).bucket(bucket)
                     .object(objectKey).expiry((int) validFor.toSeconds()).extraHeaders(Map.of("Content-Type", contentType)).build());
             return new UploadTicket(url, objectKey, clock.instant().plus(validFor));
         } catch (Exception e) {

@@ -191,6 +191,10 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <td>NGINX keep-alive pool retries the next pod; the PDB keeps half available during upgrades</td>
 </tr>
 <tr>
+<td>A service replaced (new IP address)</td>
+<td>DNS answers are cached at most 10 s and idle pooled connections dropped after 30 s, so traffic follows the new instance within seconds instead of failing for the resolver's TTL (600 s in Docker). Found with the compose stack</td>
+</tr>
+<tr>
 <td>Edge pod lost</td>
 <td>The load balancer drops it; each pod has its own 512 MB cache, refilled within seconds</td>
 </tr>

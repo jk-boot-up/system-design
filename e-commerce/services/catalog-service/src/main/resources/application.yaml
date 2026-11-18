@@ -56,6 +56,7 @@ catalog:
     batch-size: 500
   storage:
     endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${S3_PUBLIC_ENDPOINT:}       # where browsers upload, when it differs from the endpoint above
     access-key: ${S3_ACCESS_KEY:minioadmin}
     secret-key: ${S3_SECRET_KEY:minioadmin}
     bucket: ${S3_BUCKET:product-images}

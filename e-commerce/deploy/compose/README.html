@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Local stack (Docker Compose)</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="local-stack-docker-compose">Local stack (Docker Compose)<a class="headerlink" href="#local-stack-docker-compose" title="Permanent link">#</a></h1>
+<p>Every service and every piece of infrastructure of the e-commerce system on one machine. Compose project <code>e-commerce</code>.</p>
+<pre class="highlight"><code class="language-bash">cd e-commerce/deploy/compose
+docker compose up -d --build                    # core: the checkout path
+./smoke.sh                                      # staff adds a product and stock; Ada buys two; order CONFIRMED, stock 5 → 3
+docker compose --profile all up -d --build      # everything
+docker compose down                             # stop (add -v to delete the data volumes)</code></pre>
+<h2 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">#</a></h2>
+<p>The full stack needs about 10 GB of memory for Docker. With 4 GB (Docker Desktop's default) run the core plus one light profile
+(<code>async</code>), or stop the checkout services while trying <code>search</code>, <code>reviews</code> or <code>analytics</code>: OpenSearch and Cassandra are killed by the
+kernel when the Docker VM itself runs out of memory, whatever their own limits say.</p>
+<table>
+<thead>
+<tr>
+<th>Profile</th>
+<th>Adds</th>
+<th>Memory (limits)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(none) — core</td>
+<td>PostgreSQL, Kafka (+ topic creation), Redis, Keycloak, RustFS (S3), catalog, inventory, payment, cart, order, api-gateway, NGINX edge</td>
+<td>~4 GB</td>
+</tr>
+<tr>
+<td><code>search</code></td>
+<td>OpenSearch, search-service</td>
+<td>+1.5 GB</td>
+</tr>
+<tr>
+<td><code>reviews</code></td>
+<td>Cassandra, review-service</td>
+<td>+2 GB</td>
+</tr>
+<tr>
+<td><code>async</code></td>
+<td>RabbitMQ, Mailpit, notification-service, recommendation-service</td>
+<td>+0.9 GB</td>
+</tr>
+<tr>
+<td><code>analytics</code></td>
+<td>ClickHouse (analytics), Prometheus, Grafana</td>
+<td>+2 GB</td>
+</tr>
+<tr>
+<td><code>all</code></td>
+<td>all of the above</td>
+<td>~10 GB</td>
+</tr>
+</tbody>
+</table>
+<p>Without a profile its routes still exist: the gateway answers <code>503 SEARCH_UNAVAILABLE</code> / <code>DEPENDENCY_UNAVAILABLE</code> at once.</p>
+<h2 id="addresses">Addresses<a class="headerlink" href="#addresses" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Where</th>
+<th>Sign in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Shop API through the edge</td>
+<td>https://localhost:8443/api/v1/… (self-signed certificate)</td>
+<td>Bearer token, below</td>
+</tr>
+<tr>
+<td>System documentation</td>
+<td>https://localhost:8443/docs/</td>
+<td></td>
+</tr>
+<tr>
+<td>Gateway directly</td>
+<td>http://localhost:8080</td>
+<td></td>
+</tr>
+<tr>
+<td>Services directly</td>
+<td>http://localhost:8081 … 8089 (catalog … recommendation)</td>
+<td></td>
+</tr>
+<tr>
+<td>Keycloak</td>
+<td>http://localhost:8180 (realm <code>shop</code>)</td>
+<td>admin / admin</td>
+</tr>
+<tr>
+<td>Grafana</td>
+<td>http://localhost:3001 (<code>GRAFANA_PORT</code> to change; dashboard "E-commerce · Orders and revenue")</td>
+<td>anonymous viewer; admin / admin</td>
+</tr>
+<tr>
+<td>Prometheus</td>
+<td>http://localhost:9090</td>
+<td></td>
+</tr>
+<tr>
+<td>RabbitMQ</td>
+<td>http://localhost:15672</td>
+<td>shop / shop</td>
+</tr>
+<tr>
+<td>Mailpit (emails sent)</td>
+<td>http://localhost:8025</td>
+<td></td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td>localhost:5432, databases <code>inventory</code>, <code>orders</code>, <code>payments</code>, <code>catalog</code></td>
+<td>user = password = database name</td>
+</tr>
+<tr>
+<td>Kafka</td>
+<td>localhost:9092 (containers: kafka:29092)</td>
+<td></td>
+</tr>
+<tr>
+<td>Redis, OpenSearch, Cassandra, ClickHouse, S3</td>
+<td>localhost:6379, 9200, 9042, 8123, 9000</td>
+<td>S3: minioadmin / minioadmin</td>
+</tr>
+</tbody>
+</table>
+<h2 id="users-and-tokens">Users and tokens<a class="headerlink" href="#users-and-tokens" title="Permanent link">#</a></h2>
+<p>Realm <code>shop</code> (<a href="keycloak/shop-realm.json">keycloak/shop-realm.json</a>); password = user name.</p>
+<table>
+<thead>
+<tr>
+<th>User</th>
+<th>Roles</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ada</code>, <code>bob</code></td>
+<td>customer</td>
+<td>Carts, orders, reviews</td>
+</tr>
+<tr>
+<td><code>sam</code></td>
+<td>customer, staff</td>
+<td>Catalogue and stock administration</td>
+</tr>
+</tbody>
+</table>
+<pre class="highlight"><code class="language-bash">TOKEN=$(curl -s -d grant_type=password -d client_id=shop-web -d username=ada -d password=ada \
+  http://localhost:8180/realms/shop/protocol/openid-connect/token | jq -r .access_token)</code></pre>
+<p>Tokens carry <code>iss = http://localhost:8180/realms/shop</code>, <code>aud = shop-api</code>, <code>roles</code>, <code>email</code> and <code>sub</code>. Keycloak always issues that
+issuer (<code>KC_HOSTNAME</code>), while containers fetch its keys at <code>keycloak:8080</code>; services check the issuer against the public URL.</p>
+<h2 id="how-it-fits-together">How it fits together<a class="headerlink" href="#how-it-fits-together" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>One PostgreSQL server, one database and owner per service</strong> (<a href="postgres/init.sql">postgres/init.sql</a>); each service migrates its own schema.</li>
+<li><strong>Kafka in KRaft mode</strong> with two listeners: <code>kafka:29092</code> for containers, <code>localhost:9092</code> for tools and services run from an IDE.
+  Topics are created by <code>kafka-init</code> from the event catalogue (<a href="kafka/create-topics.sh">kafka/create-topics.sh</a>); brokers do not
+  auto-create topics.</li>
+<li><strong>Object storage:</strong> catalog reaches RustFS as <code>storage:9000</code> but signs upload URLs for <code>localhost:9000</code> (<code>S3_PUBLIC_ENDPOINT</code>), the
+  address a browser on this machine can reach.</li>
+<li><strong>Start order</strong> comes from health checks: infrastructure healthy → topics created → services ready → gateway → edge.</li>
+<li><strong>Memory:</strong> each Java service is limited to 512 MB (heap 70 % of it, C1 only for faster start).</li>
+</ul>
+<h2 id="running-one-service-from-the-ide">Running one service from the IDE<a class="headerlink" href="#running-one-service-from-the-ide" title="Permanent link">#</a></h2>
+<p>Stop its container and run it locally; the defaults in each service's <code>application.yaml</code> point at <code>localhost</code> ports above.</p>
+<pre class="highlight"><code class="language-bash">docker compose stop catalog-service
+cd ../../services/catalog-service &amp;&amp; ./gradlew bootRun</code></pre>
+<h2 id="verified">Verified<a class="headerlink" href="#verified" title="Permanent link">#</a></h2>
+<p>On a 4 GB / 4 CPU Docker VM, one profile at a time:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>./smoke.sh</code> (core)</td>
+<td>Product and stock created by staff; second read served from the edge cache (<code>HIT</code>); 2 in Ada's cart; order <code>CONFIRMED</code>; stock 5 → 3</td>
+</tr>
+<tr>
+<td><code>async</code></td>
+<td>One confirmation email per order in Mailpit (also for orders placed before the profile started); a tent-and-stove order makes the tent recommend the stove</td>
+</tr>
+<tr>
+<td><code>search</code></td>
+<td>Products created earlier back-filled from Kafka with stock merged; <code>q=trail</code> finds both smoke products with the Acme brand facet</td>
+</tr>
+<tr>
+<td><code>reviews</code></td>
+<td>Bob's review of a product he bought is marked verified; reads through the edge</td>
+</tr>
+<tr>
+<td><code>analytics</code></td>
+<td>3 confirmed orders, 379.60 EUR in <code>orders_per_day</code>; Grafana's ClickHouse and Prometheus datasources healthy; dashboard provisioned</td>
+</tr>
+</tbody>
+</table>
+<p>Found and fixed while bringing the stack up: health checks must run under bash (<code>/dev/tcp</code>); catalog signs upload URLs for the
+browser's host (<code>S3_PUBLIC_ENDPOINT</code>); the gateway re-resolves service addresses every 10 s (a recreated container gets a new IP,
+which Netty would otherwise trust for Docker's 600 s DNS TTL); OpenSearch needs more than 1 GB; Grafana moved to port 3001.</p>
+<p>Tracing and log aggregation (OpenTelemetry collector, Tempo, Loki) come with the observability work (P5).</p>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

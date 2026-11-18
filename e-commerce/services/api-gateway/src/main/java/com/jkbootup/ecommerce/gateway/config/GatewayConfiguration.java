@@ -8,6 +8,7 @@ import com.jkbootup.ecommerce.gateway.domain.RatePolicy;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.cloud.gateway.config.HttpClientCustomizer;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -58,15 +59,31 @@ public class GatewayConfiguration {
         return new AdmissionControlGatewayFilterFactory(buckets, ratePolicies);
     }
 
+    /**
+     * A service that is replaced gets a new address. Netty would otherwise trust the DNS answer for its full TTL (600 s
+     * from Docker's resolver) and keep idle connections to the old instance, so every request would fail until then.
+     */
+    @Bean
+    HttpClientCustomizer freshUpstreamAddresses() {
+        return client -> client.resolver(spec -> spec.cacheMaxTimeToLive(Duration.ofSeconds(10)).cacheNegativeTimeToLive(Duration.ofSeconds(1)));
+    }
+
     @Bean
     RequestIdFilter requestIdFilter() {
         return new RequestIdFilter();
     }
 
-    /** Signature, expiry, issuer and audience are checked; the issuer's keys are fetched on first use, not at start-up. */
+    /**
+     * Signature, expiry, issuer and audience are checked; keys are fetched on first use, not at start-up. When the issuer's
+     * public URL is not reachable from inside the network (local compose), the keys come from {@code gateway.jwt.jwk-set-uri}
+     * while the issuer claim is still checked against the public URL.
+     */
     @Bean
-    ReactiveJwtDecoder jwtDecoder(@Value("${gateway.jwt.issuer}") String issuer, @Value("${gateway.jwt.audience}") String audience) {
-        NimbusReactiveJwtDecoder decoder = NimbusReactiveJwtDecoder.withIssuerLocation(issuer).build();
+    ReactiveJwtDecoder jwtDecoder(@Value("${gateway.jwt.issuer}") String issuer, @Value("${gateway.jwt.audience}") String audience,
+                                  @Value("${gateway.jwt.jwk-set-uri:}") String jwkSetUri) {
+        NimbusReactiveJwtDecoder decoder = jwkSetUri.isBlank()
+                ? NimbusReactiveJwtDecoder.withIssuerLocation(issuer).build()
+                : NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build();
         OAuth2TokenValidator<Jwt> audienceCheck = new JwtClaimValidator<Collection<String>>("aud", aud -> aud != null && aud.contains(audience));
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefaultWithIssuer(issuer), audienceCheck));
         return decoder;

@@ -87,6 +87,7 @@ A bucket holds at most `burst` tokens and gains `rate` tokens per second. A requ
 | A service down | Its route answers 503 within the time limit, then immediately while the breaker is open; other routes unaffected |
 | Keycloak down | Tokens keep validating with cached keys; new signing keys cannot be fetched until it returns |
 | Gateway pod lost | NGINX keep-alive pool retries the next pod; the PDB keeps half available during upgrades |
+| A service replaced (new IP address) | DNS answers are cached at most 10 s and idle pooled connections dropped after 30 s, so traffic follows the new instance within seconds instead of failing for the resolver's TTL (600 s in Docker). Found with the compose stack |
 | Edge pod lost | The load balancer drops it; each pod has its own 512 MB cache, refilled within seconds |
 
 ## 9. Tests

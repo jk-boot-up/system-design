@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: spring
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [api-gateway:8080, catalog-service:8081, search-service:8082, cart-service:8083, inventory-service:8084,
+                  order-service:8085, payment-service:8086, review-service:8087]
+  - job_name: services
+    metrics_path: /metrics
+    static_configs:
+      - targets: [notification-service:8088, recommendation-service:8089]
+  - job_name: clickhouse
+    static_configs:
+      - targets: [analytics:9363]
+  - job_name: rabbitmq
+    static_configs:
+      - targets: [rabbitmq:15692]

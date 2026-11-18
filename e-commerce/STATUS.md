@@ -35,6 +35,11 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## Recently completed
 
+* Local stack (`deploy/compose`): every service and store, a Keycloak realm with test users, topics from the event catalogue, profiles
+  so it runs in 4 GB, and `smoke.sh` buying through the NGINX edge (verified, plus async, search, reviews and analytics profiles).
+  Bringing it up found and fixed: stale upstream addresses in the gateway after a container is replaced, browser-reachable upload
+  URLs in catalog, an optional JWK set URI for the gateway, bash health checks, OpenSearch memory.
+
 * analytics (ClickHouse 26.8): Kafka engine table with a named collection and error streaming, facts deduplicated by event id,
   rollups as refreshable views over `FINAL` so a re-delivered event never doubles revenue (the design's insert-triggered rollup would
   have), unreadable messages kept with reasons, hashed customer ids, read-only Grafana user, provisioned Grafana 13.2 dashboard
@@ -85,7 +90,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* Platform: local compose stack (P1), then system diagrams, security, observability, capacity and runbooks (S13–S17), system walkthrough (S19).
+* Platform: k8s overlays (P2), end-to-end tests (P3), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes
