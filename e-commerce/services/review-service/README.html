@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>review-service</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="review-service">review-service<a class="headerlink" href="#review-service" title="Permanent link">#</a></h1>
+<p>Product reviews and star ratings in Cassandra. A customer can review a product <strong>once</strong>; the review shows a <strong>verified</strong> badge
+when the customer bought the product, which the service learns from <code>order.OrderConfirmed</code>. Every table is shaped for one query,
+and posting is <strong>resumable</strong>: if a pod dies half-way, the customer's retry finishes the review and the counters are never
+incremented twice.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Language / framework</td>
+<td>Java 25, Spring Boot 4.0 (virtual threads), Apache Cassandra Java driver 4.19</td>
+</tr>
+<tr>
+<td>Store</td>
+<td>Cassandra keyspace <code>reviews</code>: <code>reviews_by_product</code>, <code>review_buckets_by_product</code>, <code>rating_summary_by_product</code> (counters), <code>purchases_by_customer</code>, <code>review_guard</code></td>
+</tr>
+<tr>
+<td>Consumes</td>
+<td><code>order.OrderConfirmed</code> (purchases for the verified badge)</td>
+</tr>
+<tr>
+<td>Publishes</td>
+<td><code>review.ReviewPosted</code> on <code>review.events</code> (best effort)</td>
+</tr>
+<tr>
+<td>Called by</td>
+<td>api-gateway</td>
+</tr>
+<tr>
+<td>Port</td>
+<td>8087</td>
+</tr>
+<tr>
+<td>Design</td>
+<td><a href="design/README.html">design/README.md</a> · <a href="design/walkthrough/index.html">walkthrough</a></td>
+</tr>
+<tr>
+<td>Prerequisites</td>
+<td><a href="PREREQUISITES.html">PREREQUISITES.md</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">#</a></h2>
+<pre class="highlight"><code>review-service/
+├─ README.md, PREREQUISITES.md, design/, contracts/ (openapi.yaml, events/, consumed/)
+├─ src/main/java/com/jkbootup/ecommerce/review/
+│  ├─ domain/                   Review (month bucket), RatingSummary, PostOutcome, ReviewPage
+│  ├─ application/              ReviewService (claim → append → count once) + port/ (ReviewStore, PurchaseLedger, ReviewEvents)
+│  ├─ adapter/cassandra/        CassandraReviewStore (prepared statements, lightweight transactions), SchemaInitializer
+│  ├─ adapter/messaging/        OrderConfirmedListener, KafkaReviewEvents
+│  ├─ adapter/web/              ReviewController, ProblemHandler
+│  └─ config/                   wiring, security (reads public, posting needs a customer token)
+├─ src/main/resources/cassandra/schema.cql
+├─ src/test/java/…              domain, service with crash injection, ArchUnit, Cassandra + Kafka containers
+├─ Dockerfile, k8s/, build files</code></pre>
+<h2 id="build-test-run">Build, test, run<a class="headerlink" href="#build-test-run" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash">./gradlew build
+./gradlew test -PwithContainers                 # Cassandra + Kafka containers
+cd ../../deploy/compose &amp;&amp; docker compose up -d cassandra kafka &amp;&amp; cd - &amp;&amp; ./gradlew bootRun</code></pre>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CASSANDRA_CONTACT_POINTS</code></td>
+<td><code>localhost:9042</code></td>
+<td>Cassandra</td>
+</tr>
+<tr>
+<td><code>CASSANDRA_DC</code></td>
+<td><code>datacenter1</code></td>
+<td>Local data centre</td>
+</tr>
+<tr>
+<td><code>CASSANDRA_REPLICATION</code></td>
+<td><code>{'class': 'SimpleStrategy', 'replication_factor': 1}</code></td>
+<td>Keyspace replication; production uses <code>NetworkTopologyStrategy</code> with 3 replicas</td>
+</tr>
+<tr>
+<td><code>KAFKA_BOOTSTRAP</code></td>
+<td><code>localhost:9092</code></td>
+<td>Kafka</td>
+</tr>
+<tr>
+<td><code>JWT_ISSUER</code></td>
+<td><code>http://localhost:8180/realms/shop</code></td>
+<td>Keycloak realm</td>
+</tr>
+<tr>
+<td><code>PORT</code></td>
+<td><code>8087</code></td>
+<td>HTTP port</td>
+</tr>
+</tbody>
+</table>
+<h2 id="try-it">Try it<a class="headerlink" href="#try-it" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash">curl localhost:8087/api/v1/products/SKU-1001/reviews
+curl -X POST localhost:8087/api/v1/products/SKU-1001/reviews -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"rating":5,"title":"Great grip","body":"No slips on wet rock."}'          # 201, then 409 ALREADY_REVIEWED</code></pre>
+<h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Health, metrics</td>
+<td><code>/actuator/health/{liveness,readiness}</code>, <code>/actuator/prometheus</code> (Cassandra driver metrics included)</td>
+</tr>
+<tr>
+<td>Unfinished posts</td>
+<td><code>SELECT count(*) FROM reviews.review_guard WHERE counted = false ALLOW FILTERING</code> (operator query; should be near 0)</td>
+</tr>
+<tr>
+<td>Purchase feed</td>
+<td>Consumer lag of group <code>review-service</code> on <code>order.events</code>; <code>order.events.dlq</code> depth</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

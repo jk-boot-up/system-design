@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jkbootup.dev/e-commerce/events/review.ReviewPosted.v1.json",
+  "title": "review.ReviewPosted v1",
+  "description": "Published on topic review.events (key = SKU) after a review is stored and counted. Best effort: Cassandra has no transaction to hold an outbox row.",
+  "type": "object",
+  "required": ["eventId", "type", "version", "occurredAt", "aggregateId", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "type": { "const": "review.ReviewPosted" },
+    "version": { "const": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "aggregateId": { "type": "string", "description": "the SKU" },
+    "payload": {
+      "type": "object",
+      "required": ["sku", "reviewId", "rating", "verified"],
+      "properties": {
+        "sku": { "type": "string" },
+        "reviewId": { "type": "string", "format": "uuid" },
+        "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "verified": { "type": "boolean" }
+      }
+    }
+  }
+}

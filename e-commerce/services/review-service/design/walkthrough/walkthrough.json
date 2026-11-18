@@ -1,0 +1,359 @@
+{
+ "title": "review-service",
+ "subtitle": "One review each, counted once, even after a crash",
+ "nodes": [
+  {
+   "id": "ada",
+   "label": "Ada",
+   "kind": "client",
+   "tech": "customer",
+   "x": 130,
+   "y": 90
+  },
+  {
+   "id": "pod1",
+   "label": "review pod 1",
+   "kind": "service",
+   "tech": "Java 25",
+   "x": 470,
+   "y": 90
+  },
+  {
+   "id": "pod2",
+   "label": "review pod 2",
+   "kind": "service",
+   "tech": "Java 25",
+   "x": 470,
+   "y": 290
+  },
+  {
+   "id": "guard",
+   "label": "review_guard",
+   "kind": "db",
+   "tech": "LWT · counted",
+   "x": 820,
+   "y": 90
+  },
+  {
+   "id": "timeline",
+   "label": "reviews_by_product",
+   "kind": "db",
+   "tech": "sku + month",
+   "x": 820,
+   "y": 290
+  },
+  {
+   "id": "counters",
+   "label": "rating_summary",
+   "kind": "db",
+   "tech": "counters",
+   "x": 820,
+   "y": 490
+  },
+  {
+   "id": "kafka",
+   "label": "Kafka",
+   "kind": "queue",
+   "tech": "order.events",
+   "x": 130,
+   "y": 490
+  },
+  {
+   "id": "buys",
+   "label": "purchases_by_customer",
+   "kind": "db",
+   "tech": "verified badge",
+   "x": 470,
+   "y": 490
+  }
+ ],
+ "edges": [
+  {
+   "from": "ada",
+   "to": "pod1"
+  },
+  {
+   "from": "ada",
+   "to": "pod2"
+  },
+  {
+   "from": "pod1",
+   "to": "guard"
+  },
+  {
+   "from": "pod2",
+   "to": "guard"
+  },
+  {
+   "from": "pod2",
+   "to": "timeline"
+  },
+  {
+   "from": "pod2",
+   "to": "counters"
+  },
+  {
+   "from": "kafka",
+   "to": "buys",
+   "dashed": true
+  },
+  {
+   "from": "pod1",
+   "to": "timeline"
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "post",
+   "title": "One review per customer",
+   "summary": "A lightweight transaction decides",
+   "steps": [
+    {
+     "say": "Ada bought the trail shoes last week. The order confirmation reached the review service through Kafka, and her purchase was recorded.",
+     "active": [
+      "kafka",
+      "buys"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "buys",
+       "label": "OrderConfirmed (Ada, SKU-1001)",
+       "kind": "event"
+      }
+     ],
+     "state": {
+      "title": "Ada",
+      "rows": {
+       "bought SKU-1001": "yes"
+      }
+     }
+    },
+    {
+     "say": "Ada posts five stars. The service checks her purchase, so the review will be verified, and then claims the slot for Ada and this product with insert if not exists.",
+     "active": [
+      "ada",
+      "pod1",
+      "guard"
+     ],
+     "packets": [
+      {
+       "from": "ada",
+       "to": "pod1",
+       "label": "POST 5★ Great grip",
+       "kind": "req"
+      },
+      {
+       "from": "pod1",
+       "to": "guard",
+       "label": "INSERT … IF NOT EXISTS",
+       "kind": "req"
+      }
+     ],
+     "ok": [
+      "guard"
+     ],
+     "state": {
+      "title": "review_guard",
+      "rows": {
+       "SKU-1001 · Ada": "claimed, counted = false"
+      }
+     }
+    },
+    {
+     "say": "The review is written to this month's partition of the product's timeline. Then a second conditional update flips counted from false to true, and only because that succeeded are the counters incremented.",
+     "active": [
+      "pod1",
+      "timeline",
+      "guard",
+      "counters"
+     ],
+     "packets": [
+      {
+       "from": "pod1",
+       "to": "timeline",
+       "label": "append (2026-11)",
+       "kind": "req"
+      },
+      {
+       "from": "pod1",
+       "to": "guard",
+       "label": "counted = true IF false",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "rating_summary",
+      "rows": {
+       "count": 1,
+       "total": 5,
+       "average": "5.0"
+      }
+     }
+    },
+    {
+     "say": "Ada tries to post again. The claim already exists and is counted, so she gets 409 Already Reviewed.",
+     "active": [
+      "ada",
+      "pod1",
+      "guard"
+     ],
+     "bad": [
+      "ada"
+     ],
+     "packets": [
+      {
+       "from": "pod1",
+       "to": "ada",
+       "label": "409 ALREADY_REVIEWED",
+       "kind": "error"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crash",
+   "title": "A crash half-way",
+   "summary": "The retry finishes the job",
+   "steps": [
+    {
+     "say": "Bob posts four stars. Pod 1 claims the slot, and then the pod dies before writing the review.",
+     "active": [
+      "pod1",
+      "guard"
+     ],
+     "bad": [
+      "pod1"
+     ],
+     "packets": [
+      {
+       "from": "pod1",
+       "to": "guard",
+       "label": "INSERT … IF NOT EXISTS",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "review_guard",
+      "rows": {
+       "SKU-1001 · Bob": "claimed, counted = false"
+      }
+     }
+    },
+    {
+     "say": "Bob's browser retries and reaches pod 2. The insert is not applied, and Cassandra returns the existing claim: Bob's first review, not yet counted.",
+     "active": [
+      "pod2",
+      "guard"
+     ],
+     "packets": [
+      {
+       "from": "pod2",
+       "to": "guard",
+       "label": "INSERT … IF NOT EXISTS → not applied",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Pod 2 finishes the first attempt: it appends that review, flips counted, and increments the counters. Bob gets 201 with his original review.",
+     "active": [
+      "pod2",
+      "timeline",
+      "guard",
+      "counters"
+     ],
+     "ok": [
+      "counters"
+     ],
+     "packets": [
+      {
+       "from": "pod2",
+       "to": "timeline",
+       "label": "append",
+       "kind": "req"
+      },
+      {
+       "from": "pod2",
+       "to": "counters",
+       "label": "+1, +4",
+       "kind": "req"
+      }
+     ],
+     "state": {
+      "title": "rating_summary",
+      "rows": {
+       "count": 2,
+       "total": 9,
+       "average": "4.5"
+      }
+     }
+    },
+    {
+     "say": "Whatever the timing, only one caller can flip counted, so the counters can never include a review twice.",
+     "active": [
+      "guard"
+     ],
+     "badges": [
+      {
+       "node": "guard",
+       "text": "once",
+       "tone": "ok"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "read",
+   "title": "Reading reviews",
+   "summary": "Month buckets, newest first",
+   "steps": [
+    {
+     "say": "A shopper opens the reviews. The service reads the list of month buckets for the product, newest first.",
+     "active": [
+      "pod1",
+      "timeline"
+     ],
+     "state": {
+      "title": "Buckets",
+      "rows": {
+       "SKU-1001": "2026-11, 2026-10, 2026-09"
+      }
+     }
+    },
+    {
+     "say": "It reads November first. If the page is not full, it continues in October, and so on. Each read touches one small partition.",
+     "active": [
+      "pod1",
+      "timeline"
+     ],
+     "packets": [
+      {
+       "from": "pod1",
+       "to": "timeline",
+       "label": "sku, 2026-11 · LIMIT 11",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The cursor holds the month, time and id of the last review shown, so the next page starts exactly after it.",
+     "active": [
+      "pod1",
+      "ada"
+     ],
+     "packets": [
+      {
+       "from": "pod1",
+       "to": "ada",
+       "label": "10 reviews · nextCursor",
+       "kind": "res"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

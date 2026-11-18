@@ -1,0 +1,28 @@
+name: e-commerce / review-service
+
+on:
+  push:
+    paths: ['e-commerce/services/review-service/**', '.github/workflows/e-commerce-review-service.yml']
+  pull_request:
+    paths: ['e-commerce/services/review-service/**', '.github/workflows/e-commerce-review-service.yml']
+
+defaults:
+  run:
+    working-directory: e-commerce/services/review-service
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '25' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit, architecture and container tests (Cassandra, Kafka)
+        run: ./gradlew build -PwithContainers
+      - name: Container image
+        run: docker build -t e-commerce/review-service:${{ github.sha }} .
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: review-service-test-reports, path: e-commerce/services/review-service/build/reports }

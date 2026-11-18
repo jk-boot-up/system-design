@@ -70,7 +70,7 @@ Each service also has its own `README.md` (build, run, configure, operate) and `
 | cart-service | Java | ✅ | ✅ | ✅ |
 | catalog-service | Java | ✅ | ✅ | ✅ |
 | search-service | Java | ✅ | ✅ | ✅ |
-| review-service | Java | ⏳ | ⏳ | ⏳ |
+| review-service | Java | ✅ | ✅ | ✅ |
 | api-gateway (+ NGINX edge) | Java | ⏳ | ⏳ | ⏳ |
 | notification-service | Go | ⏳ | ⏳ | ⏳ |
 | recommendation-service | Python | ⏳ | ⏳ | ⏳ |

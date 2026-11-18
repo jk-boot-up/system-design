@@ -230,7 +230,8 @@ create table payment_attempts (
 
 ## 4.6 reviews (Cassandra)
 
-Each table is designed around one query; data is duplicated on purpose.
+Each table is designed around one query; data is duplicated on purpose. Full schema:
+[schema.cql](../services/review-service/src/main/resources/cassandra/schema.cql).
 
 ```sql
 CREATE KEYSPACE reviews WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3};
@@ -247,7 +248,14 @@ CREATE TABLE reviews.reviews_by_product (
   body        text,
   verified    boolean,
   PRIMARY KEY ((sku, bucket), created_at, review_id)
-) WITH CLUSTERING ORDER BY (created_at DESC, review_id ASC);
+) WITH CLUSTERING ORDER BY (created_at DESC, review_id DESC);
+
+-- Q1b: which months hold reviews of a product, newest first
+CREATE TABLE reviews.review_buckets_by_product (
+  sku    text,
+  bucket text,
+  PRIMARY KEY ((sku), bucket)
+) WITH CLUSTERING ORDER BY (bucket DESC);
 
 -- Q2: rating summary of a product
 CREATE TABLE reviews.rating_summary_by_product (
@@ -264,23 +272,30 @@ CREATE TABLE reviews.purchases_by_customer (
   PRIMARY KEY ((customer_id), sku)
 );
 
--- Q4: one review per customer per product (lightweight transaction guard)
+-- Q4: one review per customer per product (lightweight transaction guard). The claim holds the review and whether the
+-- counters include it, so an attempt that stopped half-way can be finished by a retry.
 CREATE TABLE reviews.review_guard (
   sku         text,
   customer_id uuid,
   review_id   uuid,
+  rating      int,
+  title       text,
+  body        text,
+  verified    boolean,
+  created_at  timestamp,
+  counted     boolean,
   PRIMARY KEY ((sku, customer_id))
 );
 ```
 
 | Query | Table | Access |
 |---|---|---|
-| Show newest reviews | `reviews_by_product` | Read the current month's bucket; continue to earlier buckets until the page is full |
+| Show newest reviews | `review_buckets_by_product`, then `reviews_by_product` | Walk the buckets newest first until the page is full; `(created_at, review_id) < (…)` continues after the cursor |
 | Show rating | `rating_summary_by_product` | Single-partition read; average = total ÷ count |
 | Verified-purchase badge | `purchases_by_customer` | Single-partition read |
-| Post review | `review_guard` `INSERT … IF NOT EXISTS`, then insert the review and increment counters | The LWT happens once per review, which is rare compared with reads |
+| Post review | `review_guard` `INSERT … IF NOT EXISTS`; append the review; `UPDATE … SET counted = true IF counted = false`; only then increment counters | Two lightweight transactions per review, which is rare compared with reads; a retry finishes an interrupted post |
 
-Consistency levels: writes and reads use `LOCAL_QUORUM`; counters use `LOCAL_QUORUM`.
+Consistency levels: writes and reads use `LOCAL_QUORUM`; lightweight transactions use `LOCAL_SERIAL`; counters use `LOCAL_QUORUM`.
 
 ## 4.7 Redis key design
 

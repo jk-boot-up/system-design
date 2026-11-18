@@ -1,0 +1,30 @@
+flowchart TB
+    subgraph web[adapter.web]
+        RC[ReviewController]
+    end
+    subgraph msg[adapter.messaging]
+        OCL[OrderConfirmedListener]
+        KRE[KafkaReviewEvents]
+    end
+    subgraph app[application]
+        RS[ReviewService<br/>claim → append → count once]
+        subgraph ports[port]
+            ST[[ReviewStore]]
+            PL[[PurchaseLedger]]
+            EV[[ReviewEvents]]
+        end
+    end
+    subgraph dom[domain]
+        R[Review<br/>month bucket]
+        S[RatingSummary]
+    end
+    subgraph cas[adapter.cassandra]
+        CS[CassandraReviewStore<br/>prepared statements · LWT]
+        SI[SchemaInitializer]
+    end
+    RC & OCL --> RS
+    RS --> dom
+    RS --> ST & PL & EV
+    ST -.-> CS
+    PL -.-> CS
+    EV -.-> KRE

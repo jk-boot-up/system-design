@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "order.OrderConfirmed v1 (cart-service's copy)",
+  "description": "Fields cart-service reads to empty the customer's cart. Unknown fields are ignored.",
+  "type": "object",
+  "required": ["eventId", "type", "payload"],
+  "properties": {
+    "eventId": { "type": "string" },
+    "type": { "const": "order.OrderConfirmed" },
+    "payload": { "type": "object", "required": ["customerId"], "properties": { "customerId": { "type": "string", "format": "uuid" } } }
+  }
+}

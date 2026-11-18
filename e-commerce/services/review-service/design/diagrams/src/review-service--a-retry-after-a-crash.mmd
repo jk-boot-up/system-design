@@ -1,0 +1,13 @@
+sequenceDiagram
+    autonumber
+    participant B as Browser (Ada)
+    participant R1 as review-service pod 1
+    participant R2 as review-service pod 2
+    participant C as Cassandra
+    B->>R1: POST review
+    R1->>C: INSERT review_guard … IF NOT EXISTS → applied
+    Note over R1: pod dies before append
+    B->>R2: POST review (retry)
+    R2->>C: INSERT review_guard … IF NOT EXISTS → not applied, counted=false (the first review)
+    R2->>C: append the first review · flip counted · increment counters
+    R2-->>B: 201 the original review

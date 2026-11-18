@@ -1,0 +1,48 @@
+openapi: 3.1.0
+info:
+  title: review-service API
+  version: 1.0.0
+  description: Product reviews and rating summaries. One review per customer per product; verified when the customer bought the product.
+paths:
+  /api/v1/products/{sku}/reviews:
+    parameters: [ { name: sku, in: path, required: true, schema: { type: string } } ]
+    get:
+      operationId: listReviews
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary: { type: object, properties: { count: { type: integer }, average: { type: [number, 'null'] } } }
+                  items: { type: array, items: { $ref: '#/components/schemas/Review' } }
+                  nextCursor: { type: [string, 'null'] }
+    post:
+      operationId: postReview
+      security: [ { bearer: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [rating, title], properties: { rating: { type: integer, minimum: 1, maximum: 5 }, title: { type: string, maxLength: 120 }, body: { type: string, maxLength: 4000 } } } } }
+      responses:
+        '201': { description: 'Created (or an interrupted earlier attempt finished)', content: { application/json: { schema: { $ref: '#/components/schemas/Review' } } } }
+        '400': { description: Validation failed }
+        '401': { description: No customer token }
+        '409': { description: ALREADY_REVIEWED }
+components:
+  securitySchemes: { bearer: { type: http, scheme: bearer, bearerFormat: JWT } }
+  schemas:
+    Review:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        rating: { type: integer }
+        title: { type: string }
+        body: { type: string }
+        verified: { type: boolean }
+        createdAt: { type: string, format: date-time }

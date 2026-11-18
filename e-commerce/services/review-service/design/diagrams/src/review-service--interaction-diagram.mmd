@@ -1,0 +1,5 @@
+flowchart LR
+    GW[api-gateway] -- "GET / POST /api/v1/products/{sku}/reviews" --> R((review-service))
+    K{{Kafka order.events}} -- "OrderConfirmed" --> R
+    R -- "LWT guard, timeline, counters, purchases" --> C[(Cassandra<br/>keyspace reviews)]
+    R -- "ReviewPosted" --> KR{{Kafka review.events}}

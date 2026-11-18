@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/name: review-service
+      app.kubernetes.io/part-of: e-commerce
+    includeSelectors: true
+resources: [deployment.yaml, service.yaml, hpa.yaml, pdb.yaml, networkpolicy.yaml]
+configMapGenerator:
+  - name: review-service
+    literals:
+      - CASSANDRA_CONTACT_POINTS=cassandra-dc1-service:9042
+      - CASSANDRA_DC=dc1
+      - "CASSANDRA_REPLICATION={'class': 'NetworkTopologyStrategy', 'dc1': 3}"
+      - KAFKA_BOOTSTRAP=kafka-bootstrap:9092
+      - JWT_ISSUER=https://id.shop.example/realms/shop

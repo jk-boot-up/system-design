@@ -79,14 +79,14 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>Services (11)</td>
-<td>██████░░░░ 64%</td>
-<td>inventory, order, payment, cart, catalog, search complete</td>
-<td>review-service, then gateway, notification, recommendation, analytics</td>
+<td>███████░░░ 73%</td>
+<td>inventory, order, payment, cart, catalog, search, review complete</td>
+<td>api-gateway + NGINX, then notification, recommendation, analytics</td>
 </tr>
 <tr>
 <td>Walkthroughs</td>
-<td>██████░░░░ 60%</td>
-<td>inventory, order, payment, cart, catalog, search</td>
+<td>███████░░░ 70%</td>
+<td>inventory, order, payment, cart, catalog, search, review</td>
 <td>Each new service, system walkthrough</td>
 </tr>
 <tr>
@@ -180,13 +180,13 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>review-service</td>
-<td>⏳</td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
+<td>✅</td>
+<td>✅ 15 passing (incl. Cassandra + Kafka)</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>api-gateway + NGINX</td>
@@ -233,6 +233,11 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <h2 id="recently-completed">Recently completed<a class="headerlink" href="#recently-completed" title="Permanent link">#</a></h2>
 <ul>
 <li>
+<p>review-service: Cassandra tables per query with month buckets, one review per customer through a lightweight transaction,
+  counters incremented only by the caller that flips <code>counted</code> (10 concurrent posts by one customer count once; a crash before any
+  step is finished by the retry), verified badge from <code>OrderConfirmed</code>.</p>
+</li>
+<li>
 <p>search-service: OpenSearch read model keyed by SKU with two version guards in one scripted upsert (catalogue and stock), so
   late, repeated and reordered events are no-ops (proved with stock-before-product, v2-before-v1 and stock 9-before-8); multi-select
   brand facets, cursor pages with <code>search_after</code>, retry-forever indexing and a dead-letter topic for unreadable events.
@@ -266,7 +271,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>review-service: Cassandra tables per query, one review per customer and product (lightweight transaction), counters, verified purchases.</li>
+<li>api-gateway + NGINX edge: routes, JWT validation, Redis token-bucket rate limits, request ids, circuit-breaker fallbacks; TLS and micro-caching at the edge.</li>
 <li>System, module and service diagrams (design document 11).</li>
 </ul>
 <h2 id="risks-and-notes">Risks and notes<a class="headerlink" href="#risks-and-notes" title="Permanent link">#</a></h2>

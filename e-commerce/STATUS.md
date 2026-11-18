@@ -12,8 +12,8 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Specification and plans | ██████████ 100% | SPEC, PLAN, design plan, implementation plan, prerequisites | Keep in step with changes |
 | System design documents | ███████░░░ 70% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, 11 ADRs | System/module/service diagrams; security, observability, capacity, runbooks |
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
-| Services (11) | ██████░░░░ 64% | inventory, order, payment, cart, catalog, search complete | review-service, then gateway, notification, recommendation, analytics |
-| Walkthroughs | ██████░░░░ 60% | inventory, order, payment, cart, catalog, search | Each new service, system walkthrough |
+| Services (11) | ███████░░░ 73% | inventory, order, payment, cart, catalog, search, review complete | api-gateway + NGINX, then notification, recommendation, analytics |
+| Walkthroughs | ███████░░░ 70% | inventory, order, payment, cart, catalog, search, review | Each new service, system walkthrough |
 | Local stack and Kubernetes overlays | ░░░░░░░░░░ 0% | inventory-service `k8s/` base | Compose stack, overlays |
 | End-to-end and performance tests | ░░░░░░░░░░ 0% | — | After checkout works end to end |
 
@@ -27,13 +27,17 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | cart-service | ✅ | ✅ 16 passing (incl. Redis + Kafka) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | catalog-service | ✅ | ✅ 22 passing (incl. PostgreSQL + Redis + Kafka + S3) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | search-service | ✅ | ✅ 13 passing (incl. OpenSearch + Kafka) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| review-service | ⏳ | | | | | | |
+| review-service | ✅ | ✅ 15 passing (incl. Cassandra + Kafka) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | api-gateway + NGINX | ⏳ | | | | | | |
 | notification-service (Go) | ⏳ | | | | | | |
 | recommendation-service (Python) | ⏳ | | | | | | |
 | analytics (ClickHouse) | ⏳ | | | | | | |
 
 ## Recently completed
+
+* review-service: Cassandra tables per query with month buckets, one review per customer through a lightweight transaction,
+  counters incremented only by the caller that flips `counted` (10 concurrent posts by one customer count once; a crash before any
+  step is finished by the retry), verified badge from `OrderConfirmed`.
 
 * search-service: OpenSearch read model keyed by SKU with two version guards in one scripted upsert (catalogue and stock), so
   late, repeated and reordered events are no-ops (proved with stock-before-product, v2-before-v1 and stock 9-before-8); multi-select
@@ -62,7 +66,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* review-service: Cassandra tables per query, one review per customer and product (lightweight transaction), counters, verified purchases.
+* api-gateway + NGINX edge: routes, JWT validation, Redis token-bucket rate limits, request ids, circuit-breaker fallbacks; TLS and micro-caching at the edge.
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

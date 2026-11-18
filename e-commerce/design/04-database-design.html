@@ -251,7 +251,8 @@ create table payment_attempts (
 <li><strong>Audit trail:</strong> <code>payment_attempts</code> is append-only. Rows are never updated.</li>
 </ul>
 <h2 id="46-reviews-cassandra">4.6 reviews (Cassandra)<a class="headerlink" href="#46-reviews-cassandra" title="Permanent link">#</a></h2>
-<p>Each table is designed around one query; data is duplicated on purpose.</p>
+<p>Each table is designed around one query; data is duplicated on purpose. Full schema:
+<a href="../services/review-service/src/main/resources/cassandra/schema.cql">schema.cql</a>.</p>
 <pre class="highlight"><code class="language-sql">CREATE KEYSPACE reviews WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3};
 
 -- Q1: newest reviews of a product, paged
@@ -266,7 +267,14 @@ CREATE TABLE reviews.reviews_by_product (
   body        text,
   verified    boolean,
   PRIMARY KEY ((sku, bucket), created_at, review_id)
-) WITH CLUSTERING ORDER BY (created_at DESC, review_id ASC);
+) WITH CLUSTERING ORDER BY (created_at DESC, review_id DESC);
+
+-- Q1b: which months hold reviews of a product, newest first
+CREATE TABLE reviews.review_buckets_by_product (
+  sku    text,
+  bucket text,
+  PRIMARY KEY ((sku), bucket)
+) WITH CLUSTERING ORDER BY (bucket DESC);
 
 -- Q2: rating summary of a product
 CREATE TABLE reviews.rating_summary_by_product (
@@ -283,11 +291,18 @@ CREATE TABLE reviews.purchases_by_customer (
   PRIMARY KEY ((customer_id), sku)
 );
 
--- Q4: one review per customer per product (lightweight transaction guard)
+-- Q4: one review per customer per product (lightweight transaction guard). The claim holds the review and whether the
+-- counters include it, so an attempt that stopped half-way can be finished by a retry.
 CREATE TABLE reviews.review_guard (
   sku         text,
   customer_id uuid,
   review_id   uuid,
+  rating      int,
+  title       text,
+  body        text,
+  verified    boolean,
+  created_at  timestamp,
+  counted     boolean,
   PRIMARY KEY ((sku, customer_id))
 );</code></pre>
 <table>
@@ -301,8 +316,8 @@ CREATE TABLE reviews.review_guard (
 <tbody>
 <tr>
 <td>Show newest reviews</td>
-<td><code>reviews_by_product</code></td>
-<td>Read the current month's bucket; continue to earlier buckets until the page is full</td>
+<td><code>review_buckets_by_product</code>, then <code>reviews_by_product</code></td>
+<td>Walk the buckets newest first until the page is full; <code>(created_at, review_id) &lt; (…)</code> continues after the cursor</td>
 </tr>
 <tr>
 <td>Show rating</td>
@@ -316,12 +331,12 @@ CREATE TABLE reviews.review_guard (
 </tr>
 <tr>
 <td>Post review</td>
-<td><code>review_guard</code> <code>INSERT … IF NOT EXISTS</code>, then insert the review and increment counters</td>
-<td>The LWT happens once per review, which is rare compared with reads</td>
+<td><code>review_guard</code> <code>INSERT … IF NOT EXISTS</code>; append the review; <code>UPDATE … SET counted = true IF counted = false</code>; only then increment counters</td>
+<td>Two lightweight transactions per review, which is rare compared with reads; a retry finishes an interrupted post</td>
 </tr>
 </tbody>
 </table>
-<p>Consistency levels: writes and reads use <code>LOCAL_QUORUM</code>; counters use <code>LOCAL_QUORUM</code>.</p>
+<p>Consistency levels: writes and reads use <code>LOCAL_QUORUM</code>; lightweight transactions use <code>LOCAL_SERIAL</code>; counters use <code>LOCAL_QUORUM</code>.</p>
 <h2 id="47-redis-key-design">4.7 Redis key design<a class="headerlink" href="#47-redis-key-design" title="Permanent link">#</a></h2>
 <table>
 <thead>

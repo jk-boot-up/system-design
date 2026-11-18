@@ -1,0 +1,15 @@
+sequenceDiagram
+    autonumber
+    participant B as Browser (Ada)
+    participant R as review-service
+    participant C as Cassandra
+    B->>R: POST /products/SKU-1001/reviews {5, "Great grip"} (JWT)
+    R->>C: SELECT purchases_by_customer (Ada, SKU-1001) → found: verified
+    R->>C: INSERT review_guard … counted=false IF NOT EXISTS → applied
+    R->>C: INSERT reviews_by_product (SKU-1001, 2026-11) · INSERT review_buckets_by_product
+    R->>C: UPDATE review_guard SET counted=true IF counted=false → applied
+    R->>C: UPDATE rating_summary_by_product SET review_count+1, rating_total+5
+    R-->>B: 201 review (verified)
+    B->>R: POST again
+    R->>C: INSERT review_guard … IF NOT EXISTS → not applied, counted=true
+    R-->>B: 409 ALREADY_REVIEWED
