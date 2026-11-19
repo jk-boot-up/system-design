@@ -669,8 +669,8 @@ dev; brute-force detection on; password policy (length ≥ 12, breached-password
 </thead>
 <tbody>
 <tr>
-<td><code>/</code>, <code>/c/:slug</code>, <code>/p/:sku</code>, <code>/search</code></td>
-<td>Server-rendered and streamed; for signed-out visitors <code>Cache-Control: public, s-maxage=30, stale-while-revalidate=60</code> at the edge; personalised parts (cart count) load after</td>
+<td><code>/</code>, <code>/c/:slug</code>, <code>/p/:id</code>, <code>/search</code></td>
+<td>Server-rendered and streamed. HTML is never shared (it carries a one-time CSP nonce); for signed-out visitors the edge caches the loader data behind client-side navigation (<code>.data</code>, 30 s). Any cookie bypasses the cache</td>
 <td><code>GET /categories</code>, <code>/search</code>, <code>/products/{id}</code>, <code>/products/{sku}/reviews</code>, <code>/recommendations</code>; reviews and recommendations stream in and fail independently</td>
 </tr>
 <tr>
@@ -679,7 +679,7 @@ dev; brute-force detection on; password policy (length ≥ 12, breached-password
 <td><code>GET /cart</code>, <code>PUT /cart/items/{sku}</code>, <code>DELETE /cart</code>; "pricing pending" banner in degraded mode</td>
 </tr>
 <tr>
-<td><code>/checkout</code>, <code>/orders*</code>, <code>/p/:sku/review</code></td>
+<td><code>/checkout</code>, <code>/orders*</code>, <code>/p/:id/review</code></td>
 <td>Sign-in required; <code>private, no-store</code></td>
 <td><code>POST /orders</code> (+ <code>Idempotency-Key</code>), <code>GET /orders</code>, <code>POST /orders/{id}/cancel</code>, <code>POST /reviews</code></td>
 </tr>
@@ -689,8 +689,8 @@ dev; brute-force detection on; password policy (length ≥ 12, breached-password
 <td><code>/admin/products</code>, <code>/admin/categories</code>, image upload and confirm, inventory admin; edits send <code>If-Match</code>, a <code>412</code> shows "changed by someone else"</td>
 </tr>
 <tr>
-<td><code>/login</code>, <code>/logout</code>, <code>/auth/callback</code></td>
-<td>BFF endpoints; rate limited</td>
+<td><code>/login</code>, <code>/logout</code> (POST), <code>/auth/callback</code>, <code>/auth/backchannel-logout</code></td>
+<td>BFF endpoints; per-address rate limit at the edge</td>
 <td>Keycloak</td>
 </tr>
 <tr>
@@ -782,8 +782,8 @@ also makes the app more robust on poor networks.</p>
 </tr>
 <tr>
 <td>Language</td>
-<td>TypeScript, strict</td>
-<td>Contract mismatches fail the build</td>
+<td>TypeScript 5.9, strict, erasable syntax only (Node runs <code>server.ts</code> directly)</td>
+<td>Contract mismatches fail the build; TypeScript 7 waits for <code>openapi-typescript</code> and <code>typescript-eslint</code> to support it</td>
 </tr>
 <tr>
 <td>Runtime</td>
@@ -807,8 +807,8 @@ also makes the app more robust on poor networks.</p>
 </tr>
 <tr>
 <td>Browser data</td>
-<td>Route loaders and actions; TanStack Query only for live parts (order status polling)</td>
-<td>The server already loads data; no client store needed</td>
+<td>Route loaders and actions; order status polling with React Router's <code>useRevalidator</code></td>
+<td>The server already loads data; no client store or query library needed</td>
 </tr>
 <tr>
 <td>Styling</td>
@@ -816,8 +816,8 @@ also makes the app more robust on poor networks.</p>
 <td>Most used approach, no runtime cost, works with a strict CSP (styles from files, no CSS-in-JS)</td>
 </tr>
 <tr>
-<td>Logging and tracing</td>
-<td><code>pino</code> (JSON, PII masked), OpenTelemetry Node SDK, <code>traceparent</code> forwarded to the gateway</td>
+<td>Logging, metrics, tracing</td>
+<td><code>pino</code> (JSON, tokens and cookies redacted); <code>@prometheus-io/client</code> (the maintained successor of <code>prom-client</code>) on <code>/metrics</code>; <code>X-Request-Id</code> forwarded to the gateway; OpenTelemetry arrives with P5</td>
 <td>One trace from click to database</td>
 </tr>
 <tr>
@@ -950,6 +950,82 @@ days (high); CI blocks a release that has a known critical or high advisory.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="1615-as-built">16.15 As built<a class="headerlink" href="#1615-as-built" title="Permanent link">#</a></h2>
+<p>The storefront is in <a href="../web/storefront/README.html"><code>web/storefront</code></a>. Where the build differs from the design above, and why:</p>
+<table>
+<thead>
+<tr>
+<th>Design</th>
+<th>As built</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Edge caches anonymous HTML for 30 s</td>
+<td>Edge caches only <code>.data</code> loader responses and assets</td>
+<td>Every HTML page carries a fresh CSP nonce; a shared copy would give every visitor the same nonce, which defeats it</td>
+</tr>
+<tr>
+<td>Product URLs by SKU</td>
+<td><code>/p/:id</code>; the cart, which knows SKUs, uses <code>GET /products/by-sku</code> (added to catalog-service) to show names and links</td>
+<td>Product ids are stable; SKUs can change</td>
+</tr>
+<tr>
+<td>Browser uploads images straight to object storage</td>
+<td>Staff upload through the storefront, which forwards the file to the pre-signed URL</td>
+<td>No object-storage origin in <code>connect-src</code>; the 5 MB limit and content type are checked on our side first</td>
+</tr>
+<tr>
+<td>React Aria Components</td>
+<td>Native HTML form elements (inputs, selects, radio groups)</td>
+<td>No page needs a combobox or menu yet; axe finds no violation</td>
+</tr>
+<tr>
+<td>Component tests with MSW; BFF tests with Testcontainers</td>
+<td>Unit tests (27) for crypto, sessions, CSRF, <code>returnTo</code>, problems and money; the BFF is exercised end to end by Playwright against real Keycloak and Redis</td>
+<td>The browser journeys cover the same paths with fewer moving parts; component tests come when pages gain client logic</td>
+</tr>
+<tr>
+<td><code>ApiError</code> thrown from a loader</td>
+<td>Shaped as a React Router error response</td>
+<td>The page answers with the upstream status (404, 429, 503) and the reference id, not a generic 500</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Measured</strong> (compose stack, Apple silicon, 4 GB Docker VM):</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Client JavaScript, all routes together</td>
+<td>132 kB gzip (budget 150 kB per route; <code>npm run budget</code> fails above it)</td>
+</tr>
+<tr>
+<td>Lighthouse, mobile emulation, home and search (3 runs each)</td>
+<td>LCP 0.8–1.0 s, CLS 0, TBT 0–209 ms, accessibility 100, best practices 96</td>
+</tr>
+<tr>
+<td>OWASP ZAP baseline</td>
+<td>0 failures. Warnings reviewed: no <code>Cross-Origin-Embedder-Policy</code> (would block CDN images without CORP; accepted), <code>private, no-cache</code> on HTML (intended), "timestamps" are product SKUs. Duplicate HSTS on assets and a 500 for <code>/sitemap.xml</code> were fixed</td>
+</tr>
+<tr>
+<td>Browser journeys (Playwright + axe)</td>
+<td>5 storefront journeys plus 14 API journeys, 19 of 19 passing</td>
+</tr>
+<tr>
+<td>Image</td>
+<td>248 MB, distroless Node 26, non-root, read-only root</td>
+</tr>
+</tbody>
+</table>
+<p>The edge limits sign-in to 10 requests a minute per address (<code>SIGN_IN_RATE</code>); the local stack raises it to 300 because the
+journeys sign in many times from one address.</p>
 </main>
 <script>
 function setTheme(t) {

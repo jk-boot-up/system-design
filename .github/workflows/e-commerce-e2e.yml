@@ -1,11 +1,12 @@
 name: e-commerce / end-to-end
 
-# Every journey against the whole compose stack: nightly, on demand, and when the tests themselves change.
+# Every journey (API and storefront in a browser) against the whole compose stack, then a ZAP baseline scan and
+# Lighthouse budgets: nightly, on demand, and when the tests change.
 on:
   schedule: [ { cron: '30 2 * * *' } ]
   workflow_dispatch:
   push:
-    paths: ['e-commerce/tests/e2e/**', '.github/workflows/e-commerce-e2e.yml']
+    paths: ['e-commerce/tests/e2e/**', 'e-commerce/web/storefront/**', '.github/workflows/e-commerce-e2e.yml']
 
 defaults:
   run:
@@ -21,8 +22,19 @@ jobs:
         with: { node-version: '24', cache: npm, cache-dependency-path: e-commerce/tests/e2e/package-lock.json }
       - run: npm ci --no-audit --no-fund
       - run: npx tsc --noEmit
+      - name: Browser for the storefront journeys
+        run: npx playwright install --with-deps chromium
       - name: Journeys, core stack and every profile
         run: ./run-compose.sh core search reviews async analytics
+      - name: OWASP ZAP baseline scan of the storefront (passive; fails on any high-risk alert)
+        working-directory: e-commerce/deploy/compose
+        run: |
+          docker compose up -d --wait
+          docker run --rm --network host -v "$PWD:/zap/wrk" ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t https://localhost:8443/ -I -r zap-report.html -z "-config connection.sslAcceptAll=true"
+      - name: Lighthouse budgets (home and search, mobile)
+        working-directory: e-commerce/web/storefront
+        run: npx --yes @lhci/cli@0.16.1 autorun --config=lighthouserc.json
       - name: Stack logs
         if: failure()
         working-directory: e-commerce/deploy/compose
@@ -35,3 +47,4 @@ jobs:
             e-commerce/tests/e2e/playwright-report
             e-commerce/tests/e2e/test-results
             e-commerce/deploy/compose/compose.log
+            e-commerce/deploy/compose/zap-report.html

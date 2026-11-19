@@ -5,3 +5,6 @@ kind: Component
 patches:
   - target: { kind: KeycloakRealmImport, name: shop }
     path: users.yaml
+# The test users have no second factor, so dev lets staff pages open with a password sign-in (staging and prod do not).
+configMapGenerator:
+  - { name: storefront, namespace: e-commerce-shop, behavior: merge, literals: [ STAFF_REQUIRE_SECOND_FACTOR=false ] }

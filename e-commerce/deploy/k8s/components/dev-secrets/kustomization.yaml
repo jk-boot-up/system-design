@@ -13,6 +13,7 @@ secretGenerator:
   - { name: catalog-db,   namespace: e-commerce-platform, type: kubernetes.io/basic-auth, literals: [ username=catalog,   password=dev-catalog ] }
   - { name: keycloak-db,  namespace: e-commerce-platform, type: kubernetes.io/basic-auth, literals: [ username=keycloak,  password=dev-keycloak ] }
   - { name: notification-rabbitmq, namespace: e-commerce-platform, literals: [ username=notification, password=dev-notification ] }
+  - { name: storefront-oidc, namespace: e-commerce-platform, literals: [ client-secret=dev-storefront-secret-change-me-0123456789 ] }
   - { name: object-storage, namespace: e-commerce-platform, literals: [ RUSTFS_ACCESS_KEY=dev-catalog, RUSTFS_SECRET_KEY=dev-catalog-secret ] }
   # e-commerce-shop: what the services read
   - { name: orders-db,    namespace: e-commerce-shop, type: kubernetes.io/basic-auth, literals: [ username=orders,    password=dev-orders ] }
@@ -24,6 +25,9 @@ secretGenerator:
   - name: notification-service
     namespace: e-commerce-shop
     literals: [ "RABBITMQ_URL=amqp://notification:dev-notification@rabbitmq:5672/" ]
+  - name: storefront
+    namespace: e-commerce-shop
+    literals: [ OIDC_CLIENT_SECRET=dev-storefront-secret-change-me-0123456789, "SESSION_ENCRYPTION_KEYS=dev1:ZGV2LW9ubHktc2Vzc2lvbi1rZXktMzItYnl0ZXMtISE=" ]
   - name: analytics
     namespace: e-commerce-shop
     literals: [ CLICKHOUSE_PASSWORD=dev-clickhouse, CLICKHOUSE_GRAFANA_PASSWORD=dev-grafana ]

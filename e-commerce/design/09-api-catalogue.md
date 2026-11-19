@@ -23,6 +23,7 @@ The OpenAPI documents live with each service: `services/<service>/contracts/open
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
 | GET | `/api/v1/products/{id}` | public | | `200 Product` · `404` |
+| GET | `/api/v1/products/by-sku?sku=…` | public | up to 50 SKUs | `200 [Product]`, active only, in the order asked (cart lines, recommendations) |
 | GET | `/api/v1/categories` | public | | `200 [Category]` (tree) |
 | POST | `/api/v1/admin/products` | staff | `ProductCreate` | `201 Product` + `ETag` |
 | PUT | `/api/v1/admin/products/{id}` | staff | `ProductUpdate` + `If-Match` | `200 Product` · `412` · `428` |

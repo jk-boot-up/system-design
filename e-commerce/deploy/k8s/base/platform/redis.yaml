@@ -5,6 +5,8 @@
 #   redis-reco       co-purchase counts (rebuildable from order.events)  append-only file, never evicts
 #   redis-notify     notification sent log and claims                    append-only file, never evicts (an evicted
 #                    entry would let an email go out twice)
+#   redis-session    storefront sessions (sealed with AES-256-GCM)       append-only file, never evicts (an evicted
+#                    session would sign a shopper out mid-checkout)
 # Reachable only from e-commerce-shop and this namespace (networkpolicy.yaml); no password, as in every service's settings.
 apiVersion: redis.redis.opstreelabs.in/v1beta2
 kind: Redis
@@ -64,6 +66,20 @@ spec:
   kubernetesConfig:
     image: quay.io/opstree/redis:v8.4.6
     resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { memory: 512Mi } }
+  redisConfig: { additionalRedisConfig: redis-durable-config, maxMemoryPercentOfLimit: 80 }
+  podSecurityContext: { runAsUser: 1000, fsGroup: 1000 }
+  storage:
+    volumeClaimTemplate:
+      spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 5Gi } } }
+---
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: redis-session
+spec:
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v8.4.6
+    resources: { requests: { cpu: 250m, memory: 1Gi }, limits: { memory: 1Gi } }
   redisConfig: { additionalRedisConfig: redis-durable-config, maxMemoryPercentOfLimit: 80 }
   podSecurityContext: { runAsUser: 1000, fsGroup: 1000 }
   storage:

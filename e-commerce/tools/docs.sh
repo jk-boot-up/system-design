@@ -8,10 +8,11 @@ repo="$(cd "$(dirname "$0")/.." && pwd)"
 paths=()
 for p in "$@"; do paths+=("$(cd "$(dirname "$p")" && pwd)/$(basename "$p")"); done
 cd "$repo"
-python3 tools/extract_diagrams.py "${paths[@]}"
-( cd tools/diagrams && { [ -d node_modules ] || npm install --no-audit --no-fund; } && node render.mjs "${paths[@]}" )
-python3 tools/md2html.py "${paths[@]}"
-python3 tools/walkthrough/build.py "${paths[@]}"
+python3 tools/extract_diagrams.py ${paths[@]+"${paths[@]}"}
+( cd tools/diagrams && { [ -d node_modules ] || npm install --no-audit --no-fund; } && node render.mjs ${paths[@]+"${paths[@]}"} )
+python3 tools/md2html.py ${paths[@]+"${paths[@]}"}
+python3 tools/walkthrough/build.py ${paths[@]+"${paths[@]}"}
 if command -v node >/dev/null && node -e "require('playwright')" 2>/dev/null; then
-  find "${paths[@]:-.}" -path '*/design/walkthrough/index.html' -not -path '*/node_modules/*' -print0 | xargs -0 -r node tools/walkthrough/check.cjs
+  roots=(.); [ ${#paths[@]} -gt 0 ] && roots=("${paths[@]}")
+  find "${roots[@]}" -path '*/design/walkthrough/index.html' -not -path '*/node_modules/*' -print0 | xargs -0 -r node tools/walkthrough/check.cjs
 fi

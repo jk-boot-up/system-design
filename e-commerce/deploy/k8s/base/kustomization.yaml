@@ -14,6 +14,7 @@ images:
   - { name: e-commerce/cart-service, newName: registry.shop.example/e-commerce/cart-service }
   - { name: e-commerce/catalog-service, newName: registry.shop.example/e-commerce/catalog-service }
   - { name: e-commerce/edge, newName: registry.shop.example/e-commerce/edge }
+  - { name: e-commerce/storefront, newName: registry.shop.example/e-commerce/storefront }
   - { name: e-commerce/inventory-service, newName: registry.shop.example/e-commerce/inventory-service }
   - { name: e-commerce/notification-service, newName: registry.shop.example/e-commerce/notification-service }
   - { name: e-commerce/order-service, newName: registry.shop.example/e-commerce/order-service }

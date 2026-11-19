@@ -38,7 +38,7 @@ spec:
   issuerRef: { kind: ClusterIssuer, name: letsencrypt }
   privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }
 ---
-# The shop realm: roles, the public web client with PKCE, the shop-api audience and a "roles" claim, as in
+# The shop realm: roles, the storefront's confidential client, the public API client with PKCE, the shop-api audience and a "roles" claim, as in
 # deploy/compose/keycloak/shop-realm.json, without its test users (the dev overlay adds them).
 apiVersion: k8s.keycloak.org/v2beta1
 kind: KeycloakRealmImport
@@ -46,11 +46,21 @@ metadata:
   name: shop
 spec:
   keycloakCRName: keycloak
+  # The storefront's client secret is never written here: the operator substitutes it from the Secret.
+  placeholders:
+    STOREFRONT_CLIENT_SECRET: { secret: { name: storefront-oidc, key: client-secret } }
   realm:
     realm: shop
     enabled: true
     sslRequired: external
     accessTokenLifespan: 900
+    ssoSessionIdleTimeout: 1800
+    ssoSessionMaxLifespan: 43200
+    revokeRefreshToken: true
+    refreshTokenMaxReuse: 0
+    bruteForceProtected: true
+    failureFactor: 10
+    passwordPolicy: "length(12) and notUsername and passwordHistory(3)"
     registrationAllowed: true
     loginWithEmailAllowed: true
     roles:
@@ -59,6 +69,44 @@ spec:
         - { name: staff, description: "Merchandiser: catalogue and stock" }
     defaultRoles: [customer]
     clients:
+      # Browsers sign in through the storefront (design/16 §16.5): a confidential client, tokens kept on the server.
+      - clientId: shop-storefront
+        name: Storefront (backend-for-frontend)
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        secret: ${STOREFRONT_CLIENT_SECRET}
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        implicitFlowEnabled: false
+        frontchannelLogout: false
+        redirectUris: [ "https://shop.example/auth/callback" ]
+        webOrigins: [ "+" ]
+        attributes:
+          pkce.code.challenge.method: S256
+          post.logout.redirect.uris: "https://shop.example/"
+          backchannel.logout.url: http://storefront.e-commerce-shop.svc.cluster.local/auth/backchannel-logout
+          backchannel.logout.session.required: "true"
+          use.refresh.tokens: "true"
+        protocolMappers:
+          - name: audience shop-api
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            config: { included.custom.audience: shop-api, access.token.claim: "true", id.token.claim: "false" }
+          - name: roles
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-realm-role-mapper
+            config:
+              claim.name: roles
+              multivalued: "true"
+              jsonType.label: String
+              access.token.claim: "true"
+              id.token.claim: "false"
+              userinfo.token.claim: "false"
+          - name: amr
+            protocol: openid-connect
+            protocolMapper: oidc-amr-mapper
+            config: { access.token.claim: "true", id.token.claim: "true", introspection.token.claim: "true" }
+      # Public client for bearer-token API clients (tools, the end-to-end tests in dev); not used by browsers.
       - clientId: shop-web
         name: Shop web app
         publicClient: true

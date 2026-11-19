@@ -14,7 +14,7 @@ spec:
       containers:
         - name: nginx
           image: e-commerce/edge:0.1.0
-          env: [ { name: GATEWAY_UPSTREAM, value: "api-gateway:80" } ]
+          env: [ { name: GATEWAY_UPSTREAM, value: "api-gateway:80" }, { name: STOREFRONT_UPSTREAM, value: "storefront:80" } ]
           ports: [ { name: http, containerPort: 8080 }, { name: https, containerPort: 8443 } ]
           resources:
             requests: { cpu: 250m, memory: 256Mi }
@@ -54,4 +54,6 @@ spec:
   egress:
     - to: [ { podSelector: { matchLabels: { app.kubernetes.io/name: api-gateway } } } ]
       ports: [ { port: 8080 } ]
+    - to: [ { podSelector: { matchLabels: { app.kubernetes.io/name: storefront } } } ]
+      ports: [ { port: 8090 } ]
     - ports: [ { port: 53, protocol: UDP }, { port: 53, protocol: TCP } ]

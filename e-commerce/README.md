@@ -42,6 +42,8 @@ e-commerce/
 │     │                          Go: go.mod, cmd/, internal/      Python: pyproject.toml, src/, tests/
 │     ├─ Dockerfile
 │     └─ k8s/                    Kubernetes base: Deployment, Service, HPA, PDB, NetworkPolicy, ConfigMap
+├─ web/
+│  └─ storefront/                the web shop: React Router server rendering + backend-for-frontend (design/16)
 ├─ deploy/                       RUNNING THE WHOLE SYSTEM
 │  ├─ compose/                   local stack (project name "e-commerce"): data stores, brokers, Keycloak, observability, services
 │  └─ k8s/overlays/              dev / staging / prod overlays composing every service's k8s base
@@ -66,6 +68,9 @@ e-commerce/
 | recommendation-service | Python 3.12 | Redis | [services/recommendation-service](services/recommendation-service/README.md) |
 | notification-service | Go 1.24 | RabbitMQ, Redis | [services/notification-service](services/notification-service/README.md) |
 | analytics | ClickHouse SQL | ClickHouse | [services/analytics](services/analytics/README.md) |
+
+The web shop is its own project, [web/storefront](web/storefront/README.md) (TypeScript, React Router 8 on Node 26, sessions in
+`redis-session`), at `https://localhost:8443/` once the local stack is up.
 
 ## Build a service
 

@@ -85,6 +85,15 @@ services:
       retries: 60
     mem_limit: 768m
 
+  # Sessions of the storefront: never evicted, persisted (design/16 §16.4), apart from the shared Redis.
+  redis-session:
+    image: redis:8.4.8-alpine
+    command: [redis-server, --maxmemory, 48mb, --maxmemory-policy, noeviction, --appendonly, "yes"]
+    ports: ["127.0.0.1:6380:6379"]   # for npm run dev in web/storefront only
+    volumes: [ "redis-session:/data" ]
+    healthcheck: { test: [CMD, redis-cli, ping], interval: 3s, retries: 30 }
+    mem_limit: 64m
+
   storage:   # S3-compatible object storage (RustFS; MinIO no longer publishes community images)
     image: rustfs/rustfs:1.0.3
     environment: { RUSTFS_ACCESS_KEY: minioadmin, RUSTFS_SECRET_KEY: minioadmin }
@@ -284,19 +293,46 @@ services:
     depends_on: { redis: { condition: service_healthy }, keycloak: { condition: service_healthy } }
     healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
 
+  storefront:
+    build: ../../web/storefront
+    restart: unless-stopped
+    environment:
+      PUBLIC_ORIGIN: https://localhost:8443
+      GATEWAY_URL: http://api-gateway:8080
+      OIDC_ISSUER: http://localhost:8180/realms/shop
+      OIDC_BACKCHANNEL_ORIGIN: http://keycloak:8080
+      OIDC_ALLOW_HTTP: "true"
+      OIDC_CLIENT_ID: shop-storefront
+      OIDC_CLIENT_SECRET: dev-storefront-secret-change-me-0123456789
+      REDIS_URL: redis://redis-session:6379
+      # Dev only: a fixed key so sessions survive restarts. Production keys come from the vault.
+      SESSION_ENCRYPTION_KEYS: dev1:ZGV2LW9ubHktc2Vzc2lvbi1rZXktMzItYnl0ZXMtISE=
+      IMAGE_BASE_URL: http://localhost:9000/product-images
+      OBJECT_STORAGE_INTERNAL_ORIGIN: http://storage:9000
+      STAFF_REQUIRE_SECOND_FACTOR: "false"
+      NODE_OPTIONS: --max-old-space-size=160
+    read_only: true
+    tmpfs: [ /tmp ]
+    cap_drop: [ ALL ]
+    security_opt: [ "no-new-privileges:true" ]
+    depends_on: { redis-session: { condition: service_healthy }, api-gateway: { condition: service_healthy } }
+    healthcheck: { test: [CMD, /nodejs/bin/node, -e, "fetch('http://127.0.0.1:8090/readyz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"], interval: 5s, retries: 30 }
+    mem_limit: 256m
+
   edge:
     build: ../../services/api-gateway/edge
     restart: unless-stopped
-    environment: { GATEWAY_UPSTREAM: "api-gateway:8080" }
+    environment: { GATEWAY_UPSTREAM: "api-gateway:8080", STOREFRONT_UPSTREAM: "storefront:8090", SIGN_IN_RATE: "300r/m" }
     ports: ["8000:8080", "8443:8443"]
     volumes: [ "../..:/usr/share/nginx/docs:ro" ]      # the generated HTML documentation at https://localhost:8443/docs/
-    depends_on: { api-gateway: { condition: service_healthy } }
+    depends_on: { api-gateway: { condition: service_healthy }, storefront: { condition: service_healthy } }
     mem_limit: 64m
 
 volumes:
   postgres:
   kafka:
   redis:
+  redis-session:
   storage:
   opensearch:
   cassandra:

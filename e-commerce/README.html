@@ -112,6 +112,8 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 │     │                          Go: go.mod, cmd/, internal/      Python: pyproject.toml, src/, tests/
 │     ├─ Dockerfile
 │     └─ k8s/                    Kubernetes base: Deployment, Service, HPA, PDB, NetworkPolicy, ConfigMap
+├─ web/
+│  └─ storefront/                the web shop: React Router server rendering + backend-for-frontend (design/16)
 ├─ deploy/                       RUNNING THE WHOLE SYSTEM
 │  ├─ compose/                   local stack (project name "e-commerce"): data stores, brokers, Keycloak, observability, services
 │  └─ k8s/overlays/              dev / staging / prod overlays composing every service's k8s base
@@ -198,6 +200,8 @@ over PostgreSQL, Cassandra, Redis, OpenSearch, ClickHouse, MinIO, Kafka and Rabb
 </tr>
 </tbody>
 </table>
+<p>The web shop is its own project, <a href="web/storefront/README.html">web/storefront</a> (TypeScript, React Router 8 on Node 26, sessions in
+<code>redis-session</code>), at <code>https://localhost:8443/</code> once the local stack is up.</p>
 <h2 id="build-a-service">Build a service<a class="headerlink" href="#build-a-service" title="Permanent link">#</a></h2>
 <p>Every service builds and tests on its own; nothing at this level builds them all.</p>
 <pre class="highlight"><code class="language-bash">cd services/order-service &amp;&amp; ./gradlew build                     # Java

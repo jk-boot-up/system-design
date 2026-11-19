@@ -237,11 +237,11 @@ dev; brute-force detection on; password policy (length ≥ 12, breached-password
 
 | Route | Rendering and caching | Data (API catalogue) |
 |---|---|---|
-| `/`, `/c/:slug`, `/p/:sku`, `/search` | Server-rendered and streamed; for signed-out visitors `Cache-Control: public, s-maxage=30, stale-while-revalidate=60` at the edge; personalised parts (cart count) load after | `GET /categories`, `/search`, `/products/{id}`, `/products/{sku}/reviews`, `/recommendations`; reviews and recommendations stream in and fail independently |
+| `/`, `/c/:slug`, `/p/:id`, `/search` | Server-rendered and streamed. HTML is never shared (it carries a one-time CSP nonce); for signed-out visitors the edge caches the loader data behind client-side navigation (`.data`, 30 s). Any cookie bypasses the cache | `GET /categories`, `/search`, `/products/{id}`, `/products/{sku}/reviews`, `/recommendations`; reviews and recommendations stream in and fail independently |
 | `/cart` | Server-rendered, `private, no-store`; quantity changes are form actions with optimistic UI | `GET /cart`, `PUT /cart/items/{sku}`, `DELETE /cart`; "pricing pending" banner in degraded mode |
-| `/checkout`, `/orders*`, `/p/:sku/review` | Sign-in required; `private, no-store` | `POST /orders` (+ `Idempotency-Key`), `GET /orders`, `POST /orders/{id}/cancel`, `POST /reviews` |
+| `/checkout`, `/orders*`, `/p/:id/review` | Sign-in required; `private, no-store` | `POST /orders` (+ `Idempotency-Key`), `GET /orders`, `POST /orders/{id}/cancel`, `POST /reviews` |
 | `/staff/*` | `staff` role and recent second factor required; never cached; code split so shoppers never download it | `/admin/products`, `/admin/categories`, image upload and confirm, inventory admin; edits send `If-Match`, a `412` shows "changed by someone else" |
-| `/login`, `/logout`, `/auth/callback` | BFF endpoints; rate limited | Keycloak |
+| `/login`, `/logout` (POST), `/auth/callback`, `/auth/backchannel-logout` | BFF endpoints; per-address rate limit at the edge | Keycloak |
 | `/healthz`, `/readyz`, `/metrics` | Not routed by the edge | |
 
 All pages work without JavaScript for the core path (browse, search, add to cart, check out) because loaders and actions are
@@ -293,14 +293,14 @@ Error pages never show stack traces or upstream messages. Loading states are ske
 | Concern | Choice | Why |
 |---|---|---|
 | Framework | React Router 8.5 (framework mode), React 19, Vite 8 | §16.3 |
-| Language | TypeScript, strict | Contract mismatches fail the build |
+| Language | TypeScript 5.9, strict, erasable syntax only (Node runs `server.ts` directly) | Contract mismatches fail the build; TypeScript 7 waits for `openapi-typescript` and `typescript-eslint` to support it |
 | Runtime | Node 26 LTS (supported to April 2029) on a distroless image | Current LTS line, small image without a shell |
 | OIDC | `openid-client` 6 | Certified OpenID relying-party library; standards only, not tied to Keycloak |
 | Sessions | Own small session store over `redis` 6 with AES-256-GCM | A few dozen lines we fully understand, instead of a generic session framework |
 | API client and types | `openapi-typescript` + `openapi-fetch` from each service's `contracts/openapi.yaml`; Zod for runtime checks | The services are contract-first; a breaking API change fails the UI build |
-| Browser data | Route loaders and actions; TanStack Query only for live parts (order status polling) | The server already loads data; no client store needed |
+| Browser data | Route loaders and actions; order status polling with React Router's `useRevalidator` | The server already loads data; no client store or query library needed |
 | Styling | Tailwind CSS 4 with design tokens as CSS variables (light and dark) | Most used approach, no runtime cost, works with a strict CSP (styles from files, no CSS-in-JS) |
-| Logging and tracing | `pino` (JSON, PII masked), OpenTelemetry Node SDK, `traceparent` forwarded to the gateway | One trace from click to database |
+| Logging, metrics, tracing | `pino` (JSON, tokens and cookies redacted); `@prometheus-io/client` (the maintained successor of `prom-client`) on `/metrics`; `X-Request-Id` forwarded to the gateway; OpenTelemetry arrives with P5 | One trace from click to database |
 | Tests | Vitest 5 + Testing Library + MSW 3; Playwright 1.65 + axe-core; OWASP ZAP baseline scan | §16.13 |
 
 **Patch policy:** Renovate opens updates daily; framework and runtime security fixes ship within 72 hours (critical) or 7
@@ -340,3 +340,29 @@ days (high); CI blocks a release that has a known critical or high advisory.
 | U4 | Cart, merge, checkout with every outcome, orders, cancellation, reviews |
 | U5 | Staff pages with second factor: products, images, categories, stock |
 | U6 | Edge routing, compose and k8s wiring, Playwright + axe + ZAP + Lighthouse in CI, README and walkthrough |
+
+## 16.15 As built
+
+The storefront is in [`web/storefront`](../web/storefront/README.md). Where the build differs from the design above, and why:
+
+| Design | As built | Why |
+|---|---|---|
+| Edge caches anonymous HTML for 30 s | Edge caches only `.data` loader responses and assets | Every HTML page carries a fresh CSP nonce; a shared copy would give every visitor the same nonce, which defeats it |
+| Product URLs by SKU | `/p/:id`; the cart, which knows SKUs, uses `GET /products/by-sku` (added to catalog-service) to show names and links | Product ids are stable; SKUs can change |
+| Browser uploads images straight to object storage | Staff upload through the storefront, which forwards the file to the pre-signed URL | No object-storage origin in `connect-src`; the 5 MB limit and content type are checked on our side first |
+| React Aria Components | Native HTML form elements (inputs, selects, radio groups) | No page needs a combobox or menu yet; axe finds no violation |
+| Component tests with MSW; BFF tests with Testcontainers | Unit tests (27) for crypto, sessions, CSRF, `returnTo`, problems and money; the BFF is exercised end to end by Playwright against real Keycloak and Redis | The browser journeys cover the same paths with fewer moving parts; component tests come when pages gain client logic |
+| `ApiError` thrown from a loader | Shaped as a React Router error response | The page answers with the upstream status (404, 429, 503) and the reference id, not a generic 500 |
+
+**Measured** (compose stack, Apple silicon, 4 GB Docker VM):
+
+| Check | Result |
+|---|---|
+| Client JavaScript, all routes together | 132 kB gzip (budget 150 kB per route; `npm run budget` fails above it) |
+| Lighthouse, mobile emulation, home and search (3 runs each) | LCP 0.8–1.0 s, CLS 0, TBT 0–209 ms, accessibility 100, best practices 96 |
+| OWASP ZAP baseline | 0 failures. Warnings reviewed: no `Cross-Origin-Embedder-Policy` (would block CDN images without CORP; accepted), `private, no-cache` on HTML (intended), "timestamps" are product SKUs. Duplicate HSTS on assets and a 500 for `/sitemap.xml` were fixed |
+| Browser journeys (Playwright + axe) | 5 storefront journeys plus 14 API journeys, 19 of 19 passing |
+| Image | 248 MB, distroless Node 26, non-root, read-only root |
+
+The edge limits sign-in to 10 requests a minute per address (`SIGN_IN_RATE`); the local stack raises it to 300 because the
+journeys sign in many times from one address.

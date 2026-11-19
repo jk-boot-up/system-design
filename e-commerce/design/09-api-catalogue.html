@@ -115,6 +115,13 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>GET</td>
+<td><code>/api/v1/products/by-sku?sku=…</code></td>
+<td>public</td>
+<td>up to 50 SKUs</td>
+<td><code>200 [Product]</code>, active only, in the order asked (cart lines, recommendations)</td>
+</tr>
+<tr>
+<td>GET</td>
 <td><code>/api/v1/categories</code></td>
 <td>public</td>
 <td></td>

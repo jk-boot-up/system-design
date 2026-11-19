@@ -3,6 +3,20 @@ upstream gateway {
     keepalive 64;
 }
 
+# Sign-in, callback and sign-out per address (SIGN_IN_RATE: 10r/m by default; the local stack allows more for the tests).
+limit_req_zone $binary_remote_addr zone=sign_in:10m rate=${SIGN_IN_RATE};
+
+upstream storefront {
+    server ${STOREFRONT_UPSTREAM};
+    keepalive 32;
+}
+
+# Pages may come from the cache only for visitors without a session or cart cookie: anything personal is never shared.
+map $http_cookie $shop_cookie {
+    default                           0;
+    "~(^|;\s*)__Host-(sid|guest)="    1;
+}
+
 server {
     listen 8080;
     location = /healthz { access_log off; return 200 "ok\n"; }
@@ -66,6 +80,45 @@ server {
         expires 5m;
     }
 
-    location = / { return 302 /docs/; }
-    location / { return 404; }
+    # ── storefront (design/16 §16.12) ────────────────────────────────────────────────────────────────────────────────
+    # Its probes and metrics are for the cluster only.
+    location ~ ^/(healthz|readyz|metrics)$ { return 404; }
+
+    # Hashed build files: cached here and in browsers for a year.
+    location /assets/ {
+        proxy_cache micro;
+        proxy_cache_valid 200 1h;
+        proxy_cache_key $scheme$host$request_uri;
+        add_header X-Cache $upstream_cache_status always;
+        include /etc/nginx/storefront-proxy.conf;
+    }
+
+    # Sign-in endpoints: a tight per-address limit against credential stuffing and session-store flooding.
+    location ~ ^/(login|logout|auth/) {
+        limit_req zone=sign_in burst=10 nodelay;
+        include /etc/nginx/storefront-proxy.conf;
+    }
+
+    # Staff pages accept product images (up to 5 MB) and are never cached.
+    location /staff {
+        client_max_body_size 6m;
+        include /etc/nginx/storefront-proxy.conf;
+    }
+
+    # Every other path is a storefront page. Responses the storefront marks shareable (X-Accel-Expires: the loader data
+    # of public pages, 30 s) are kept for visitors without a session or cart cookie. HTML documents never are: each
+    # carries a one-time CSP nonce. Signed-in responses and anything that sets a cookie are never cached.
+    location / {
+        limit_req zone=per_address burst=100 nodelay;
+        proxy_cache micro;
+        proxy_cache_methods GET HEAD;
+        proxy_cache_key $scheme$request_method$host$request_uri;
+        proxy_cache_lock on;
+        proxy_cache_use_stale updating error timeout http_502 http_503 http_504;
+        proxy_cache_background_update on;
+        proxy_cache_bypass $shop_cookie;
+        proxy_no_cache $shop_cookie;
+        add_header X-Cache $upstream_cache_status always;
+        include /etc/nginx/storefront-proxy.conf;
+    }
 }

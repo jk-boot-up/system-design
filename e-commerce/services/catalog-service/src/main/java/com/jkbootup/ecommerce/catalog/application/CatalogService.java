@@ -77,6 +77,19 @@ public class CatalogService {
         return p;
     }
 
+    public static final int MAX_PUBLIC_LOOKUP = 50;
+
+    /** Active products for a few SKUs (cart lines, recommendations), in the order asked. Unknown or inactive SKUs are left out. */
+    public List<Product> activeBySkus(List<String> skus) {
+        var unique = new LinkedHashSet<>(skus);
+        if (unique.size() > MAX_PUBLIC_LOOKUP)
+            throw new DomainException("TOO_MANY_SKUS", "At most " + MAX_PUBLIC_LOOKUP + " SKUs per request");
+        if (unique.isEmpty()) return List.of();
+        Map<String, Product> found = new java.util.HashMap<>();
+        for (Product p : products.findBySkus(unique)) if (p.isActive()) found.put(p.sku(), p);
+        return unique.stream().map(found::get).filter(java.util.Objects::nonNull).toList();
+    }
+
     /** Current price, name and status per SKU, for cart-service. Unknown SKUs are left out. */
     public List<Product> pricesFor(Collection<String> skus) {
         var unique = new LinkedHashSet<>(skus);

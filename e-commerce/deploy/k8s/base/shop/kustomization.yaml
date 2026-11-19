@@ -1,4 +1,4 @@
-# The shop namespace: every service's own k8s/ base, unchanged, plus what only makes sense once they run together.
+# The shop namespace: every service's own k8s/ base and the storefront's, unchanged, plus what only makes sense once they run together.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: e-commerce-shop
@@ -15,6 +15,7 @@ resources:
   - ../../../../services/notification-service/k8s
   - ../../../../services/recommendation-service/k8s
   - ../../../../services/analytics/k8s
+  - ../../../../web/storefront/k8s
   - default-deny.yaml
   - aliases.yaml
   - certificate.yaml

@@ -15,7 +15,8 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Services (11) | ██████████ 100% | all eleven complete | — |
 | Walkthroughs | █████████░ 92% | every service | System walkthrough |
 | Local stack and Kubernetes overlays | ██████████ 100% | Compose stack with profiles and smoke test; dev, staging and prod overlays with operator-managed stores, checked against the operators' CRDs | — |
-| End-to-end and performance tests | █████░░░░░ 50% | End-to-end journeys (`tests/e2e`): 17 across core and every profile, nightly CI | Reviews journey locally (needs > 4 GB); Gatling (P4) |
+| Storefront (web UI) | ██████████ 100% | React Router 8 server rendering + backend-for-frontend (`web/storefront`): every page, sign-in, checkout, staff; compose, edge and k8s wiring; CI | Component tests when pages gain client logic |
+| End-to-end and performance tests | ██████░░░░ 60% | End-to-end journeys (`tests/e2e`): 22 across core, the storefront in a browser and every profile; ZAP and Lighthouse; nightly CI | Reviews journey locally (needs > 4 GB); Gatling (P4) |
 
 ## Services
 
@@ -34,6 +35,19 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | analytics (ClickHouse) | ✅ | ✅ 1 end-to-end (ClickHouse image + Kafka) + Grafana check | ✅ (consumed) | ✅ | ✅ | ✅ | ✅ |
 
 ## Recently completed
+
+* Storefront (`web/storefront`, design/16, ADR 0012): React Router 8.5 framework mode on Node 26, rendered on the server and
+  acting as backend-for-frontend. Keycloak confidential client with PKCE; tokens only on the server in sessions sealed with
+  AES-256-GCM in `redis-session` (rotation at sign-in, refresh under a lock, back-channel logout); CSRF by origin plus a
+  per-session token; CSP with a per-page nonce; server-owned checkout idempotency key. Pages for browse, search, product
+  (reviews and recommendations streamed), cart with guest merge, checkout with every outcome, orders with live status and
+  cancellation, reviews, and staff pages (products with `If-Match`, image upload, categories, stock) behind the `staff` role
+  and a second factor. Edge routes pages, assets and sign-in (with a per-address limit) to it; compose and k8s bases (HPA,
+  PDB, network policy, External Secrets, realm client) added. 5 browser journeys with axe pass with the 14 API journeys (19 of
+  19); Lighthouse LCP ≤ 1.0 s, accessibility 100; ZAP baseline 0 failures; 132 kB of JavaScript. Found and fixed on the way:
+  a cached HTML page would share one CSP nonce (HTML is no longer cached), React Router's own origin check failed behind the
+  edge (the edge now forwards the host), duplicate HSTS on assets, API failures surfaced as 500 pages (they now keep their
+  status and a reference id), and catalog had no way to look products up by SKU (`GET /products/by-sku`).
 
 * End-to-end tests (`tests/e2e`, Playwright Test in TypeScript): 17 journeys through the NGINX edge (browse, cart and merge,
   checkout with every outcome, idempotent replay, cancel, search, reviews, email exactly once, recommendations, analytics);
@@ -106,7 +120,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* Platform: the storefront (UI: React Router server rendering + backend-for-frontend, designed in design/16), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
+* Platform: Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

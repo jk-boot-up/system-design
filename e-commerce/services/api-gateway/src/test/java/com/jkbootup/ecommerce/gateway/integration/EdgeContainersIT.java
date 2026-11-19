@@ -45,6 +45,8 @@ class EdgeContainersIT {
                     + " ip=" + ex.getRequestHeaders().getFirst("X-Real-IP"));
             byte[] body = "{\"ok\":true}".getBytes(StandardCharsets.UTF_8);
             ex.getResponseHeaders().add("Content-Type", "application/json");
+            // A storefront product page for anonymous visitors may be cached by the edge for 30 s.
+            if (ex.getRequestURI().getPath().startsWith("/p/")) ex.getResponseHeaders().add("X-Accel-Expires", "30");
             ex.sendResponseHeaders(200, body.length);
             ex.getResponseBody().write(body);
             ex.close();
@@ -54,6 +56,7 @@ class EdgeContainersIT {
         Testcontainers.exposeHostPorts(port);
         edge = new GenericContainer<>(new ImageFromDockerfile("e-commerce/edge-test", false).withFileFromPath(".", Path.of("edge")))
                 .withEnv("GATEWAY_UPSTREAM", "host.testcontainers.internal:" + port)
+                .withEnv("STOREFRONT_UPSTREAM", "host.testcontainers.internal:" + port)
                 .withExposedPorts(8080, 8443)
                 .waitingFor(Wait.forHttp("/healthz").forPort(8080));
         edge.start();
@@ -119,5 +122,29 @@ class EdgeContainersIT {
                 URI.create("http://localhost:" + edge.getMappedPort(8080) + "/api/v1/products/1")).build(), HttpResponse.BodyHandlers.ofString());
         assertThat(plain.statusCode()).isEqualTo(301);
         assertThat(plain.headers().firstValue("Location")).hasValueSatisfying(l -> assertThat(l).startsWith("https://"));
+    }
+
+    @Test
+    void anonymousPagesAreCachedButNeverForShoppersWithASessionOrCart() throws Exception {
+        int before = HITS.get();
+        assertThat(get("/p/123").headers().firstValue("X-Cache")).hasValue("MISS");
+        HttpResponse<String> cached = get("/p/123");
+        assertThat(cached.headers().firstValue("X-Cache")).hasValue("HIT");
+        assertThat(cached.headers().firstValue("X-Accel-Expires")).isEmpty();
+        assertThat(HITS.get() - before).isEqualTo(1);
+        assertThat(get("/p/123", "Cookie", "__Host-sid=abc").headers().firstValue("X-Cache")).hasValue("BYPASS");
+        assertThat(get("/p/123", "Cookie", "theme=dark; __Host-guest=0f0f").headers().firstValue("X-Cache")).hasValue("BYPASS");
+        assertThat(HITS.get() - before).isEqualTo(3);
+    }
+
+    @Test
+    void storefrontProbesAreNotPublicAndSecurityHeadersAppearOnce() throws Exception {
+        int before = HITS.get();
+        for (String probe : new String[]{"/readyz", "/metrics"}) assertThat(get(probe).statusCode()).isEqualTo(404);
+        assertThat(HITS.get()).isEqualTo(before);
+        HttpResponse<String> page = get("/cart");
+        assertThat(page.statusCode()).isEqualTo(200);
+        assertThat(page.headers().allValues("Strict-Transport-Security")).hasSize(1);
+        assertThat(LAST.get()).startsWith("/cart").contains("ip=");
     }
 }

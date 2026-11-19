@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
@@ -31,6 +32,13 @@ public class ProductController {
     public ProductController(CatalogService service, ImageLinks links) {
         this.service = service;
         this.imageBaseUrl = links.baseUrl();
+    }
+
+    /** A few products by SKU, for pages that only know SKUs (cart lines, recommendations). */
+    @GetMapping("/products/by-sku")
+    public ResponseEntity<List<ProductView>> bySku(@RequestParam("sku") List<String> skus) {
+        return ResponseEntity.ok().cacheControl(CacheControl.maxAge(Duration.ofSeconds(60)).cachePublic())
+                .body(service.activeBySkus(skus).stream().map(p -> ProductView.of(p, imageBaseUrl)).toList());
     }
 
     @GetMapping("/products/{id}")

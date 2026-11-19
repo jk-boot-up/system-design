@@ -9,7 +9,12 @@
       fieldPaths: [ data.SHOP_ORIGINS ]
       options: { delimiter: /, index: 2 }
     - select: { kind: KeycloakRealmImport, name: shop }
-      fieldPaths: [ "spec.realm.clients.[clientId=shop-web].redirectUris.0", "spec.realm.clients.[clientId=shop-web].webOrigins.0" ]
+      fieldPaths: [ "spec.realm.clients.[clientId=shop-web].redirectUris.0", "spec.realm.clients.[clientId=shop-web].webOrigins.0",
+                    "spec.realm.clients.[clientId=shop-storefront].redirectUris.0",
+                    "spec.realm.clients.[clientId=shop-storefront].attributes.post\\.logout\\.redirect\\.uris" ]
+      options: { delimiter: /, index: 2 }
+    - select: { kind: ConfigMap, name: storefront }
+      fieldPaths: [ data.PUBLIC_ORIGIN ]
       options: { delimiter: /, index: 2 }
 - source: { kind: ConfigMap, name: environment, fieldPath: data.ID_HOST }
   targets:
@@ -33,8 +38,14 @@
     - select: { kind: ConfigMap, name: review-service }
       fieldPaths: [ data.JWT_ISSUER ]
       options: { delimiter: /, index: 2 }
+    - select: { kind: ConfigMap, name: storefront }
+      fieldPaths: [ data.OIDC_ISSUER ]
+      options: { delimiter: /, index: 2 }
 - source: { kind: ConfigMap, name: environment, fieldPath: data.CDN_HOST }
   targets:
     - select: { kind: ConfigMap, name: catalog-service }
+      fieldPaths: [ data.IMAGE_BASE_URL ]
+      options: { delimiter: /, index: 2 }
+    - select: { kind: ConfigMap, name: storefront }
       fieldPaths: [ data.IMAGE_BASE_URL ]
       options: { delimiter: /, index: 2 }

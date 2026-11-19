@@ -109,6 +109,17 @@ class CatalogServiceTest {
     }
 
     @Test
+    void publicLookupBySkuReturnsActiveProductsInTheOrderAsked() {
+        service.createProduct("SKU-1001", details("89.90", ProductStatus.ACTIVE));
+        service.createProduct("SKU-1002", details("19.90", ProductStatus.ACTIVE));
+        service.createProduct("SKU-DRAFT", details("9.90", ProductStatus.DRAFT));
+        assertThat(service.activeBySkus(List.of("SKU-1002", "SKU-DRAFT", "SKU-404", "SKU-1001", "SKU-1002")))
+                .extracting(Product::sku).containsExactly("SKU-1002", "SKU-1001");
+        assertThatThrownBy(() -> service.activeBySkus(java.util.stream.IntStream.range(0, 51).mapToObj(i -> "SKU-" + i).toList()))
+                .hasMessageContaining("At most 50");
+    }
+
+    @Test
     void imageUploadIsSignedThenConfirmedOnlyWhenTheObjectExists() {
         Product p = service.createProduct("SKU-1001", details("89.90", ProductStatus.ACTIVE));
         ImageStorage.UploadTicket ticket = service.startImageUpload(p.id(), "image/webp", 120_000);

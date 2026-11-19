@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* Design tokens (design/16 §16.11): colours as CSS variables, light and dark, contrast checked against WCAG 2.2 AA. */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+}
+
+:root {
+  color-scheme: light dark;
+  --canvas: #f7f7f5;
+  --surface: #ffffff;
+  --ink: #1b1d21;
+  --muted: #5a5f69;     /* 6.4:1 on surface */
+  --line: #d9dbe0;
+  --brand: #1f5f8b;     /* 7.0:1 with white */
+  --brand-ink: #ffffff;
+  --ok: #1e6b3a;
+  --warn: #8a5300;
+  --danger: #b0262d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #121417;
+    --surface: #1b1e23;
+    --ink: #eceef1;
+    --muted: #a8aeb8;   /* 7.9:1 on surface */
+    --line: #343941;
+    --brand: #7fb8e0;
+    --brand-ink: #0b1620;
+    --ok: #79c995;
+    --warn: #e8b05c;
+    --danger: #ff8a8f;
+  }
+}
+
+body { @apply bg-canvas text-ink font-sans antialiased; }
+:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.skip-link { @apply sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2; }
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+@layer components {
+  .btn-primary { @apply btn bg-brand text-brand-ink hover:brightness-110; }
+  .btn-quiet { @apply btn border border-line bg-surface text-ink hover:bg-canvas; }
+  .card { @apply rounded-lg border border-line bg-surface; }
+  .field { @apply w-full rounded-md border border-line bg-surface px-3 py-2 text-ink; }
+  .notice { @apply rounded-md border px-4 py-3; }
+  .skeleton { @apply animate-pulse rounded bg-line; }
+}

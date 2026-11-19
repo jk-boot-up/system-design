@@ -1,0 +1,47 @@
+name: e-commerce / storefront
+
+on:
+  push:
+    paths: ['e-commerce/web/storefront/**', 'e-commerce/services/*/contracts/openapi.yaml', '.github/workflows/e-commerce-storefront.yml']
+  pull_request:
+    paths: ['e-commerce/web/storefront/**', 'e-commerce/services/*/contracts/openapi.yaml', '.github/workflows/e-commerce-storefront.yml']
+  schedule: [ { cron: '0 6 * * *' } ]   # daily: new advisories against unchanged dependencies fail the build
+
+defaults:
+  run:
+    working-directory: e-commerce/web/storefront
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '26', cache: npm, cache-dependency-path: e-commerce/web/storefront/package-lock.json }
+      - name: Dependencies (lockfile only, no install scripts)
+        run: npm ci --ignore-scripts --no-fund
+      - name: Known vulnerabilities (high or critical fail the build)
+        run: npm audit --audit-level=high
+      - name: Contracts unchanged since the types were generated
+        run: npm run api:types && git diff --exit-code -- app/api
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Build and JavaScript budget
+        run: npm run build && npm run budget
+      - name: SBOM (CycloneDX)
+        run: npm run sbom
+      - name: Container image
+        run: docker build -t e-commerce/storefront:${{ github.sha }} .
+      - uses: actions/upload-artifact@v4
+        with: { name: storefront-sbom, path: e-commerce/web/storefront/sbom.cdx.json }
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with: { fail-on-severity: high }

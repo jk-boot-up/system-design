@@ -12,7 +12,7 @@ that service needs; you can work on one service without installing everything he
 | JDK | 25 (Temurin, Oracle or any OpenJDK 25 build) | Java services | `java -version` |
 | Go | 1.24+ | notification-service | `go version` |
 | Python | 3.12+ | recommendation-service | `python3 --version` |
-| Node.js | 20+ | Documentation tooling only (diagram rendering) | `node --version` |
+| Node.js | 26 LTS | The storefront (`web/storefront`), end-to-end tests, documentation tooling | `node --version` |
 | curl and jq | any | Trying the APIs from a shell | `curl --version`, `jq --version` |
 
 Gradle is **not** a prerequisite: every Java service ships its own Gradle wrapper (`./gradlew`), which downloads the right Gradle

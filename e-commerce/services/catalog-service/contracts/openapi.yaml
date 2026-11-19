@@ -6,6 +6,15 @@ info:
     Public product and category reads (through the gateway), the staff API for products, categories and images, and the
     internal price lookup for cart-service. Staff updates are conditional: send the ETag you read in If-Match.
 paths:
+  /api/v1/products/by-sku:
+    get:
+      operationId: getProductsBySku
+      description: Active products for up to 50 SKUs, in the order asked; unknown or inactive SKUs are left out.
+      parameters:
+        - { name: sku, in: query, required: true, schema: { type: array, items: { type: string }, maxItems: 50 }, style: form, explode: true }
+      responses:
+        '200': { description: Products, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Product' } } } } }
+        '400': { $ref: '#/components/responses/Problem' }
   /api/v1/products/{id}:
     get:
       operationId: getProduct

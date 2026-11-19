@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/name: storefront
+      app.kubernetes.io/part-of: e-commerce
+    includeSelectors: true
+resources: [deployment.yaml, service.yaml, hpa.yaml, pdb.yaml, networkpolicy.yaml]
+# Hosts are production's; deploy/k8s/components/hosts sets each environment's. Secrets (OIDC_CLIENT_SECRET,
+# SESSION_ENCRYPTION_KEYS) come from the Secret "storefront": dev-secrets or External Secrets.
+configMapGenerator:
+  - name: storefront
+    literals:
+      - PUBLIC_ORIGIN=https://shop.example
+      - GATEWAY_URL=http://api-gateway
+      - OIDC_ISSUER=https://id.shop.example/realms/shop
+      - OIDC_BACKCHANNEL_ORIGIN=http://keycloak:8080
+      - OIDC_CLIENT_ID=shop-storefront
+      - REDIS_URL=redis://redis-session:6379
+      - IMAGE_BASE_URL=https://cdn.shop.example/product-images
+      - LOG_LEVEL=info
+      - NODE_OPTIONS=--max-old-space-size=320
