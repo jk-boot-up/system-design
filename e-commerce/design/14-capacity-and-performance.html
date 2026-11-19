@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14. Capacity and performance model</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../README.html">E-commerce platform</a>
+  <span class="src">14-capacity-and-performance.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="14-capacity-and-performance-model">14. Capacity and performance model<a class="headerlink" href="#14-capacity-and-performance-model" title="Permanent link">#</a></h1>
+<p>How much load each part of the system carries at the planned volume (1×) and at ten times it (10×), where the first limit
+is, and how the load tests check the budgets. Inputs are the estimates in <a href="SPEC.html#3-capacity-estimates">SPEC §3</a>; scaling
+steps are in <a href="SPEC.html#13-scalability-modularity-and-performance">SPEC §13</a>; sizes in Kubernetes are in the service bases
+and <a href="../deploy/k8s/README.html"><code>deploy/k8s</code></a>.</p>
+<h2 id="141-load-model">14.1 Load model<a class="headerlink" href="#141-load-model" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th>1× average</th>
+<th>1× peak</th>
+<th>10× peak</th>
+<th>Derivation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reads at the edge</td>
+<td>290 rps</td>
+<td>25 k rps</td>
+<td>250 k rps</td>
+<td>1 M DAU × 25 reads / 86,400 s; ×8 daily peak; ×10 for an event</td>
+</tr>
+<tr>
+<td>Reads reaching services</td>
+<td>~60 rps</td>
+<td>~5 k rps</td>
+<td>~50 k rps</td>
+<td>about 80 % of reads (images, static pages, anonymous product pages) are served by the CDN and edge</td>
+</tr>
+<tr>
+<td>Orders</td>
+<td>1.2 /s</td>
+<td>500 /s (flash sale)</td>
+<td>5 k /s</td>
+<td>100 k orders a day; flash-sale design point</td>
+</tr>
+<tr>
+<td>Cart writes</td>
+<td>12 /s</td>
+<td>5 k /s</td>
+<td>50 k /s</td>
+<td>~10 per order</td>
+</tr>
+<tr>
+<td>Kafka messages</td>
+<td>12 /s</td>
+<td>5 k /s</td>
+<td>50 k /s</td>
+<td>~10 events per order across topics</td>
+</tr>
+<tr>
+<td>Searches</td>
+<td>~30 rps</td>
+<td>~2.5 k rps</td>
+<td>~25 k rps</td>
+<td>about half of the reads that reach services</td>
+</tr>
+</tbody>
+</table>
+<h2 id="142-per-service-budget">14.2 Per-service budget<a class="headerlink" href="#142-per-service-budget" title="Permanent link">#</a></h2>
+<p>Replica ranges are the HPA bounds in each service's <code>k8s/hpa.yaml</code>. "Per pod at peak" is the 1× peak divided by the
+maximum replicas: the rate one pod must sustain before the next step is needed.</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Carries</th>
+<th>1× peak</th>
+<th>HPA min–max</th>
+<th>Per pod at 1× peak</th>
+<th>First limit at 10×</th>
+<th>Next step</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>api-gateway</td>
+<td>every API call</td>
+<td>~5 k rps</td>
+<td>3–20</td>
+<td>250 rps</td>
+<td>pod count</td>
+<td>raise <code>maxReplicas</code>; non-blocking (WebFlux), so CPU bound</td>
+</tr>
+<tr>
+<td>catalog-service</td>
+<td>product pages not cached at the edge</td>
+<td>~1.5 k rps</td>
+<td>2–10</td>
+<td>150 rps</td>
+<td>Redis cache hit rate</td>
+<td>more cache, read replicas</td>
+</tr>
+<tr>
+<td>search-service</td>
+<td>searches</td>
+<td>~2.5 k rps</td>
+<td>2–10</td>
+<td>250 rps</td>
+<td>OpenSearch query throughput</td>
+<td>more replicas of the index, then shards</td>
+</tr>
+<tr>
+<td>cart-service</td>
+<td>cart reads and writes</td>
+<td>~5 k rps</td>
+<td>2–10</td>
+<td>500 rps</td>
+<td>Redis operations per node</td>
+<td>Redis Cluster</td>
+</tr>
+<tr>
+<td>order-service</td>
+<td>checkouts</td>
+<td>500 /s</td>
+<td>3–20</td>
+<td>25 /s</td>
+<td>the orders primary (14.3)</td>
+<td>sharding by <code>customer_id</code></td>
+</tr>
+<tr>
+<td>inventory-service</td>
+<td>reservations</td>
+<td>500 /s, all on hot SKUs in a sale</td>
+<td>3–20</td>
+<td>25 /s</td>
+<td>row contention on one SKU</td>
+<td>admission control at the gateway; sub-bucket rows (SPEC §6.4)</td>
+</tr>
+<tr>
+<td>payment-service</td>
+<td>authorise, capture</td>
+<td>1 k /s</td>
+<td>2–10</td>
+<td>100 /s</td>
+<td>the provider's rate limit</td>
+<td>negotiated limit; queue authorisations</td>
+</tr>
+<tr>
+<td>review-service</td>
+<td>review reads</td>
+<td>~500 rps</td>
+<td>2–10</td>
+<td>50 rps</td>
+<td>—</td>
+<td>Cassandra nodes</td>
+</tr>
+<tr>
+<td>recommendation-service</td>
+<td>recommendation reads</td>
+<td>~1 k rps</td>
+<td>2–6</td>
+<td>170 rps</td>
+<td>—</td>
+<td>more replicas</td>
+</tr>
+</tbody>
+</table>
+<h2 id="143-connection-budget-postgresql">14.3 Connection budget (PostgreSQL)<a class="headerlink" href="#143-connection-budget-postgresql" title="Permanent link">#</a></h2>
+<p>Each service with PostgreSQL connects through PgBouncer in transaction mode, so the number of pods does not multiply the
+connections the database must hold.</p>
+<table>
+<thead>
+<tr>
+<th>Database</th>
+<th>Client pool per pod</th>
+<th>Max pods</th>
+<th>Client connections to PgBouncer</th>
+<th>Server connections (PgBouncer → PostgreSQL)</th>
+<th>Queries at 1× peak</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>orders</td>
+<td>30 (<code>DB_POOL_SIZE</code>)</td>
+<td>20</td>
+<td>600 of 2,000 (<code>max_client_conn</code>)</td>
+<td>50 (<code>default_pool_size</code>)</td>
+<td>~2.5 k/s (500 orders × ~5)</td>
+</tr>
+<tr>
+<td>inventory</td>
+<td>20</td>
+<td>20</td>
+<td>400 of 2,000</td>
+<td>50</td>
+<td>~1.5 k/s</td>
+</tr>
+<tr>
+<td>payments</td>
+<td>20</td>
+<td>10</td>
+<td>200 of 2,000</td>
+<td>50</td>
+<td>~1 k/s</td>
+</tr>
+<tr>
+<td>catalog</td>
+<td>20</td>
+<td>10</td>
+<td>— (direct, no pooler)</td>
+<td>200 of <code>max_connections</code> 200</td>
+<td>mostly cache misses</td>
+</tr>
+</tbody>
+</table>
+<p>Catalog connects directly: at its maximum of 10 pods it would use every one of the database's 200 connections, leaving
+none for migrations or operators. Add <code>pgbouncer-catalog</code> (as for the others) or lower its pool before raising its
+<code>maxReplicas</code>.</p>
+<p>At 1× one primary per database is comfortable. At 10× the orders primary would need ~25 k writes and reads a second;
+order history moves to read replicas first, then orders are sharded by <code>customer_id</code> (Citus), which keeps a customer's
+orders on one shard.</p>
+<h2 id="144-partition-budget-kafka">14.4 Partition budget (Kafka)<a class="headerlink" href="#144-partition-budget-kafka" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Partitions</th>
+<th>Max consumers per group</th>
+<th>Messages at 1× peak</th>
+<th>Per partition</th>
+<th>At 10×</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>order.events</code></td>
+<td>12</td>
+<td>12</td>
+<td>~2.5 k/s</td>
+<td>~210/s</td>
+<td>~2.1 k/s per partition: raise to 48 ahead of need</td>
+</tr>
+<tr>
+<td><code>catalog.events</code></td>
+<td>12</td>
+<td>12</td>
+<td>low (staff edits, imports)</td>
+<td>—</td>
+<td>bulk imports are the peak</td>
+</tr>
+<tr>
+<td><code>inventory.events</code></td>
+<td>12</td>
+<td>12</td>
+<td>~1 k/s in a sale</td>
+<td>~85/s</td>
+<td>raise with <code>order.events</code></td>
+</tr>
+<tr>
+<td><code>payment.events</code></td>
+<td>12</td>
+<td>12</td>
+<td>~1 k/s</td>
+<td>~85/s</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>review.events</code></td>
+<td>6</td>
+<td>6</td>
+<td>low</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>KEDA scales consumers on lag, up to the partition count. Partitions can be added but never removed, and adding them moves
+keys to new partitions (order per aggregate holds only for new events), so they are raised ahead of need in a quiet hour.</p>
+<h2 id="145-storage-growth-per-year-at-1">14.5 Storage growth (per year at 1×)<a class="headerlink" href="#145-storage-growth-per-year-at-1" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th>Growth</th>
+<th>Plan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Orders (PostgreSQL)</td>
+<td>~73 GB</td>
+<td>monthly partitions; old partitions detached to cold storage</td>
+</tr>
+<tr>
+<td>Payments</td>
+<td>~30 GB</td>
+<td>as orders</td>
+</tr>
+<tr>
+<td>Search index</td>
+<td>50 GB with a replica</td>
+<td>shard count fixed at creation; reindex behind an alias</td>
+</tr>
+<tr>
+<td>Kafka</td>
+<td>&lt; 100 GB per broker (7 days)</td>
+<td>retention per topic</td>
+</tr>
+<tr>
+<td>Carts (Redis)</td>
+<td>~4 GB</td>
+<td>30-day expiry</td>
+</tr>
+</tbody>
+</table>
+<h2 id="146-load-test-plan-and-results">14.6 Load-test plan and results<a class="headerlink" href="#146-load-test-plan-and-results" title="Permanent link">#</a></h2>
+<p>The Gatling simulations in <a href="../tests/performance/README.html"><code>tests/performance</code></a> hold each journey to its p99 budget after
+a warm-up and fail on a regression of more than 10 % against the environment's baseline.</p>
+<table>
+<thead>
+<tr>
+<th>Journey</th>
+<th>Budget (p99)</th>
+<th>Local rate</th>
+<th>Local p99 (4 GB Docker VM)</th>
+<th>Target rate (production-like)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Product page</td>
+<td>150 ms</td>
+<td>8 visitors/s</td>
+<td>9 ms</td>
+<td>300 visitors/s</td>
+</tr>
+<tr>
+<td>Search</td>
+<td>300 ms</td>
+<td>4 visitors/s</td>
+<td>not measurable locally (OpenSearch OOM-killed or starved); warm single request ~20 ms</td>
+<td>150 visitors/s</td>
+</tr>
+<tr>
+<td>Add to cart</td>
+<td>100 ms</td>
+<td>6 visitors/s</td>
+<td>54 ms</td>
+<td>200 visitors/s</td>
+</tr>
+<tr>
+<td>Place order (whole saga)</td>
+<td>1.5 s</td>
+<td>1 order/s</td>
+<td>320 ms</td>
+<td>50 orders/s</td>
+</tr>
+</tbody>
+</table>
+<p>The local numbers show the budgets are reachable and catch regressions on one machine. They do not measure capacity: one
+laptop runs every service, store and broker at once.</p>
+<p>Still to run, on a production-like cluster with several load generators:</p>
+<ol>
+<li>The target rates above (about 2,000 requests a second in steady state), to measure per-pod throughput and fill in the
+   "per pod" column of 14.2 with measured numbers.</li>
+<li>A flash sale: 500 orders a second on ten SKUs, checking admission control, inventory row contention and that no SKU
+   is oversold.</li>
+<li>A soak of several hours at the steady state, watching memory, connection counts and consumer lag.</li>
+<li>Failure under load: kill a broker, a database primary and a gateway pod in turn; the SLO burn must stay under the page
+   threshold.</li>
+</ol>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

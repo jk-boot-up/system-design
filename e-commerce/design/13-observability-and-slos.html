@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13. Observability and SLOs</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../README.html">E-commerce platform</a>
+  <span class="src">13-observability-and-slos.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="13-observability-and-slos">13. Observability and SLOs<a class="headerlink" href="#13-observability-and-slos" title="Permanent link">#</a></h1>
+<p>What the platform measures, what it promises, and how a person gets from an alert to the cause. The decision is
+<a href="adr/0013-observability-with-opentelemetry-alloy-and-slos-at-the-gateway.html">ADR 0013</a>; the implementation, how to run it
+and how to check it are in <a href="../deploy/observability/README.html"><code>deploy/observability</code></a>; what to do when an alert fires is
+in <a href="15-runbooks.html">15 Runbooks</a>.</p>
+<h2 id="131-signals-and-pipeline">13.1 Signals and pipeline<a class="headerlink" href="#131-signals-and-pipeline" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Signals and pipeline diagram" src="diagrams/observability-and-slos--signals-and-pipeline.light.svg" data-light="diagrams/observability-and-slos--signals-and-pipeline.light.svg" data-dark="diagrams/observability-and-slos--signals-and-pipeline.dark.svg" loading="lazy"></figure></p>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Produced by</th>
+<th>Conventions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Traces</td>
+<td>Java: Micrometer Tracing bridged to OpenTelemetry; storefront: OTel Node SDK with HTTP and undici instrumentation</td>
+<td>W3C <code>traceparent</code> everywhere, including Kafka record headers and the outbox row; health checks, metrics scrapes and the relay's polling are not traced; query strings are dropped from span names and URLs</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>Micrometer at <code>/actuator/prometheus</code>; <code>/metrics</code> in Go and Python; Strimzi's Kafka exporter</td>
+<td>Prometheus naming; histograms for <code>http.server.requests</code> (5 ms – 5 s); the gateway's per-route histogram with buckets at each SLO threshold</td>
+</tr>
+<tr>
+<td>Logs</td>
+<td>stdout, one JSON object per line</td>
+<td>Java: ECS (<code>LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs</code>) with <code>traceId</code> and <code>spanId</code>; storefront: pino with the same fields; labels in Loki are only <code>service</code> and <code>level</code>, the trace id is structured metadata</td>
+</tr>
+</tbody>
+</table>
+<h2 id="132-one-trace-from-click-to-consumers">13.2 One trace from click to consumers<a class="headerlink" href="#132-one-trace-from-click-to-consumers" title="Permanent link">#</a></h2>
+<p>The outbox writer stores the request's <code>traceparent</code> with each event; the relay sends the event inside that context, so the
+asynchronous half of a request belongs to the same trace. Verified on the local stack with a real checkout:</p>
+<pre class="highlight"><code>api-gateway        http post /api/v1/orders                        request.id = 4525fb06-…
+order-service        http post /api/v1/orders
+cart-service           http get /internal/carts/{customerId}/checkout-snapshot
+inventory-service      http post /internal/reservations
+payment-service        http post /internal/payments/authorize
+order-service          order.events send          (outbox relay, after commit)
+cart-service             order.events process     (cart cleared)
+inventory-service        order.events process</code></pre>
+<p>Problem responses return the request id as <code>traceId</code>. Support can paste it into Tempo
+(<code>{ span.request.id = "&lt;id&gt;" }</code>) and land on the trace, then jump to that trace's log lines in Loki.</p>
+<h2 id="133-slis-and-slos">13.3 SLIs and SLOs<a class="headerlink" href="#133-slis-and-slos" title="Permanent link">#</a></h2>
+<p>Measured at the API gateway per route, so failures between the gateway and a service count against the service. Objectives
+are over 30 days and come from SPEC §2.2.</p>
+<table>
+<thead>
+<tr>
+<th>Journey</th>
+<th>SLI</th>
+<th>Objective</th>
+<th>Error budget (30 days)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Browse (catalog, search, reviews, recommendations, order reads)</td>
+<td>non-5xx responses / all</td>
+<td>99.95 %</td>
+<td>21.6 min</td>
+</tr>
+<tr>
+<td>Cart</td>
+<td>non-5xx / all on cart routes</td>
+<td>99.95 %</td>
+<td>21.6 min</td>
+</tr>
+<tr>
+<td>Checkout</td>
+<td>non-5xx / all on <code>POST /orders</code></td>
+<td>99.9 %</td>
+<td>43.2 min</td>
+</tr>
+<tr>
+<td>Product page latency</td>
+<td>GET catalog under 150 ms</td>
+<td>99 %</td>
+<td>1 % of requests</td>
+</tr>
+<tr>
+<td>Search latency</td>
+<td>GET search under 300 ms</td>
+<td>99 %</td>
+<td>1 %</td>
+</tr>
+<tr>
+<td>Add-to-cart latency</td>
+<td>PUT/POST cart items under 100 ms</td>
+<td>99 %</td>
+<td>1 %</td>
+</tr>
+<tr>
+<td>Checkout latency</td>
+<td><code>POST /orders</code> under 1.5 s</td>
+<td>99 %</td>
+<td>1 %</td>
+</tr>
+</tbody>
+</table>
+<p>A declined payment or an out-of-stock answer is a correct <code>4xx</code>/<code>409</code> outcome, not an error. Checkout outcomes are counted
+separately (<code>checkout_outcomes_total{outcome}</code>) so the business can see declines without them burning the budget.</p>
+<p>The table lives in one place, <code>deploy/observability/generate.py</code>, which writes the recording rules, the alerts, the
+Kubernetes PrometheusRules and the SLO dashboard; CI fails when the generated files are stale.</p>
+<h2 id="134-alerts">13.4 Alerts<a class="headerlink" href="#134-alerts" title="Permanent link">#</a></h2>
+<p>Burn-rate alerts follow the SRE workbook's multi-window pattern: both a long and a short window must burn, so an alert
+starts fast and stops soon after the problem does.</p>
+<table>
+<thead>
+<tr>
+<th>Alert</th>
+<th>Windows</th>
+<th>Burn rate</th>
+<th>Budget gone in</th>
+<th>Severity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ErrorBudgetBurnFast</code></td>
+<td>1 h and 5 min</td>
+<td>14.4</td>
+<td>~2 days</td>
+<td>page</td>
+</tr>
+<tr>
+<td><code>ErrorBudgetBurnFast</code></td>
+<td>6 h and 30 min</td>
+<td>6</td>
+<td>5 days</td>
+<td>page</td>
+</tr>
+<tr>
+<td><code>ErrorBudgetBurnSlow</code></td>
+<td>1 day and 2 h</td>
+<td>3</td>
+<td>10 days</td>
+<td>ticket</td>
+</tr>
+<tr>
+<td><code>ErrorBudgetBurnSlow</code></td>
+<td>3 days and 6 h</td>
+<td>1</td>
+<td>30 days</td>
+<td>ticket</td>
+</tr>
+</tbody>
+</table>
+<p>Cause-based alerts cover what SLOs see late or not at all:</p>
+<table>
+<thead>
+<tr>
+<th>Alert</th>
+<th>Fires when</th>
+<th>Severity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OutboxBacklogStale</code></td>
+<td>the oldest unpublished event of a service is older than 30 s</td>
+<td>page</td>
+</tr>
+<tr>
+<td><code>TopicGrowingFasterThanItsEvents</code></td>
+<td>a topic grows more than ten times faster than its outbox publishes (a producer re-sending)</td>
+<td>page</td>
+</tr>
+<tr>
+<td><code>ServiceDown</code></td>
+<td>Prometheus cannot scrape a service for 2 min</td>
+<td>page</td>
+</tr>
+<tr>
+<td><code>DeadLetterQueueNotEmpty</code></td>
+<td>any <code>&lt;topic&gt;.dlq</code> has messages</td>
+<td>ticket</td>
+</tr>
+<tr>
+<td><code>ConsumerLagGrowing</code></td>
+<td>a consumer group is more than 1,000 events behind and still falling behind, for 10 min</td>
+<td>ticket</td>
+</tr>
+<tr>
+<td><code>PaymentOutcomeUnknown</code></td>
+<td>more than 5 checkouts ended in a payment timeout within 15 min</td>
+<td>ticket</td>
+</tr>
+<tr>
+<td><code>PaymentDeclineRateHigh</code></td>
+<td>more than 30 % of checkouts declined for 15 min</td>
+<td>ticket</td>
+</tr>
+<tr>
+<td><code>RateLimiterDegraded</code></td>
+<td>the gateway cannot reach Redis and limits per instance</td>
+<td>ticket</td>
+</tr>
+</tbody>
+</table>
+<p>Every alert has a runbook section (<a href="15-runbooks.html">15</a> and <code>deploy/observability/RUNBOOK.md</code>) and unit tests run by
+<code>promtool</code> in CI.</p>
+<h2 id="135-dashboards">13.5 Dashboards<a class="headerlink" href="#135-dashboards" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Dashboard</th>
+<th>Shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Services: rate, errors, duration</td>
+<td>RED per service and route, p50/p95/p99 from histograms</td>
+</tr>
+<tr>
+<td>SLOs and error budgets</td>
+<td>each SLO's 30-day compliance, budget left, burn rates per window</td>
+</tr>
+<tr>
+<td>Checkout, events and Kafka</td>
+<td>checkout outcomes, outbox backlog and age, events published per type, messages produced per topic, consumer lag, DLQ depth</td>
+</tr>
+<tr>
+<td>Analytics (ClickHouse)</td>
+<td>business views: orders, revenue, top products (<a href="../services/analytics/README.html">analytics</a>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="136-sampling-retention-and-cost">13.6 Sampling, retention and cost<a class="headerlink" href="#136-sampling-retention-and-cost" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Environment</th>
+<th>Traces</th>
+<th>Logs</th>
+<th>Metrics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Local (compose)</td>
+<td>100 %, 24 h</td>
+<td>72 h</td>
+<td>15 d</td>
+</tr>
+<tr>
+<td>Kubernetes</td>
+<td>tail sampling: every error, every trace over 1 s, 10 % of the rest</td>
+<td>per environment</td>
+<td>per environment</td>
+</tr>
+</tbody>
+</table>
+<p>Tail sampling needs all spans of a trace on one collector: an Alloy DaemonSet receives spans and routes them by trace id to
+an <code>alloy-sampler</code> StatefulSet, which decides once the trace is complete.</p>
+<h2 id="137-known-gaps">13.7 Known gaps<a class="headerlink" href="#137-known-gaps" title="Permanent link">#</a></h2>
+<ul>
+<li>notification-service and recommendation-service export metrics but no traces; their consumers ignore the incoming
+  <code>traceparent</code>.</li>
+<li>The edge logs the request id but starts no trace.</li>
+<li>Exemplars (a link from a latency bucket to an example trace) are stored by Prometheus but not yet attached by services.</li>
+<li>Locally, the core stack plus this profile needs about 5 GB of Docker memory under load.</li>
+</ul>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

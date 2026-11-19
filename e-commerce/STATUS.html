@@ -67,9 +67,9 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>System design documents</td>
-<td>███████░░░ 70%</td>
-<td>HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, 13 ADRs</td>
-<td>System/module/service diagrams; security, observability, capacity, runbooks</td>
+<td>█████████░ 95%</td>
+<td>HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, system/module/service diagrams, security, observability, capacity, runbooks, storefront, 13 ADRs</td>
+<td>System walkthrough</td>
 </tr>
 <tr>
 <td>Documentation tooling</td>
@@ -244,6 +244,12 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </table>
 <h2 id="recently-completed">Recently completed<a class="headerlink" href="#recently-completed" title="Permanent link">#</a></h2>
 <ul>
+<li>Design documents 11–15: the system and service-interaction map as wired in the code, modules inside a service and
+  communication diagrams of checkout, indexing and cancellation; security (trust boundaries, STRIDE, sign-in, secrets,
+  data protection and the gaps: no mTLS on internal calls, no database backups, no SBOMs or automated updates for the
+  backend); observability and SLOs; capacity at 1× and 10× with connection and partition budgets (catalog can exhaust its
+  database's connections at full scale-out); runbooks for outbox backlog, DLQ replay, stuck sagas, hot SKUs, database
+  failover, broker loss and cache stampede (product cache entries expire together: no jitter yet).</li>
 <li>Observability (<code>deploy/observability</code>, ADR 0013): every Java service and the storefront export OpenTelemetry traces
   through Alloy to Tempo. Outbox rows store the request's <code>traceparent</code> and the relay sends inside it, so one trace shows
   the request, the gateway, the service, its calls, the event and every consumer (verified: a checkout spans gateway,
@@ -365,8 +371,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>Design documents S13–S17; system walkthrough (S19).</li>
-<li>System, module and service diagrams (design document 11).</li>
+<li>System walkthrough (S19).</li>
 </ul>
 <h2 id="risks-and-notes">Risks and notes<a class="headerlink" href="#risks-and-notes" title="Permanent link">#</a></h2>
 <table>

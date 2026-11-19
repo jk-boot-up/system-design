@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>15. Runbooks</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../README.html">E-commerce platform</a>
+  <span class="src">15-runbooks.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="15-runbooks">15. Runbooks<a class="headerlink" href="#15-runbooks" title="Permanent link">#</a></h1>
+<p>What to do when something goes wrong in production. Each runbook says how the problem shows itself, how to confirm it,
+what to do, and how to know it is over. The per-alert runbook that alerts link to is
+<a href="../deploy/observability/RUNBOOK.html"><code>deploy/observability/RUNBOOK.md</code></a>; this document covers the incidents behind those
+alerts, including the ones that need several steps or a decision.</p>
+<p>Common first steps for every incident:</p>
+<ol>
+<li>Open <em>SLOs and error budgets</em> in Grafana: which journeys are burning, and since when.</li>
+<li>Check for a deploy in the last hour (<code>kubectl -n e-commerce-shop rollout history deploy/&lt;service&gt;</code>). If one lines up,
+   roll it back first and investigate afterwards (<code>kubectl rollout undo</code>).</li>
+<li>Take a failing request's <code>traceId</code> from a problem response or the logs and open its trace in Tempo.</li>
+</ol>
+<h2 id="151-outbox-backlog">15.1 Outbox backlog<a class="headerlink" href="#151-outbox-backlog" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Signals:</strong> <code>OutboxBacklogStale</code> (page); the <em>Transactional outboxes</em> panel shows a service's oldest unpublished event
+  growing; downstream read models are stale (search shows old prices, carts are not cleared after orders).</li>
+<li><strong>Confirm:</strong> the service's log has <code>Outbox relay pass failed, retrying in … ms</code> with the Kafka error;
+  <code>outbox_unpublished</code> is rising.</li>
+<li><strong>Act:</strong></li>
+<li>Kafka unavailable or rejecting writes → 15.6.</li>
+<li>The relay is not running (the pod is up but nothing is logged) → restart the deployment; the relay starts with the
+    application.</li>
+<li>One event too large or invalid for the topic → the relay keeps failing on the same row. Find it (<code>select id, type,
+    length(payload::text) from outbox where published_at is null order by id limit 5</code>), fix the cause in code, and do not
+    delete the row by hand unless the event is truly unwanted (its consumers would never learn of it).</li>
+<li><strong>Over when:</strong> <code>outbox_oldest_unpublished_age_seconds</code> is back under a second. The relay publishes what Kafka accepts and
+  backs off up to 30 s, so it catches up by itself once Kafka is healthy.</li>
+</ul>
+<h2 id="152-dead-letter-queue-replay">15.2 Dead-letter queue replay<a class="headerlink" href="#152-dead-letter-queue-replay" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Signals:</strong> <code>DeadLetterQueueNotEmpty</code> (ticket); a consumer's effect is missing (a cart not cleared, a review not
+  allowed, an email not sent).</li>
+<li><strong>Confirm:</strong> read the parked events with their headers:
+  <pre class="highlight"><code class="language-bash">kubectl -n e-commerce-platform exec -it kafka-combined-0 -- bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 \
+  --topic order.events.dlq --from-beginning --property print.headers=true --property print.key=true</code></pre>
+  The <code>traceparent</code> header leads to the failed attempt's trace; the consumer's log has the exception.</li>
+<li><strong>Act:</strong>
+  1. Fix the cause (a bug, a missing schema version, a dependency that was down).
+  2. Deploy the fix.
+  3. Replay: copy the parked events back onto the main topic with the same key, then empty the DLQ by moving the
+     consumer's offset. Consumers are idempotent (processed-events ledger), so replaying an event that did get through is
+     harmless.</li>
+<li><strong>Over when:</strong> the DLQ depth is zero and the missing effects are visible.</li>
+<li><strong>Note:</strong> there is no replay tool yet; a small one (read DLQ, write main topic, same key and headers) belongs in
+  <code>deploy/tools</code>.</li>
+</ul>
+<h2 id="153-stuck-checkout-sagas">15.3 Stuck checkout sagas<a class="headerlink" href="#153-stuck-checkout-sagas" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Signals:</strong> orders stay <code>PENDING</code> or <code>CANCELLING</code>; their order pages show the order as pending; checkout latency
+  SLO burns; <code>PaymentOutcomeUnknown</code> may fire.</li>
+<li><strong>Confirm:</strong>
+  <pre class="highlight"><code class="language-sql">select saga_step, status, count(*), min(updated_at)
+from orders where status in ('PENDING', 'CANCELLING') group by 1, 2;</code></pre>
+  Saga recovery runs every 15 s on one replica (ShedLock <code>order.saga-recovery</code>) and picks up orders untouched for 30 s.</li>
+<li><strong>Act:</strong></li>
+<li>Recovery logs <code>Saga recovery looked at N in-flight orders</code> but the count does not fall → the step it retries is
+    failing: look at inventory-service or payment-service (their circuit breakers, their databases, the payment
+    provider).</li>
+<li>Recovery does not log at all → check the lock: a pod killed while holding it releases it after at most 5 minutes
+    (<code>lockAtMostFor</code>); if it is older, delete the row from <code>shedlock</code>.</li>
+<li>Never mark an order <code>CONFIRMED</code> or <code>CANCELLED</code> by hand: the payment and stock steps would not match. Let recovery
+    finish, or fix the dependency it waits for.</li>
+<li><strong>Over when:</strong> no order is <code>PENDING</code> for longer than a minute.</li>
+</ul>
+<h2 id="154-hot-sku-flash-sale">15.4 Hot SKU (flash sale)<a class="headerlink" href="#154-hot-sku-flash-sale" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Signals:</strong> many <code>429</code> responses on add-to-cart and checkout for one SKU; inventory latency rises; the checkout latency
+  SLO may burn.</li>
+<li><strong>Confirm:</strong> the gateway's admission control (<code>hot-sku</code>: 200 requests a second per SKU, burst 400) is rejecting;
+  inventory's reservation latency is high for that SKU only.</li>
+<li><strong>Act:</strong></li>
+<li>This is the design working: admission control keeps a sale from taking down checkout for everyone else. Leave it.</li>
+<li>If the sale was announced, the SKU's stock is small and the queue is long, lower the per-SKU rate so customers fail
+    fast instead of waiting.</li>
+<li>If inventory still struggles, split the SKU's stock into sub-bucket rows (SPEC §6.4) before the next sale.</li>
+<li><strong>Over when:</strong> the sale ends or stock reaches zero (<code>OUT_OF_STOCK</code> is an answer, not an error).</li>
+</ul>
+<h2 id="155-database-failover-postgresql">15.5 Database failover (PostgreSQL)<a class="headerlink" href="#155-database-failover-postgresql" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Signals:</strong> a burst of 5xx from one service; its logs show connection errors; CloudNativePG reports a failover.</li>
+<li><strong>Confirm:</strong> <code>kubectl -n e-commerce-platform get cluster &lt;name&gt;-db</code> shows a new primary.</li>
+<li><strong>Act:</strong></li>
+<li>CloudNativePG promotes a replica on its own (seconds). PgBouncer reconnects to the new primary; services retry.
+    Usually nothing else is needed.</li>
+<li>Sagas interrupted by the failover are finished by recovery (15.3); outbox rows are published once writes succeed
+    again (15.1).</li>
+<li>If the cluster cannot elect a primary (two of three instances lost), restore from backup. Backups are not yet
+    configured (<a href="12-security-design.html#128-gaps-designed-not-yet-built">12 §12.8</a>); until they are, this is data loss.</li>
+<li><strong>Over when:</strong> the cluster reports healthy with three instances and the service's error rate is normal.</li>
+</ul>
+<h2 id="156-kafka-broker-loss">15.6 Kafka broker loss<a class="headerlink" href="#156-kafka-broker-loss" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Signals:</strong> <code>OutboxBacklogStale</code> on several services at once; consumer lag rising everywhere; under-replicated
+  partitions.</li>
+<li><strong>Confirm:</strong> <code>kubectl -n e-commerce-platform get kafka,kafkanodepool</code>; the Kafka exporter's
+  <code>kafka_topic_partition_under_replicated_partition</code>.</li>
+<li><strong>Act:</strong></li>
+<li>One broker of three lost: topics have replication factor 3 and <code>min.insync.replicas</code> 2, so producers keep writing
+    and consumers keep reading. Strimzi recreates the pod; watch it rejoin and catch up.</li>
+<li>Two brokers lost: producers fail (<code>NotEnoughReplicas</code>). Checkouts still complete (the outbox holds events), but
+    nothing downstream sees them. Restore brokers first; do not lower <code>min.insync.replicas</code>, which would risk losing
+    acknowledged events.</li>
+<li>Disk full on a broker: find the topic growing fastest (<code>TopicGrowingFasterThanItsEvents</code>), stop its producer if it
+    is looping, then lower that topic's retention temporarily.</li>
+<li><strong>Over when:</strong> no under-replicated partitions, outbox backlogs drained, lag back to normal.</li>
+</ul>
+<h2 id="157-cache-stampede">15.7 Cache stampede<a class="headerlink" href="#157-cache-stampede" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Signals:</strong> catalog-service and its database CPU spike together, often right after Redis restarts or at the same
+  moment every few minutes; product-latency SLO burns.</li>
+<li><strong>Confirm:</strong> Redis hit rate drops sharply; many identical <code>select … from product</code> queries at once.</li>
+<li><strong>Why it can happen here:</strong> product entries expire after exactly 10 minutes and a miss reads PostgreSQL directly, with
+  no jitter and no single-flight. Entries written together (after a restart, or by an import) expire together.</li>
+<li><strong>Act now:</strong> scale catalog-service out; the edge and gateway caches absorb anonymous product pages meanwhile. If Redis
+  itself is down, catalog keeps working from PostgreSQL (Redis errors count as misses), so restore Redis.</li>
+<li><strong>Fix for good:</strong> add jitter to the expiry (for example 10 minutes ± 10 %) and collapse concurrent misses for the same
+  product into one query; then this runbook only covers Redis loss.</li>
+<li><strong>Over when:</strong> the hit rate is back above 90 % and database CPU is normal.</li>
+</ul>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

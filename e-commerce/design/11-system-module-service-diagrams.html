@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11. System, module and service diagrams</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../README.html">E-commerce platform</a>
+  <span class="src">11-system-module-service-diagrams.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="11-system-module-and-service-diagrams">11. System, module and service diagrams<a class="headerlink" href="#11-system-module-and-service-diagrams" title="Permanent link">#</a></h1>
+<p>The system as built: what runs, how the services depend on each other, what every service is made of inside, and how they
+cooperate in the key flows. Names are the names in the code (<code>services/*</code>, <code>deploy/compose/compose.yaml</code>). The C4 views in
+<a href="01-high-level-design.html">01 High-level design</a> show the intent; this document shows the wiring.</p>
+<h2 id="111-system-diagram">11.1 System diagram<a class="headerlink" href="#111-system-diagram" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="System diagram diagram" src="diagrams/system-module-service-diagrams--system-diagram.light.svg" data-light="diagrams/system-module-service-diagrams--system-diagram.light.svg" data-dark="diagrams/system-module-service-diagrams--system-diagram.dark.svg" loading="lazy"></figure></p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Runs</th>
+<th>Talks to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Edge</td>
+<td>NGINX: TLS, HSTS, per-address rate limits, caching of public assets</td>
+<td>storefront, api-gateway, Keycloak</td>
+</tr>
+<tr>
+<td>Web</td>
+<td>storefront (server-rendered pages, the session holds the tokens), Keycloak</td>
+<td>api-gateway, <code>redis-session</code></td>
+</tr>
+<tr>
+<td>API</td>
+<td>api-gateway: validates JWTs, rate limits per user and address, admission control for hot SKUs, routes</td>
+<td>every public service</td>
+</tr>
+<tr>
+<td>Services</td>
+<td>eleven services, each with its own store (<a href="adr/0002-microservices-with-a-database-per-service.html">ADR 0002</a>)</td>
+<td>each other only as shown in 11.2</td>
+</tr>
+<tr>
+<td>Messaging</td>
+<td>Kafka for domain events, RabbitMQ for email work queues (<a href="adr/0006-kafka-for-events-rabbitmq-for-work-queues.html">ADR 0006</a>)</td>
+<td>producers through the outbox</td>
+</tr>
+</tbody>
+</table>
+<h2 id="112-service-interaction-map">11.2 Service-interaction map<a class="headerlink" href="#112-service-interaction-map" title="Permanent link">#</a></h2>
+<p>Solid arrows are synchronous HTTP (inside the cluster); dotted arrows are Kafka topics, labelled with the topic.</p>
+<p><figure class="diagram"><img alt="Service-interaction map diagram" src="diagrams/system-module-service-diagrams--service-interaction-map.light.svg" data-light="diagrams/system-module-service-diagrams--service-interaction-map.light.svg" data-dark="diagrams/system-module-service-diagrams--service-interaction-map.dark.svg" loading="lazy"></figure></p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Calls (HTTP)</th>
+<th>Publishes</th>
+<th>Consumes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>api-gateway</td>
+<td>the public services</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>catalog-service</td>
+<td>—</td>
+<td><code>catalog.events</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>search-service</td>
+<td>—</td>
+<td>—</td>
+<td><code>catalog.events</code>, <code>inventory.events</code></td>
+</tr>
+<tr>
+<td>cart-service</td>
+<td>catalog-service (prices, cached 30 s)</td>
+<td>—</td>
+<td><code>order.events</code> (clears the cart on confirmation)</td>
+</tr>
+<tr>
+<td>inventory-service</td>
+<td>—</td>
+<td><code>inventory.events</code></td>
+<td><code>order.events</code> (releases stock still held for a cancelled order: a safety net)</td>
+</tr>
+<tr>
+<td>order-service</td>
+<td>cart (snapshot), inventory (reserve, commit, release, return), payment (authorize, capture, void, refund)</td>
+<td><code>order.events</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>payment-service</td>
+<td>the payment provider</td>
+<td><code>payment.events</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>review-service</td>
+<td>—</td>
+<td><code>review.events</code></td>
+<td><code>order.events</code> (who may review what)</td>
+</tr>
+<tr>
+<td>recommendation-service</td>
+<td>—</td>
+<td>—</td>
+<td><code>order.events</code> (bought-together pairs)</td>
+</tr>
+<tr>
+<td>notification-service</td>
+<td>Mailpit / SMTP</td>
+<td>— (RabbitMQ <code>email.send</code>, <code>email.retry.*</code>)</td>
+<td><code>order.events</code></td>
+</tr>
+<tr>
+<td>analytics</td>
+<td>—</td>
+<td>—</td>
+<td><code>order.events</code> (ClickHouse Kafka engine)</td>
+</tr>
+</tbody>
+</table>
+<p><code>payment.events</code> and <code>review.events</code> have no consumer in the code yet. The <a href="10-event-catalogue.html">event catalogue</a> lists
+analytics and a future catalogue rating cache as their readers.</p>
+<p>No service calls a service that calls it back, and every synchronous chain is at most two hops deep (gateway → order →
+inventory). Everything else that one service must learn from another arrives as an event, so a slow consumer never slows
+a request.</p>
+<h2 id="113-module-diagram-inside-a-java-service">11.3 Module diagram: inside a Java service<a class="headerlink" href="#113-module-diagram-inside-a-java-service" title="Permanent link">#</a></h2>
+<p>Every Java service has the same packages under <code>com.jkbootup.ecommerce.&lt;service&gt;</code>, and ArchUnit tests enforce the arrows:
+the domain depends on nothing, the application depends only on the domain and its own ports, and an adapter depends on
+the application but never on another adapter (<a href="adr/0003-no-shared-code-between-services.html">ADR 0003</a>).</p>
+<p><figure class="diagram"><img alt="Module diagram: inside a Java service diagram" src="diagrams/system-module-service-diagrams--module-diagram-inside-a-java-service.light.svg" data-light="diagrams/system-module-service-diagrams--module-diagram-inside-a-java-service.light.svg" data-dark="diagrams/system-module-service-diagrams--module-diagram-inside-a-java-service.dark.svg" loading="lazy"></figure></p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Adapters</th>
+<th>Store</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>api-gateway</td>
+<td><code>admission</code>, <code>filter</code>, <code>web</code> (no application layer: it routes)</td>
+<td>Redis (rate limits)</td>
+</tr>
+<tr>
+<td>catalog-service</td>
+<td><code>web</code>, <code>persistence</code>, <code>messaging</code>, <code>redis</code>, <code>storage</code></td>
+<td>PostgreSQL <code>catalog</code>, object storage</td>
+</tr>
+<tr>
+<td>search-service</td>
+<td><code>web</code>, <code>opensearch</code>, <code>messaging</code></td>
+<td>OpenSearch <code>products</code></td>
+</tr>
+<tr>
+<td>cart-service</td>
+<td><code>web</code>, <code>redis</code>, <code>client</code>, <code>messaging</code></td>
+<td>Redis</td>
+</tr>
+<tr>
+<td>inventory-service</td>
+<td><code>web</code>, <code>persistence</code>, <code>messaging</code>, <code>scheduling</code> (reservation expiry)</td>
+<td>PostgreSQL <code>inventory</code></td>
+</tr>
+<tr>
+<td>order-service</td>
+<td><code>web</code>, <code>persistence</code>, <code>client</code>, <code>messaging</code>, <code>scheduling</code> (saga recovery)</td>
+<td>PostgreSQL <code>orders</code></td>
+</tr>
+<tr>
+<td>payment-service</td>
+<td><code>web</code>, <code>persistence</code>, <code>provider</code>, <code>messaging</code>, <code>scheduling</code> (reconciliation)</td>
+<td>PostgreSQL <code>payments</code></td>
+</tr>
+<tr>
+<td>review-service</td>
+<td><code>web</code>, <code>cassandra</code>, <code>messaging</code></td>
+<td>Cassandra</td>
+</tr>
+</tbody>
+</table>
+<p>The outbox services (catalog, inventory, order, payment) carry an <code>observability</code> package with <code>TraceContext</code>: the
+persistence adapter stores the current <code>traceparent</code> with each outbox row and the messaging adapter restores it when it
+sends, which is why it sits outside both adapters.</p>
+<p>The Go and Python services follow the same shape in their own idiom:</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Layout</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>notification-service (Go)</td>
+<td><code>internal/domain</code>, <code>internal/app</code>, <code>internal/adapter/{kafka,rabbit,smtp,dedupe,httpapi}</code>, <code>cmd/notification-service</code></td>
+</tr>
+<tr>
+<td>recommendation-service (Python)</td>
+<td><code>recommendation/domain.py</code>, <code>recommendation/app.py</code>, <code>recommendation/adapters/{kafka_consumer,redis_store,http}.py</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="114-communication-diagrams-of-the-key-flows">11.4 Communication diagrams of the key flows<a class="headerlink" href="#114-communication-diagrams-of-the-key-flows" title="Permanent link">#</a></h2>
+<p>UML communication diagrams: the objects and the numbered messages between them. The sequence diagrams in
+<a href="05-sequence-diagrams.html">05</a> show the same flows over time, including every failure branch.</p>
+<h3 id="checkout">Checkout<a class="headerlink" href="#checkout" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Checkout diagram" src="diagrams/system-module-service-diagrams--checkout.light.svg" data-light="diagrams/system-module-service-diagrams--checkout.light.svg" data-dark="diagrams/system-module-service-diagrams--checkout.dark.svg" loading="lazy"></figure></p>
+<h3 id="a-product-change-reaches-search">A product change reaches search<a class="headerlink" href="#a-product-change-reaches-search" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="A product change reaches search diagram" src="diagrams/system-module-service-diagrams--a-product-change-reaches-search.light.svg" data-light="diagrams/system-module-service-diagrams--a-product-change-reaches-search.light.svg" data-dark="diagrams/system-module-service-diagrams--a-product-change-reaches-search.dark.svg" loading="lazy"></figure></p>
+<h3 id="cancellation">Cancellation<a class="headerlink" href="#cancellation" title="Permanent link">#</a></h3>
+<p><figure class="diagram"><img alt="Cancellation diagram" src="diagrams/system-module-service-diagrams--cancellation.light.svg" data-light="diagrams/system-module-service-diagrams--cancellation.light.svg" data-dark="diagrams/system-module-service-diagrams--cancellation.dark.svg" loading="lazy"></figure></p>
+<p>The order stays <code>CANCELLING</code> until both the refund and the stock return succeed; saga recovery retries them. Inventory's
+listener on <code>OrderCancelled</code> is a safety net: release is idempotent, so a stock hold that survived is freed.</p>
+<p>When a checkout fails before capture (out of stock, declined, payment timeout), order-service compensates instead: void
+the authorisation, release the reservation, cancel the order.</p>
+<h2 id="115-where-to-look-next">11.5 Where to look next<a class="headerlink" href="#115-where-to-look-next" title="Permanent link">#</a></h2>
+<ul>
+<li>Per service, in more detail: <code>services/&lt;service&gt;/design/README.md</code> and its walkthrough.</li>
+<li>Deployment of these boxes: <a href="03-deployment.html">03 Deployment</a>; data inside them: <a href="04-database-design.html">04 Database design</a>.</li>
+<li>What every arrow is protected by: <a href="12-security-design.html">12 Security design</a>; how every arrow is observed:
+  <a href="13-observability-and-slos.html">13 Observability and SLOs</a>.</li>
+</ul>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

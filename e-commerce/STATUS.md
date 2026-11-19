@@ -10,7 +10,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Area | Progress | Done | Next |
 |---|---|---|---|
 | Specification and plans | ██████████ 100% | SPEC, PLAN, design plan, implementation plan, prerequisites | Keep in step with changes |
-| System design documents | ███████░░░ 70% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, 13 ADRs | System/module/service diagrams; security, observability, capacity, runbooks |
+| System design documents | █████████░ 95% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, system/module/service diagrams, security, observability, capacity, runbooks, storefront, 13 ADRs | System walkthrough |
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
 | Services (11) | ██████████ 100% | all eleven complete | — |
 | Walkthroughs | █████████░ 92% | every service | System walkthrough |
@@ -37,6 +37,12 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## Recently completed
 
+* Design documents 11–15: the system and service-interaction map as wired in the code, modules inside a service and
+  communication diagrams of checkout, indexing and cancellation; security (trust boundaries, STRIDE, sign-in, secrets,
+  data protection and the gaps: no mTLS on internal calls, no database backups, no SBOMs or automated updates for the
+  backend); observability and SLOs; capacity at 1× and 10× with connection and partition budgets (catalog can exhaust its
+  database's connections at full scale-out); runbooks for outbox backlog, DLQ replay, stuck sagas, hot SKUs, database
+  failover, broker loss and cache stampede (product cache entries expire together: no jitter yet).
 * Observability (`deploy/observability`, ADR 0013): every Java service and the storefront export OpenTelemetry traces
   through Alloy to Tempo. Outbox rows store the request's `traceparent` and the relay sends inside it, so one trace shows
   the request, the gateway, the service, its calls, the event and every consumer (verified: a checkout spans gateway,
@@ -141,8 +147,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* Design documents S13–S17; system walkthrough (S19).
-* System, module and service diagrams (design document 11).
+* System walkthrough (S19).
 
 ## Risks and notes
 

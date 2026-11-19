@@ -1,0 +1,49 @@
+flowchart TB
+    browser([Browser])
+    staff([Staff])
+    psp([Payment provider])
+    subgraph edge_tier[Edge]
+        edge[NGINX edge<br/>TLS, per-address limits, cache]
+    end
+    subgraph web_tier[Web]
+        storefront[storefront<br/>React Router SSR + BFF, Node]
+        keycloak[Keycloak<br/>realm shop]
+    end
+    subgraph api_tier[API]
+        gateway[api-gateway<br/>JWT, rate limits, admission]
+    end
+    subgraph services[Services]
+        catalog[catalog-service]
+        search[search-service]
+        cart[cart-service]
+        inventory[inventory-service]
+        order[order-service]
+        payment[payment-service]
+        review[review-service]
+        recommendation[recommendation-service<br/>Python]
+        notification[notification-service<br/>Go]
+        analytics[analytics<br/>ClickHouse]
+    end
+    subgraph messaging[Messaging]
+        kafka[(Kafka<br/>domain events)]
+        rabbit[(RabbitMQ<br/>email jobs)]
+    end
+    subgraph stores[Stores]
+        pg[(PostgreSQL<br/>catalog, inventory, orders, payments)]
+        redis[(Redis<br/>carts, rate limits, sessions)]
+        os[(OpenSearch)]
+        cass[(Cassandra)]
+        s3[(Object storage<br/>product images)]
+    end
+    browser --> edge
+    staff --> edge
+    edge --> storefront
+    edge --> keycloak
+    edge --> gateway
+    storefront --> gateway
+    gateway --> services
+    services -->|outbox| kafka
+    kafka -->|consumers| services
+    notification --> rabbit
+    services --> stores
+    payment --> psp

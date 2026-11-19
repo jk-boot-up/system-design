@@ -1,0 +1,13 @@
+flowchart TB
+    staff([Staff])
+    gw[api-gateway]
+    cat[catalog-service]
+    k[(Kafka)]
+    srch[search-service]
+    osx[(OpenSearch)]
+    staff -->|1 PUT /api/v1/products/id| gw
+    gw -->|2 route, role staff| cat
+    cat -->|3 commit product + outbox row| cat
+    cat -.->|4 catalog.events ProductChanged| k
+    k -.->|5 consume| srch
+    srch -->|6 scripted upsert, version guard| osx

@@ -1,0 +1,32 @@
+flowchart TB
+    subgraph internet[Internet: untrusted]
+        browser([Browser])
+        attacker([Bots, attackers])
+    end
+    subgraph dmz[Edge: TLS ends here]
+        edge[NGINX edge]
+    end
+    subgraph web[Web tier: holds user sessions]
+        storefront[storefront BFF]
+        keycloak[Keycloak]
+        rsess[(redis-session<br/>tokens AES-256-GCM)]
+    end
+    subgraph shop[Namespace e-commerce-shop: default deny]
+        gateway[api-gateway<br/>JWT, roles, rate limits]
+        services[services<br/>check JWT and ownership again]
+    end
+    subgraph platform[Namespace e-commerce-platform]
+        stores[(databases, Kafka, Redis,<br/>OpenSearch, Cassandra, RabbitMQ)]
+    end
+    psp([Payment provider])
+    browser --> edge
+    attacker --> edge
+    edge --> storefront
+    edge --> keycloak
+    edge --> gateway
+    storefront --> rsess
+    storefront --> gateway
+    gateway --> services
+    services --> stores
+    services -->|egress gateway, FQDN allow-list| psp
+    browser -.->|card data, tokenised| psp

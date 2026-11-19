@@ -1,0 +1,18 @@
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant SF as storefront (BFF)
+    participant KC as Keycloak
+    participant R as redis-session
+    participant GW as api-gateway
+    B->>SF: GET /auth/sign-in?returnTo=/cart
+    SF->>B: 302 to Keycloak (code flow, PKCE, state, nonce)
+    B->>KC: credentials (+ OTP for staff)
+    KC->>B: 302 /auth/callback?code=…
+    B->>SF: callback
+    SF->>KC: code + verifier + client secret
+    KC->>SF: ID, access and refresh tokens
+    SF->>R: store tokens sealed with AES-256-GCM
+    SF->>B: Set-Cookie __Host-sid (HttpOnly, Secure, SameSite=Lax), 302 /cart
+    B->>SF: GET /cart (cookie)
+    SF->>GW: GET /api/v1/cart, Authorization: Bearer access token

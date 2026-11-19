@@ -1,0 +1,16 @@
+flowchart TB
+    b([Customer])
+    gw[api-gateway]
+    os[order-service]
+    ps[payment-service]
+    k[(Kafka)]
+    is[inventory-service]
+    ns[notification-service]
+    b -->|1 POST /api/v1/orders/id/cancel| gw
+    gw -->|2 route| os
+    os -->|3 POST /internal/payments/id/refund| ps
+    os -->|4 POST /internal/reservations/id/return| is
+    os -->|5 commit CANCELLED + outbox row| os
+    os -.->|6 order.events OrderCancelled| k
+    k -.->|7 release anything still held| is
+    k -.->|7 cancellation email| ns

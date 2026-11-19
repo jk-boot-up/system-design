@@ -25,7 +25,7 @@ e-commerce/
 │  ├─ SPEC.md, PLAN.md           specification and delivery plan
 │  ├─ DESIGN-PLAN.md             every design deliverable with status
 │  ├─ IMPLEMENTATION-PLAN.md     every implementation work item, definition of done, test strategy
-│  ├─ 01-high-level-design.md … 10-event-catalogue.md
+│  ├─ 01-high-level-design.md … 16-storefront-ui.md
 │  ├─ adr/                       architecture decision records
 │  ├─ diagrams/                  SVG diagrams (light + dark); editable sources in diagrams/src
 │  └─ walkthrough/               animated walkthrough of the whole system (themes + narration)

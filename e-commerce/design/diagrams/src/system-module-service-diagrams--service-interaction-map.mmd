@@ -1,0 +1,31 @@
+flowchart LR
+    gateway[api-gateway]
+    catalog[catalog-service]
+    search[search-service]
+    cart[cart-service]
+    inventory[inventory-service]
+    order[order-service]
+    payment[payment-service]
+    review[review-service]
+    recommendation[recommendation-service]
+    notification[notification-service]
+    analytics[analytics]
+    gateway -->|/api/v1/products, /categories| catalog
+    gateway -->|/api/v1/search| search
+    gateway -->|/api/v1/cart| cart
+    gateway -->|/api/v1/orders| order
+    gateway -->|/api/v1/reviews| review
+    gateway -->|/api/v1/recommendations| recommendation
+    gateway -->|PUT /api/v1/admin/stock/sku| inventory
+    cart -->|prices by SKU| catalog
+    order -->|checkout snapshot| cart
+    order -->|reserve, commit, release, return| inventory
+    order -->|authorize, capture, void, refund| payment
+    catalog -.->|catalog.events| search
+    inventory -.->|inventory.events| search
+    order -.->|order.events| cart
+    order -.->|order.events| inventory
+    order -.->|order.events| review
+    order -.->|order.events| recommendation
+    order -.->|order.events| notification
+    order -.->|order.events| analytics

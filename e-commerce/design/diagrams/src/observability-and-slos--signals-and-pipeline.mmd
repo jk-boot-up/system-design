@@ -1,0 +1,21 @@
+flowchart LR
+    subgraph sources[Sources]
+        java[8 Java services<br/>Spring Boot OTel starter]
+        node[storefront<br/>OTel Node SDK]
+        others[notification Go,<br/>recommendation Python]
+        kx[Kafka exporter]
+    end
+    alloy[Grafana Alloy<br/>OTLP receiver, log collector,<br/>tail sampling in Kubernetes]
+    tempo[(Tempo<br/>traces)]
+    loki[(Loki<br/>logs)]
+    prom[(Prometheus<br/>metrics, rules)]
+    am[Alertmanager]
+    grafana[Grafana]
+    java -->|OTLP traces| alloy
+    node -->|OTLP traces| alloy
+    java & node & others -->|stdout JSON| alloy
+    alloy --> tempo
+    alloy --> loki
+    java & others & kx -->|scrape| prom
+    prom --> am
+    tempo & loki & prom --> grafana

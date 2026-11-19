@@ -1,0 +1,26 @@
+flowchart TB
+    subgraph adapter[adapter]
+        web[web<br/>controllers, problem responses]
+        persistence[persistence<br/>JdbcClient repositories, outbox writer]
+        messaging[messaging<br/>outbox relay, Kafka listeners]
+        client[client<br/>RestClient with timeouts, retries, breaker]
+        other[redis / opensearch / cassandra / storage / provider / scheduling]
+    end
+    subgraph application[application]
+        usecases[use cases]
+        port[port<br/>interfaces the use cases need]
+    end
+    domain[domain<br/>aggregates, value objects, state machines]
+    config[config<br/>wiring, ObservabilityConfiguration]
+    observability[observability<br/>TraceContext]
+    web --> usecases
+    messaging --> usecases
+    usecases --> port
+    usecases --> domain
+    persistence -.->|implements| port
+    client -.->|implements| port
+    other -.->|implements| port
+    persistence --> observability
+    messaging --> observability
+    config --> adapter
+    config --> application

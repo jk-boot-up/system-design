@@ -31,12 +31,12 @@ Status: ✅ done · 🔄 in progress · ⏳ planned
 | S10 | [08 Class and UML diagrams](08-class-diagrams.md) | Component, domain classes per context, ports and adapters, outbox, package and UML deployment views | ✅ |
 | S11 | [09 API catalogue](09-api-catalogue.md) | Conventions, every public and internal endpoint, error codes | ✅ |
 | S12 | [10 Event catalogue](10-event-catalogue.md) | Envelope, topics, every event payload, consumers, evolution rules | ✅ |
-| S13 | 11 System, module and service diagrams | System diagram, module diagram of every service, service-interaction map, UML communication diagrams of the key flows | 🔄 |
-| S14 | 12 Security design | Threat model (STRIDE per trust boundary), authentication and authorisation flows, secrets, data protection | ⏳ |
-| S15 | 13 Observability and SLOs | SLIs and SLOs per journey, dashboards, alerts with burn rates, tracing and log conventions | ⏳ |
-| S16 | 14 Capacity and performance model | Per-service throughput, connection and partition budgets at 1× and 10×, load-test plan and budgets | ⏳ |
-| S17 | 15 Runbooks | Outbox backlog, DLQ replay, stuck sagas, hot SKU, database failover, Kafka broker loss, cache stampede | ⏳ |
-| S18 | [ADRs](adr/README.md) | 11 decision records (microservices, no shared code, saga, outbox, brokers, languages, polyglot persistence, ids, JDBC, diagrams) | ✅ (new ADRs as decisions arise) |
+| S13 | [11 System, module and service diagrams](11-system-module-service-diagrams.md) | System diagram, module diagram of every service, service-interaction map, UML communication diagrams of the key flows | ✅ |
+| S14 | [12 Security design](12-security-design.md) | Threat model (STRIDE per trust boundary), authentication and authorisation flows, secrets, data protection | ✅ |
+| S15 | [13 Observability and SLOs](13-observability-and-slos.md) | SLIs and SLOs per journey, dashboards, alerts with burn rates, tracing and log conventions | ✅ |
+| S16 | [14 Capacity and performance model](14-capacity-and-performance.md) | Per-service throughput, connection and partition budgets at 1× and 10×, load-test plan and budgets | ✅ |
+| S17 | [15 Runbooks](15-runbooks.md) | Outbox backlog, DLQ replay, stuck sagas, hot SKU, database failover, Kafka broker loss, cache stampede | ✅ |
+| S18 | [ADRs](adr/README.md) | 13 decision records (microservices, no shared code, saga, outbox, brokers, languages, polyglot persistence, ids, JDBC, diagrams) | ✅ (new ADRs as decisions arise) |
 | S19 | System walkthrough (`walkthrough/`) | Animated: architecture tour (system → services → modules), browse and search, cart, checkout happy path, out of stock, payment declined, payment timeout, cancellation and refund, event fan-out, flash sale, failure of a dependency | ⏳ |
 | S20 | [PREREQUISITES.md](../PREREQUISITES.md) | Tools, versions, resources, ports, verification | ✅ |
 | S21 | [16 Storefront UI](16-storefront-ui.md) | Industry survey, ranked stack choice with reasons, BFF security design, pages, checkout, errors, accessibility, performance, deployment, testing | ✅ |

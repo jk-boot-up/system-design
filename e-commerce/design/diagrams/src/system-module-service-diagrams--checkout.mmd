@@ -1,0 +1,21 @@
+flowchart TB
+    b([Browser])
+    sf[storefront]
+    gw[api-gateway]
+    os[order-service]
+    cs[cart-service]
+    is[inventory-service]
+    ps[payment-service]
+    k[(Kafka)]
+    b -->|1 POST /checkout| sf
+    sf -->|2 POST /api/v1/orders + Idempotency-Key| gw
+    gw -->|3 admission, then route| os
+    os -->|4 GET checkout-snapshot| cs
+    os -->|5 POST /internal/reservations| is
+    os -->|6 POST /internal/payments/authorize| ps
+    os -->|7 POST reservations/id/commit| is
+    os -->|8 POST payments/id/capture| ps
+    os -->|9 commit CONFIRMED + outbox row| os
+    os -.->|10 order.events OrderConfirmed| k
+    k -.->|11 clear cart| cs
+    k -.->|11 email, analytics, recommendations| b2[notification, analytics, recommendation]

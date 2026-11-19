@@ -17,6 +17,11 @@ the design, then read these documents in order.
 | 8 | [Class and UML diagrams](08-class-diagrams.md) | Domain models, ports and adapters, component and package diagrams |
 | 9 | [API catalogue](09-api-catalogue.md) | Every public and internal endpoint with request and response shapes |
 | 10 | [Event catalogue](10-event-catalogue.md) | Every event, topic, key, producer, consumer and payload |
+| 11 | [System, module and service diagrams](11-system-module-service-diagrams.md) | The system as built, the service-interaction map, modules inside a service, communication diagrams of checkout, indexing and cancellation |
+| 12 | [Security design](12-security-design.md) | Trust boundaries, STRIDE per boundary, sign-in and sessions, authorisation, secrets, data protection, supply chain, gaps |
+| 13 | [Observability and SLOs](13-observability-and-slos.md) | Signals and pipeline, one trace across the outbox, SLIs and SLOs, burn-rate and cause alerts, dashboards, sampling |
+| 14 | [Capacity and performance model](14-capacity-and-performance.md) | Load at 1× and 10×, per-service, connection and partition budgets, storage growth, load-test plan and results |
+| 15 | [Runbooks](15-runbooks.md) | Outbox backlog, DLQ replay, stuck sagas, hot SKU, database failover, Kafka broker loss, cache stampede |
 | 16 | [Storefront UI](16-storefront-ui.md) | What the industry uses, ranked stack choice with reasons, BFF security, pages, checkout, deployment, testing |
 | 11 | Low-level design per service | Each service keeps its own design in `services/<service>/design/README.md` (links below) |
 | 12 | [Architecture decision records](adr/) | One record per significant decision |
