@@ -15,7 +15,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Services (11) | ██████████ 100% | all eleven complete | — |
 | Walkthroughs | █████████░ 92% | every service | System walkthrough |
 | Local stack and Kubernetes overlays | ██████████ 100% | Compose stack with profiles and smoke test; dev, staging and prod overlays with operator-managed stores, checked against the operators' CRDs | — |
-| End-to-end and performance tests | ░░░░░░░░░░ 0% | — | After checkout works end to end |
+| End-to-end and performance tests | █████░░░░░ 50% | End-to-end journeys (`tests/e2e`): 17 across core and every profile, nightly CI | Reviews journey locally (needs > 4 GB); Gatling (P4) |
 
 ## Services
 
@@ -34,6 +34,14 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | analytics (ClickHouse) | ✅ | ✅ 1 end-to-end (ClickHouse image + Kafka) + Grafana check | ✅ (consumed) | ✅ | ✅ | ✅ | ✅ |
 
 ## Recently completed
+
+* End-to-end tests (`tests/e2e`, Playwright Test in TypeScript): 17 journeys through the NGINX edge (browse, cart and merge,
+  checkout with every outcome, idempotent replay, cancel, search, reviews, email exactly once, recommendations, analytics);
+  `run-compose.sh` runs one profile at a time so it fits 4 GB; nightly CI. Core (14), search, async and analytics pass
+  locally; reviews needs more Docker memory than this machine has free. The journeys found and fixed: errors without the
+  promised `traceId` in every service; invalid input answered with an empty `403` instead of `400 VALIDATION_FAILED` (the
+  error page was blocked by security) in every Java service; `401`/`403` without problem bodies; the checkout rate limit
+  applied to reading, polling and cancelling orders, not only to placing them.
 
 * Kubernetes overlays (`deploy/k8s`): dev, staging and prod built from every service's own base; services in `e-commerce-shop`,
   operator-managed stores in `e-commerce-platform` (CloudNativePG + PgBouncer, Strimzi KRaft + the catalogue's topics, Redis per
@@ -98,7 +106,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* Platform: end-to-end tests (P3), then the storefront (UI: React Router server rendering + backend-for-frontend, designed in design/16), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
+* Platform: the storefront (UI: React Router server rendering + backend-for-frontend, designed in design/16), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

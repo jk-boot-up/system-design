@@ -1,5 +1,7 @@
 package com.jkbootup.ecommerce.search.adapter.web;
 
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import com.jkbootup.ecommerce.search.application.port.SearchIndex;
 import com.jkbootup.ecommerce.search.domain.DomainException;
 import org.springframework.http.HttpHeaders;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** Maps errors to RFC 9457 problem details with a stable {@code code}. */
 @RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)   // domain errors first; RequestProblemHandler takes the rest
 public class ProblemHandler {
 
     @ExceptionHandler(DomainException.class)

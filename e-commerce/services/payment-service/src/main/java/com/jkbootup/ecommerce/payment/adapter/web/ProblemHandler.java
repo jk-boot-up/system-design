@@ -1,5 +1,7 @@
 package com.jkbootup.ecommerce.payment.adapter.web;
 
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import com.jkbootup.ecommerce.payment.domain.DomainException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -7,6 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)   // domain errors first; RequestProblemHandler takes the rest
 public class ProblemHandler {
 
     @ExceptionHandler(DomainException.class)

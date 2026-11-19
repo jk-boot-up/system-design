@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>End-to-end tests</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="end-to-end-tests">End-to-end tests<a class="headerlink" href="#end-to-end-tests" title="Permanent link">#</a></h1>
+<p>Journeys across the running system, through the public NGINX edge as a client would use it, checking what happens
+afterwards in every service (stock, cart, email, recommendations, search, analytics). Milestone P3 of the
+<a href="../../design/IMPLEMENTATION-PLAN.html">implementation plan</a>.</p>
+<p>Written in TypeScript with Playwright Test, the same toolchain the <a href="../../design/16-storefront-ui.html">storefront</a> will use, so
+its browser journeys join this suite.</p>
+<pre class="highlight"><code class="language-bash">cd e-commerce/tests/e2e
+npm ci
+./run-compose.sh                      # starts the compose stack and runs everything, one profile at a time (fits 4 GB)
+./run-compose.sh core async           # only these
+npm run core                          # core journeys against a stack that is already running
+npx playwright test --grep @search    # one profile's journeys against a running stack
+npx playwright show-report            # last run's HTML report</code></pre>
+<h2 id="journeys">Journeys<a class="headerlink" href="#journeys" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Profile</th>
+<th>What it proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>browse.spec.ts</code></td>
+<td>core</td>
+<td>A product staff publishes is readable by anyone and micro-cached at the edge (MISS → HIT); unknown products are <code>404 NOT_FOUND</code> problems; only staff change the catalogue (<code>401 UNAUTHENTICATED</code>, <code>403 FORBIDDEN</code>); <code>/internal</code> is not reachable</td>
+</tr>
+<tr>
+<td><code>cart.spec.ts</code></td>
+<td>core</td>
+<td>A guest cart (<code>X-Guest-Id</code>) merges into the account cart at sign-in with correct totals; quantity 0 removes a line; quantities above 99 are <code>400 VALIDATION_FAILED</code></td>
+</tr>
+<tr>
+<td><code>checkout.spec.ts</code></td>
+<td>core</td>
+<td>Confirmed order takes stock and empties the cart; the same <code>Idempotency-Key</code> returns the same order and takes no more stock; out of stock (<code>409</code>), declined card (<code>402</code>, stock released, cart kept), unknown payment (<code>504 PAYMENT_UNKNOWN</code>, stock released), empty cart (<code>422</code>); another customer cannot read the order</td>
+</tr>
+<tr>
+<td><code>cancel.spec.ts</code></td>
+<td>core</td>
+<td>Cancelling a confirmed order refunds it and returns the stock; cancelling again is safe (idempotent)</td>
+</tr>
+<tr>
+<td><code>search.spec.ts</code></td>
+<td><code>search</code></td>
+<td>A new product becomes searchable with brand facets; when it sells out it leaves in-stock results</td>
+</tr>
+<tr>
+<td><code>reviews.spec.ts</code></td>
+<td><code>reviews</code></td>
+<td>A buyer's review is verified, a non-buyer's is not; one review per customer (<code>409 ALREADY_REVIEWED</code>); the rating summary is right</td>
+</tr>
+<tr>
+<td><code>async.spec.ts</code></td>
+<td><code>async</code></td>
+<td>An order sends exactly one confirmation email (checked in Mailpit) and makes the other items recommendations</td>
+</tr>
+<tr>
+<td><code>analytics.spec.ts</code></td>
+<td><code>analytics</code></td>
+<td>The confirmed order lands once in ClickHouse with a hashed customer key; the dashboard user is read-only</td>
+</tr>
+</tbody>
+</table>
+<p>Every error response is checked to be an RFC 9457 problem with the catalogue's <code>code</code> and a <code>traceId</code>.</p>
+<h2 id="how-the-tests-are-built">How the tests are built<a class="headerlink" href="#how-the-tests-are-built" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Fresh data per test.</strong> Staff creates new SKUs for each journey, so runs never depend on each other or on old data.</li>
+<li><strong>Waiting for events, not sleeping.</strong> Effects that travel through Kafka are polled with a deadline (<code>eventually</code>).</li>
+<li><strong>Rate limits respected.</strong> Checkout is limited to three orders and then one every five seconds per user; a <code>429</code> is waited
+  out with <code>Retry-After</code> and the same <code>Idempotency-Key</code>, as a real client must.</li>
+<li><strong>Read-only side doors</strong> for facts the public API does not show: inventory's internal stock endpoint, Mailpit's API,
+  review-service's purchase table (to know when the verified badge can be expected), and ClickHouse as the read-only
+  dashboard user.</li>
+<li><strong>Profiles.</strong> A journey that needs an optional profile skips when it is not running, unless <code>E2E_REQUIRE</code> names it (or
+  <code>all</code>): then it fails. <code>run-compose.sh</code> always sets it for the profile it starts.</li>
+</ul>
+<h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default (local compose stack)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>E2E_EDGE</code></td>
+<td><code>https://localhost:8443</code></td>
+</tr>
+<tr>
+<td><code>E2E_TOKEN_URL</code>, <code>E2E_CLIENT_ID</code></td>
+<td>Keycloak at <code>localhost:8180</code>, client <code>shop-web</code> (password grant: dev realm only)</td>
+</tr>
+<tr>
+<td><code>E2E_INSECURE_TLS</code></td>
+<td><code>true</code> (self-signed certificate)</td>
+</tr>
+<tr>
+<td><code>E2E_INVENTORY</code>, <code>E2E_MAILPIT</code>, <code>E2E_CASSANDRA</code>, <code>E2E_CLICKHOUSE</code></td>
+<td>the compose ports</td>
+</tr>
+<tr>
+<td><code>E2E_REQUIRE</code></td>
+<td>empty; e.g. <code>search,async</code> or <code>all</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="memory">Memory<a class="headerlink" href="#memory" title="Permanent link">#</a></h2>
+<p>The whole stack needs about 10 GB. <code>run-compose.sh</code> runs the core stack plus one profile at a time and stops core services a
+profile does not use (search stops checkout). On a 4 GB Docker VM the <code>reviews</code> profile, which needs the full checkout
+path <em>and</em> Cassandra, only fits when nothing else runs in Docker; give Docker 6 GB or more to run it. CI runs everything
+nightly (<a href="../../../.github/workflows/e-commerce-e2e.yml">workflow</a>).</p>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

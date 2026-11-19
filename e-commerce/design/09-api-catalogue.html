@@ -68,7 +68,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td><strong>Errors</strong></td>
-<td>RFC 9457 <code>application/problem+json</code> with <code>type</code>, <code>title</code>, <code>status</code>, <code>detail</code>, <code>instance</code>, plus <code>code</code> and <code>traceId</code></td>
+<td>RFC 9457 <code>application/problem+json</code> with <code>type</code>, <code>title</code>, <code>status</code>, <code>detail</code>, <code>instance</code>, plus <code>code</code> and <code>traceId</code> (the <code>X-Request-Id</code> of the request until distributed tracing is in place), on every error including 401, 403 and 429</td>
 </tr>
 <tr>
 <td><strong>Pagination</strong></td>
@@ -268,7 +268,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <td><code>/api/v1/orders/{id}/cancel</code></td>
 <td>customer (owner) or staff</td>
 <td></td>
-<td><code>200 Order</code> · <code>409 NOT_CANCELLABLE</code></td>
+<td><code>200 Order</code> (also when already cancelled: a retry is safe) · <code>409 NOT_CANCELLABLE</code> once shipped</td>
 </tr>
 </tbody>
 </table>
@@ -475,6 +475,16 @@ applies the effect twice.</p>
 <td>503</td>
 <td><code>DEPENDENCY_UNAVAILABLE</code></td>
 <td>Circuit open or timeout; retry later</td>
+</tr>
+<tr>
+<td>405 / 415</td>
+<td><code>METHOD_NOT_ALLOWED</code> / <code>UNSUPPORTED_MEDIA_TYPE</code></td>
+<td>Wrong method or body type</td>
+</tr>
+<tr>
+<td>500</td>
+<td><code>INTERNAL_ERROR</code></td>
+<td>Unexpected; details only in the logs (quote the <code>traceId</code>)</td>
 </tr>
 <tr>
 <td>504</td>

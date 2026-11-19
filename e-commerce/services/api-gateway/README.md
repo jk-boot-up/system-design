@@ -25,6 +25,7 @@ api-gateway/
 │  ├─ adapter/admission/        RedisTokenBuckets (Lua script, timeout, local fallback), AdmissionControl filter (429)
 │  ├─ adapter/filter/           RequestIdFilter
 │  ├─ adapter/web/              FallbackController (503 problem per service)
+│  ├─ problem/                  ProblemResponses: 401, 403 and 429 as problems with code and traceId
 │  └─ config/                   rate policies, JWT decoder (issuer + audience), access rules
 ├─ src/main/resources/application.yaml   routes, circuit breakers, time limits, rate limits
 ├─ edge/                        nginx.conf, server template, security headers, dev certificate, Dockerfile, k8s/
@@ -61,7 +62,8 @@ docker build -t e-commerce/edge edge && docker run --rm -p 8443:8443 -e GATEWAY_
 | `/api/v1/search` | search-service | Fallback code `SEARCH_UNAVAILABLE` |
 | `/api/v1/cart/items/{sku}` | cart-service | Plus the `hot-sku` limit, one bucket per SKU for all shoppers |
 | `/api/v1/cart/**` | cart-service | Guests allowed (`X-Guest-Id`) |
-| `/api/v1/orders/**` | order-service | Signed in; `checkout` limit per customer; 12 s time limit |
+| `POST /api/v1/orders` | order-service | Signed in; `checkout` limit per customer (placing orders only); 12 s time limit |
+| `/api/v1/orders/**` | order-service | Signed in; reading, polling and cancelling use the `browse` limit |
 | `/internal/**` | none | Denied at the gateway and 404 at the edge |
 
 ## Rate limits

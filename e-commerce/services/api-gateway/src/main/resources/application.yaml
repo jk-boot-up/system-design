@@ -72,11 +72,18 @@ spring:
               filters:
                 - name: CircuitBreaker
                   args: { name: cart, fallbackUri: 'forward:/fallback/cart' }
+            # Only placing an order spends the checkout budget; reading, polling and cancelling use the browse budget.
+            - id: checkout
+              uri: ${ORDER_URL:http://localhost:8085}
+              predicates: [ "Path=/api/v1/orders", "Method=POST" ]
+              filters:
+                - AdmissionControl=checkout,USER
+                - name: CircuitBreaker
+                  args: { name: order, fallbackUri: 'forward:/fallback/order' }
             - id: orders
               uri: ${ORDER_URL:http://localhost:8085}
               predicates: [ "Path=/api/v1/orders,/api/v1/orders/**" ]
               filters:
-                - AdmissionControl=checkout,USER
                 - name: CircuitBreaker
                   args: { name: order, fallbackUri: 'forward:/fallback/order' }
 server:

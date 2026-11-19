@@ -95,6 +95,7 @@ to a stricter local bucket when Redis is down), and turns a down service into a 
 │  ├─ adapter/admission/        RedisTokenBuckets (Lua script, timeout, local fallback), AdmissionControl filter (429)
 │  ├─ adapter/filter/           RequestIdFilter
 │  ├─ adapter/web/              FallbackController (503 problem per service)
+│  ├─ problem/                  ProblemResponses: 401, 403 and 429 as problems with code and traceId
 │  └─ config/                   rate policies, JWT decoder (issuer + audience), access rules
 ├─ src/main/resources/application.yaml   routes, circuit breakers, time limits, rate limits
 ├─ edge/                        nginx.conf, server template, security headers, dev certificate, Dockerfile, k8s/
@@ -192,9 +193,14 @@ docker build -t e-commerce/edge edge &amp;&amp; docker run --rm -p 8443:8443 -e 
 <td>Guests allowed (<code>X-Guest-Id</code>)</td>
 </tr>
 <tr>
+<td><code>POST /api/v1/orders</code></td>
+<td>order-service</td>
+<td>Signed in; <code>checkout</code> limit per customer (placing orders only); 12 s time limit</td>
+</tr>
+<tr>
 <td><code>/api/v1/orders/**</code></td>
 <td>order-service</td>
-<td>Signed in; <code>checkout</code> limit per customer; 12 s time limit</td>
+<td>Signed in; reading, polling and cancelling use the <code>browse</code> limit</td>
 </tr>
 <tr>
 <td><code>/internal/**</code></td>

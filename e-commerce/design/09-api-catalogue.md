@@ -7,7 +7,7 @@
 | **Base path** | `/api/v1/…` public (through the gateway); `/internal/…` service-to-service (never routed by the gateway) |
 | **Format** | JSON, UTF-8, camelCase fields, ISO-8601 UTC timestamps |
 | **Money** | `{"amount": "19.99", "currency": "EUR"}`. The amount is a string, so no floating-point rounding is possible |
-| **Errors** | RFC 9457 `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, plus `code` and `traceId` |
+| **Errors** | RFC 9457 `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, plus `code` and `traceId` (the `X-Request-Id` of the request until distributed tracing is in place), on every error including 401, 403 and 429 |
 | **Pagination** | Cursor-based: `?limit=20&cursor=…` → `{"items": […], "nextCursor": "…" or null}` |
 | **Idempotency** | `Idempotency-Key` header (1–64 chars) required on `POST /orders`. A replay returns the first response |
 | **Concurrency** | `ETag` on admin resources; updates need `If-Match`, otherwise 428; on mismatch 412 |
@@ -68,7 +68,7 @@ The OpenAPI documents live with each service: `services/<service>/contracts/open
 | POST | `/api/v1/orders` | customer + `Idempotency-Key` | `{paymentToken}` | `201 Order` · `402 PAYMENT_DECLINED` · `409 OUT_OF_STOCK` · `422 CART_NOT_READY` · `503 DEPENDENCY_UNAVAILABLE` |
 | GET | `/api/v1/orders` | customer | `limit, cursor` | `200 {items:[OrderSummary], nextCursor}` |
 | GET | `/api/v1/orders/{id}` | customer (owner) or staff | | `200 Order` · `404` |
-| POST | `/api/v1/orders/{id}/cancel` | customer (owner) or staff | | `200 Order` · `409 NOT_CANCELLABLE` |
+| POST | `/api/v1/orders/{id}/cancel` | customer (owner) or staff | | `200 Order` (also when already cancelled: a retry is safe) · `409 NOT_CANCELLABLE` once shipped |
 
 ```json
 // Order
@@ -123,4 +123,6 @@ applies the effect twice.
 | 422 | `CART_NOT_READY`, `UPLOAD_MISSING` | Semantically invalid request |
 | 429 | `RATE_LIMITED` | With `Retry-After` |
 | 503 | `DEPENDENCY_UNAVAILABLE` | Circuit open or timeout; retry later |
+| 405 / 415 | `METHOD_NOT_ALLOWED` / `UNSUPPORTED_MEDIA_TYPE` | Wrong method or body type |
+| 500 | `INTERNAL_ERROR` | Unexpected; details only in the logs (quote the `traceId`) |
 | 504 | `PAYMENT_UNKNOWN` | Payment outcome not known in time; the order was cancelled safely |

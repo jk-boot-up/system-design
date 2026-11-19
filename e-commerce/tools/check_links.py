@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SKIP = {"node_modules", ".git", "build", ".gradle", ".venv"}
+SKIP = {"node_modules", ".git", "build", ".gradle", ".venv", "playwright-report", "test-results"}
 PATTERNS = [re.compile(r'\]\(([^)\s]+)\)'), re.compile(r'(?:href|src|srcset)="([^"]+)"')]
 
 

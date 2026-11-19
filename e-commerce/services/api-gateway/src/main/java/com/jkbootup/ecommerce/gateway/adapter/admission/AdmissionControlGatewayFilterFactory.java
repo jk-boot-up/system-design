@@ -4,16 +4,14 @@ import com.jkbootup.ecommerce.gateway.domain.RatePolicy;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
-import org.springframework.core.io.buffer.DataBuffer;
+import com.jkbootup.ecommerce.gateway.problem.ProblemResponses;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +60,7 @@ public class AdmissionControlGatewayFilterFactory extends AbstractGatewayFilterF
                     ServerHttpResponse res = exchange.getResponse();
                     res.getHeaders().set("X-RateLimit-Remaining-" + policy.name(), Long.toString(d.remaining()));
                     if (d.allowed()) return chain.filter(exchange);
-                    return reject(res, d.retryAfterSeconds(), policy.name());
+                    return reject(exchange, d.retryAfterSeconds(), policy.name());
                 });
     }
 
@@ -84,14 +82,9 @@ public class AdmissionControlGatewayFilterFactory extends AbstractGatewayFilterF
         return remote == null ? "unknown" : remote.getAddress().getHostAddress();
     }
 
-    private static Mono<Void> reject(ServerHttpResponse res, long retryAfter, String policy) {
-        res.setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
-        res.getHeaders().set(HttpHeaders.RETRY_AFTER, Long.toString(retryAfter));
-        res.getHeaders().setContentType(MediaType.APPLICATION_PROBLEM_JSON);
-        String body = """
-                {"type":"about:blank","title":"Too Many Requests","status":429,"code":"RATE_LIMITED",\
-                "detail":"Too many requests (%s); retry after %d s"}""".formatted(policy, retryAfter);
-        DataBuffer buffer = res.bufferFactory().wrap(body.getBytes(StandardCharsets.UTF_8));
-        return res.writeWith(Mono.just(buffer));
+    private static Mono<Void> reject(ServerWebExchange exchange, long retryAfter, String policy) {
+        exchange.getResponse().getHeaders().set(HttpHeaders.RETRY_AFTER, Long.toString(retryAfter));
+        return ProblemResponses.write(exchange, HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
+                "Too many requests (%s); retry after %d s".formatted(policy, retryAfter));
     }
 }

@@ -18,6 +18,8 @@ import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import com.jkbootup.ecommerce.review.adapter.web.ProblemSecurityHandlers;
+import jakarta.servlet.DispatcherType;
 import org.springframework.util.backoff.ExponentialBackOff;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -57,14 +59,17 @@ public class ReviewConfiguration {
 
     @Bean
     SecurityFilterChain security(HttpSecurity http) throws Exception {
+        var problems = new ProblemSecurityHandlers();
         return http.csrf(c -> c.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()   // an error page must never turn into a 403
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/*/reviews").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/products/*/reviews").authenticated()
                         .anyRequest().denyAll())
-                .oauth2ResourceServer(o -> o.jwt(j -> {}))
+                .oauth2ResourceServer(o -> o.jwt(j -> {}).authenticationEntryPoint(problems).accessDeniedHandler(problems))
+                .exceptionHandling(e -> e.authenticationEntryPoint(problems).accessDeniedHandler(problems))
                 .build();
     }
 }

@@ -97,9 +97,9 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>End-to-end and performance tests</td>
-<td>░░░░░░░░░░ 0%</td>
-<td>—</td>
-<td>After checkout works end to end</td>
+<td>█████░░░░░ 50%</td>
+<td>End-to-end journeys (<code>tests/e2e</code>): 17 across core and every profile, nightly CI</td>
+<td>Reviews journey locally (needs &gt; 4 GB); Gatling (P4)</td>
 </tr>
 </tbody>
 </table>
@@ -233,6 +233,15 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <h2 id="recently-completed">Recently completed<a class="headerlink" href="#recently-completed" title="Permanent link">#</a></h2>
 <ul>
 <li>
+<p>End-to-end tests (<code>tests/e2e</code>, Playwright Test in TypeScript): 17 journeys through the NGINX edge (browse, cart and merge,
+  checkout with every outcome, idempotent replay, cancel, search, reviews, email exactly once, recommendations, analytics);
+  <code>run-compose.sh</code> runs one profile at a time so it fits 4 GB; nightly CI. Core (14), search, async and analytics pass
+  locally; reviews needs more Docker memory than this machine has free. The journeys found and fixed: errors without the
+  promised <code>traceId</code> in every service; invalid input answered with an empty <code>403</code> instead of <code>400 VALIDATION_FAILED</code> (the
+  error page was blocked by security) in every Java service; <code>401</code>/<code>403</code> without problem bodies; the checkout rate limit
+  applied to reading, polling and cancelling orders, not only to placing them.</p>
+</li>
+<li>
 <p>Kubernetes overlays (<code>deploy/k8s</code>): dev, staging and prod built from every service's own base; services in <code>e-commerce-shop</code>,
   operator-managed stores in <code>e-commerce-platform</code> (CloudNativePG + PgBouncer, Strimzi KRaft + the catalogue's topics, Redis per
   use, OpenSearch, K8ssandra, RabbitMQ with notification's own user, Keycloak with the shop realm); host names set once per
@@ -309,7 +318,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>Platform: end-to-end tests (P3), then the storefront (UI: React Router server rendering + backend-for-frontend, designed in design/16), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).</li>
+<li>Platform: the storefront (UI: React Router server rendering + backend-for-frontend, designed in design/16), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).</li>
 <li>System, module and service diagrams (design document 11).</li>
 </ul>
 <h2 id="risks-and-notes">Risks and notes<a class="headerlink" href="#risks-and-notes" title="Permanent link">#</a></h2>

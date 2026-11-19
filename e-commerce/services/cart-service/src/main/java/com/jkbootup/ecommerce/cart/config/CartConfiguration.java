@@ -13,6 +13,8 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import com.jkbootup.ecommerce.cart.adapter.web.ProblemSecurityHandlers;
+import jakarta.servlet.DispatcherType;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -43,14 +45,17 @@ public class CartConfiguration {
     /** Guests may use the cart without a token; a token, when sent, must be valid. Internal endpoints rely on network policy. */
     @Bean
     SecurityFilterChain security(HttpSecurity http) throws Exception {
+        var problems = new ProblemSecurityHandlers();
         return http.csrf(c -> c.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()   // an error page must never turn into a 403
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers("/api/v1/cart/merge").authenticated()
                         .requestMatchers("/api/v1/cart/**", "/api/v1/cart", "/internal/**").permitAll()
                         .anyRequest().denyAll())
-                .oauth2ResourceServer(o -> o.jwt(j -> {}))
+                .oauth2ResourceServer(o -> o.jwt(j -> {}).authenticationEntryPoint(problems).accessDeniedHandler(problems))
+                .exceptionHandling(e -> e.authenticationEntryPoint(problems).accessDeniedHandler(problems))
                 .build();
     }
 }

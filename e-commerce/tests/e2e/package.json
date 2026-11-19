@@ -1,0 +1,20 @@
+{
+  "name": "e-commerce-e2e",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end journeys against the running e-commerce stack (deploy/compose or a Kubernetes environment)",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "core": "playwright test --grep-invert \"@search|@reviews|@async|@analytics\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3",
+    "cassandra-driver": "4.10.0"
+  }
+}

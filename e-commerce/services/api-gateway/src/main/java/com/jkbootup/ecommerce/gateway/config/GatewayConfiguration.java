@@ -3,6 +3,7 @@ package com.jkbootup.ecommerce.gateway.config;
 import com.jkbootup.ecommerce.gateway.adapter.admission.AdmissionControlGatewayFilterFactory;
 import com.jkbootup.ecommerce.gateway.adapter.admission.RedisTokenBuckets;
 import com.jkbootup.ecommerce.gateway.adapter.filter.RequestIdFilter;
+import com.jkbootup.ecommerce.gateway.problem.ProblemResponses;
 import com.jkbootup.ecommerce.gateway.domain.LocalTokenBuckets;
 import com.jkbootup.ecommerce.gateway.domain.RatePolicy;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -113,7 +114,9 @@ public class GatewayConfiguration {
                         .pathMatchers(HttpMethod.GET, "/api/v1/products/**", "/api/v1/categories", "/api/v1/search").permitAll()
                         .pathMatchers("/api/v1/cart", "/api/v1/cart/**").permitAll()                 // guests use X-Guest-Id
                         .anyExchange().denyAll())
-                .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(new ReactiveJwtAuthenticationConverterAdapter(converter))))
+                .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(new ReactiveJwtAuthenticationConverterAdapter(converter)))
+                        .authenticationEntryPoint(ProblemResponses.unauthenticated()).accessDeniedHandler(ProblemResponses.forbidden()))
+                .exceptionHandling(e -> e.authenticationEntryPoint(ProblemResponses.unauthenticated()).accessDeniedHandler(ProblemResponses.forbidden()))
                 .build();
     }
 }

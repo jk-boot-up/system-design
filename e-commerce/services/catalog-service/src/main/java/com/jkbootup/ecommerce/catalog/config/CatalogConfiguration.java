@@ -27,6 +27,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import com.jkbootup.ecommerce.catalog.adapter.web.ProblemSecurityHandlers;
+import jakarta.servlet.DispatcherType;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -94,6 +96,7 @@ public class CatalogConfiguration {
      */
     @Bean
     SecurityFilterChain security(HttpSecurity http) throws Exception {
+        var problems = new ProblemSecurityHandlers();
         var roles = new JwtGrantedAuthoritiesConverter();
         roles.setAuthoritiesClaimName("roles");
         roles.setAuthorityPrefix("ROLE_");
@@ -102,11 +105,13 @@ public class CatalogConfiguration {
         return http.csrf(c -> c.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()   // an error page must never turn into a 403
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("staff")
                         .requestMatchers("/api/v1/products/**", "/api/v1/categories", "/internal/**").permitAll()
                         .anyRequest().denyAll())
-                .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(converter)))
+                .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(converter)).authenticationEntryPoint(problems).accessDeniedHandler(problems))
+                .exceptionHandling(e -> e.authenticationEntryPoint(problems).accessDeniedHandler(problems))
                 .build();
     }
 }
