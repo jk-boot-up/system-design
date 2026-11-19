@@ -465,6 +465,38 @@ platform) are not needed with our NGINX edge and CDN. A team already fluent in N
 same design (§16.5–16.11 apply unchanged).</p>
 <p><strong>Why not SvelteKit?</strong> Technically as strong and as secure, but a much smaller ecosystem and hiring pool.</p>
 <p><strong>Why not keep the single-page app?</strong> It would need a separate BFF anyway, and still could not serve indexable public pages.</p>
+<h3 id="how-the-decision-was-reached">How the decision was reached<a class="headerlink" href="#how-the-decision-was-reached" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Question</th>
+<th>Answer and reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-11-19</td>
+<td>Should the platform have a UI at all?</td>
+<td>Yes: a storefront milestone after the end-to-end tests (P3). Every API it needs already exists, and a real UI makes the walkthroughs and videos far clearer than API calls</td>
+</tr>
+<tr>
+<td>2026-11-19</td>
+<td>React with Vite, or Next.js, for a simple demo?</td>
+<td>React + Vite single-page app: simplest to run (static files on the existing edge), most common skills, and a demo behind sign-in needs no server rendering</td>
+</tr>
+<tr>
+<td>2026-11-19</td>
+<td>Requirement added: <strong>the UI must be production grade and secure</strong></td>
+<td>The single-page app no longer qualifies: tokens would sit in the browser and public pages would not be server-rendered. Both needs call for a server, so the criteria gained <em>security model</em> and <em>production storefront fit</em>, and the stacks were re-ranked (above)</td>
+</tr>
+<tr>
+<td>2026-11-19</td>
+<td>Final choice</td>
+<td><strong>React Router 8 framework mode (rank 1, 91/100)</strong>, confirmed by the project owner; Next.js (83) stays the documented alternative</td>
+</tr>
+</tbody>
+</table>
 <h2 id="164-architecture">16.4 Architecture<a class="headerlink" href="#164-architecture" title="Permanent link">#</a></h2>
 <p><figure class="diagram"><img alt="Architecture diagram" src="diagrams/storefront-ui--architecture.light.svg" data-light="diagrams/storefront-ui--architecture.light.svg" data-dark="diagrams/storefront-ui--architecture.dark.svg" loading="lazy"></figure></p>
 <ul>

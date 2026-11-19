@@ -147,6 +147,15 @@ same design (§16.5–16.11 apply unchanged).
 
 **Why not keep the single-page app?** It would need a separate BFF anyway, and still could not serve indexable public pages.
 
+### How the decision was reached
+
+| Date | Question | Answer and reason |
+|---|---|---|
+| 2026-11-19 | Should the platform have a UI at all? | Yes: a storefront milestone after the end-to-end tests (P3). Every API it needs already exists, and a real UI makes the walkthroughs and videos far clearer than API calls |
+| 2026-11-19 | React with Vite, or Next.js, for a simple demo? | React + Vite single-page app: simplest to run (static files on the existing edge), most common skills, and a demo behind sign-in needs no server rendering |
+| 2026-11-19 | Requirement added: **the UI must be production grade and secure** | The single-page app no longer qualifies: tokens would sit in the browser and public pages would not be server-rendered. Both needs call for a server, so the criteria gained *security model* and *production storefront fit*, and the stacks were re-ranked (above) |
+| 2026-11-19 | Final choice | **React Router 8 framework mode (rank 1, 91/100)**, confirmed by the project owner; Next.js (83) stays the documented alternative |
+
 ## 16.4 Architecture
 
 <picture>
