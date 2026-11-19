@@ -1,5 +1,6 @@
 package com.jkbootup.ecommerce.catalog.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import com.jkbootup.ecommerce.catalog.adapter.messaging.OutboxRelay;
 import com.jkbootup.ecommerce.catalog.adapter.persistence.JdbcCategoryRepository;
 import com.jkbootup.ecommerce.catalog.adapter.persistence.JdbcProductRepository;
@@ -80,8 +81,9 @@ public class CatalogConfiguration {
     @Bean
     @ConditionalOnProperty(name = "catalog.jobs.enabled", havingValue = "true", matchIfMissing = true)
     OutboxRelay outboxRelay(JdbcClient jdbc, KafkaTemplate<String, String> kafka, TransactionTemplate tx,
-                            @Value("${catalog.outbox.batch-size:500}") int batchSize) {
-        return new OutboxRelay(jdbc, kafka, tx, batchSize);
+                            @Value("${catalog.outbox.batch-size:500}") int batchSize,
+                            MeterRegistry meters) {
+        return new OutboxRelay(jdbc, kafka, tx, batchSize, meters);
     }
 
     @Bean

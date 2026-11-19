@@ -18,6 +18,15 @@
     "sbom": "npm sbom --sbom-format cyclonedx --omit dev > sbom.cdx.json"
   },
   "dependencies": {
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/context-async-hooks": "3.1.0",
+    "@opentelemetry/core": "3.1.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "0.301.0",
+    "@opentelemetry/instrumentation-http": "0.301.0",
+    "@opentelemetry/instrumentation-undici": "0.35.0",
+    "@opentelemetry/resources": "3.1.0",
+    "@opentelemetry/sdk-trace": "3.1.0",
+    "@opentelemetry/semantic-conventions": "1.44.0",
     "@prometheus-io/client": "0.16.1",
     "@react-router/express": "8.5.2",
     "@react-router/node": "8.5.2",

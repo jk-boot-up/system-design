@@ -1,0 +1,20 @@
+# Tempo, single binary, traces kept for a day on local disk (deploy/compose, profile "observability").
+stream_over_http_enabled: true
+server:
+  http_listen_port: 3200
+  log_level: warn
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc: { endpoint: "0.0.0.0:4317" }
+storage:
+  trace:
+    backend: local
+    local: { path: /tmp/tempo/blocks }
+    wal: { path: /tmp/tempo/wal }
+compactor:
+  compaction:
+    block_retention: 24h
+usage_report:
+  reporting_enabled: false

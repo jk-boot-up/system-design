@@ -817,7 +817,7 @@ also makes the app more robust on poor networks.</p>
 </tr>
 <tr>
 <td>Logging, metrics, tracing</td>
-<td><code>pino</code> (JSON, tokens and cookies redacted); <code>@prometheus-io/client</code> (the maintained successor of <code>prom-client</code>) on <code>/metrics</code>; <code>X-Request-Id</code> forwarded to the gateway; OpenTelemetry arrives with P5</td>
+<td><code>pino</code> (JSON, tokens and cookies redacted); <code>@prometheus-io/client</code> (the maintained successor of <code>prom-client</code>) on <code>/metrics</code>; <code>X-Request-Id</code> forwarded to the gateway; OpenTelemetry Node SDK (<code>tracing.ts</code>): a span per page or data request and per <code>fetch</code>, <code>traceparent</code> sent to the gateway, query strings left out, <code>traceId</code> in every log line</td>
 <td>One trace from click to database</td>
 </tr>
 <tr>

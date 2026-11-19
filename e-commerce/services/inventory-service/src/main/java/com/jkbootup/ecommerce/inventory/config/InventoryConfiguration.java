@@ -1,5 +1,6 @@
 package com.jkbootup.ecommerce.inventory.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import com.jkbootup.ecommerce.inventory.adapter.messaging.OrderCancelledListener;
 import com.jkbootup.ecommerce.inventory.adapter.messaging.OutboxRelay;
 import com.jkbootup.ecommerce.inventory.adapter.persistence.JdbcReservationRepository;
@@ -54,8 +55,9 @@ public class InventoryConfiguration {
     @Bean
     @ConditionalOnProperty(name = "inventory.jobs.enabled", havingValue = "true", matchIfMissing = true)
     OutboxRelay outboxRelay(JdbcClient jdbc, KafkaTemplate<String, String> kafka, TransactionTemplate tx,
-                            @Value("${inventory.outbox.batch-size:500}") int batchSize) {
-        return new OutboxRelay(jdbc, kafka, tx, batchSize);
+                            @Value("${inventory.outbox.batch-size:500}") int batchSize,
+                            MeterRegistry meters) {
+        return new OutboxRelay(jdbc, kafka, tx, batchSize, meters);
     }
 
     @Bean

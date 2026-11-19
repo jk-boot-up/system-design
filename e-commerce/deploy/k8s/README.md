@@ -72,6 +72,8 @@ overlays/
 | Keycloak operator | 26.8.2 | **`e-commerce-platform`** (it watches only its own namespace) | the `keycloak-k8s-resources` manifests |
 | External Secrets Operator | 2.15.0 | `external-secrets` | Helm chart `external-secrets/external-secrets` (staging, prod) |
 | KEDA | 2.21.1 | `keda` | Helm chart `kedacore/keda` |
+| kube-prometheus-stack (Prometheus Operator 0.94.2, Prometheus, Alertmanager, Grafana) | 92.18.0 | `monitoring` | Helm, values in [`deploy/observability/k8s/values`](../observability/k8s/values/) |
+| Tempo, Loki, Alloy (agents and tail sampler) | 2.10.10, 3.7.9, chart 1.15.0 | `monitoring` | Helm, same values directory ([observability README](../observability/README.md)) |
 
 `verify.sh --server` checks every manifest against exactly these CRD versions.
 

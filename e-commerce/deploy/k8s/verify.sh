@@ -27,6 +27,8 @@ CRDS=(
   "keycloak-realms   https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/26.8.2/kubernetes/keycloakrealmimports.k8s.keycloak.org-v1.yml"
   "external-secrets  https://raw.githubusercontent.com/external-secrets/external-secrets/v2.15.0/deploy/crds/bundle.yaml"
   "keda              https://github.com/kedacore/keda/releases/download/v2.21.1/keda-2.21.1-crds.yaml"
+  "prometheus-operator https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.94.2/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml"
+  "prometheus-rules  https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.94.2/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml"
 )
 
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT

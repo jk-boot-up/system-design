@@ -10,13 +10,14 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Area | Progress | Done | Next |
 |---|---|---|---|
 | Specification and plans | ██████████ 100% | SPEC, PLAN, design plan, implementation plan, prerequisites | Keep in step with changes |
-| System design documents | ███████░░░ 70% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, 11 ADRs | System/module/service diagrams; security, observability, capacity, runbooks |
+| System design documents | ███████░░░ 70% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, 13 ADRs | System/module/service diagrams; security, observability, capacity, runbooks |
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
 | Services (11) | ██████████ 100% | all eleven complete | — |
 | Walkthroughs | █████████░ 92% | every service | System walkthrough |
 | Local stack and Kubernetes overlays | ██████████ 100% | Compose stack with profiles and smoke test; dev, staging and prod overlays with operator-managed stores, checked against the operators' CRDs | — |
 | Storefront (web UI) | ██████████ 100% | React Router 8 server rendering + backend-for-frontend (`web/storefront`): every page, sign-in, checkout, staff; compose, edge and k8s wiring; CI | Component tests when pages gain client logic |
-| End-to-end and performance tests | ████████░░ 80% | End-to-end journeys (`tests/e2e`): 22 across core, the storefront in a browser and every profile; ZAP and Lighthouse; nightly CI | Reviews journey locally (needs > 4 GB); verify the search simulation |
+| End-to-end and performance tests | █████████░ 90% | End-to-end journeys (`tests/e2e`): 22 across core, the storefront in a browser and every profile; ZAP and Lighthouse; Gatling for browse, cart, checkout and search; nightly CI | Reviews journey and search simulation need > 4 GB of Docker memory |
+| Observability | █████████░ 90% | Traces across HTTP, the outbox and Kafka; logs in Loki; SLOs and burn-rate alerts; platform alerts with tests; runbook; dashboards; k8s stack with tail sampling | Traces from the Go and Python services; exemplars |
 
 ## Services
 
@@ -36,11 +37,24 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## Recently completed
 
+* Observability (`deploy/observability`, ADR 0013): every Java service and the storefront export OpenTelemetry traces
+  through Alloy to Tempo. Outbox rows store the request's `traceparent` and the relay sends inside it, so one trace shows
+  the request, the gateway, the service, its calls, the event and every consumer (verified: a checkout spans gateway,
+  order, cart, inventory and payment, then `order.events` consumed by cart and inventory). Logs are ECS JSON collected
+  into Loki by service and level. SLOs are measured per route at the gateway with histogram buckets at each threshold;
+  `generate.py` produces the recording rules, multi-window burn-rate alerts, the Kubernetes PrometheusRules and three
+  dashboards. Platform alerts (outbox backlog, DLQ, consumer lag, topic growth, payments, rate limiter) have promtool tests
+  and a runbook. In Kubernetes: kube-prometheus-stack, PodMonitors, Strimzi's Kafka exporter, an Alloy DaemonSet routing
+  by trace id to a tail-sampling StatefulSet. Health checks and the relay's polling are excluded from traces.
+* Outbox relay fixed in catalog, inventory, order and payment: it marks what Kafka acknowledged, waits at most 10 s, backs
+  off from 1 s to 30 s after a failure, and exports its backlog and oldest-unpublished age. Before, one failing partition
+  made it re-send the whole batch every 100 ms (444 events became 30 million messages in two hours, and a full disk).
 * Performance tests (`tests/performance`, Gatling 3.16, Java DSL): browse, search, add to cart and checkout, seeded through
   the public API, each with a warm-up excluded from the budgets, then held to SPEC §2.2 p99 budgets and compared with a
   per-environment baseline (> 10 % fails); `run-compose.sh` with an overlay that lifts per-address limits for a single
   load generator; nightly CI with the baseline kept in the Actions cache. Locally: product page 9 ms, add to cart 54 ms,
-  place order 320 ms (p99). Search is not yet verified: this run's products were not searchable within 90 s. Without a
+  place order 320 ms (p99). Search indexes and answers warm requests in about 20 ms, but its simulation needs more than a
+  4 GB Docker VM (OpenSearch is OOM-killed or starved under load). Without a
   warm-up the cold JVMs missed two budgets (add to cart 147 ms, place order 1.7 s), which is why every run warms up first.
 
 * Storefront (`web/storefront`, design/16, ADR 0012): React Router 8.5 framework mode on Node 26, rendered on the server and
@@ -127,7 +141,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* Platform: search simulation (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
+* Design documents S13–S17; system walkthrough (S19).
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes
@@ -135,4 +149,5 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Item | Note |
 |---|---|
 | Maven Central rate limits (HTTP 429) during builds | Builds retry with back-off; CI caches dependencies |
+| Search simulation and core + observability exceed a 4 GB Docker VM | OpenSearch and Keycloak are OOM-killed under load; Keycloak now restarts by itself. Use 6 GB+ for these runs |
 | Whole local stack needs about 16 GB of memory | Each service's README shows how to start only the infrastructure it needs |

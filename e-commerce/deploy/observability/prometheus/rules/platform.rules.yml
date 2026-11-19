@@ -1,0 +1,71 @@
+# Alerts on the platform and the business flow (SPEC 8.2). Severity "page" wakes someone; "ticket" waits for working hours.
+# Each alert links to its section of RUNBOOK.md. The SLO burn-rate alerts are generated: see generate.py.
+groups:
+  - name: platform
+    rules:
+      - alert: OutboxBacklogStale
+        expr: max by (service) (outbox_oldest_unpublished_age_seconds) > 30
+        for: 1m
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $labels.service }}: events are not reaching Kafka"
+          description: "The oldest unpublished outbox event is {{ $value | humanizeDuration }} old (limit 30 s). Downstream services see stale data until the relay catches up."
+          runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#outbox-backlog-stale
+      - alert: DeadLetterQueueNotEmpty
+        expr: sum by (topic) (kafka_topic_partition_current_offset{topic=~".+\\.dlq"} - kafka_topic_partition_oldest_offset{topic=~".+\\.dlq"}) > 0
+        for: 1m
+        labels: { severity: ticket }
+        annotations:
+          summary: "{{ $labels.topic }} holds {{ $value }} events"
+          description: "Events failed five times and were parked. Find the cause in the consumer's logs (trace id in the event headers), fix it, then replay."
+          runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#dead-letter-queue
+      - alert: ConsumerLagGrowing
+        expr: sum by (consumergroup, topic) (kafka_consumergroup_lag) > 1000 and sum by (consumergroup, topic) (delta(kafka_consumergroup_lag[10m])) > 0
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "{{ $labels.consumergroup }} is {{ $value }} events behind on {{ $labels.topic }} and falling further behind"
+          description: "Read models (search, carts, reviews) go stale. Scale the consumer (KEDA scales on this lag) or look for a slow dependency."
+          runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#consumer-lag
+      - alert: TopicGrowingFasterThanItsEvents
+        expr: |
+          sum by (topic) (rate(kafka_topic_partition_current_offset{topic=~"(catalog|inventory|order|payment)\\.events"}[5m]))
+            > 10 * (sum by (topic) (label_replace(rate(outbox_events_published_total[5m]), "topic", "$1.events", "type", "([a-z]+)\\..*")) + 1)
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $labels.topic }} receives far more messages than its outbox publishes"
+          description: "A producer is re-sending ({{ $value | humanize }} messages/s). Duplicates are deduplicated by event id, but they fill the disk and delay every consumer."
+          runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#topic-growing-faster-than-its-events
+      - alert: ServiceDown
+        expr: up{job=~"spring|services"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $labels.service }} ({{ $labels.instance }}) is not answering scrapes"
+          runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#service-down
+      - alert: PaymentOutcomeUnknown
+        expr: sum(increase(checkout_outcomes_total{outcome="PAYMENT_UNKNOWN"}[15m])) > 5
+        labels: { severity: ticket }
+        annotations:
+          summary: "{{ $value | humanize }} checkouts in 15 min could not confirm the payment"
+          description: "The payment provider is slow or failing; orders were cancelled and the reconciler settles any charge. Check payment-service latency and the provider's status."
+          runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#payment-outcome-unknown
+      - alert: PaymentDeclineRateHigh
+        expr: |
+          sum(rate(checkout_outcomes_total{outcome="PAYMENT_DECLINED"}[15m])) / sum(rate(checkout_outcomes_total[15m])) > 0.3
+            and sum(rate(checkout_outcomes_total[15m])) > 0.1
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of checkouts are declined"
+          description: "Far above normal: a provider problem, a broken card form, or card testing (look at the rate per customer and the bot signals at the gateway)."
+          runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#payment-decline-rate-high
+      - alert: RateLimiterDegraded
+        expr: sum(increase(gateway_ratelimit_degraded_total[5m])) > 0
+        for: 5m
+        labels: { severity: ticket }
+        annotations:
+          summary: "The gateway is rate limiting per instance: Redis is unreachable"
+          description: "Limits still hold, but per gateway instance rather than globally, so the effective limit is multiplied by the replica count."
+          runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#rate-limiter-degraded

@@ -213,6 +213,18 @@ overlays/
 <td><code>keda</code></td>
 <td>Helm chart <code>kedacore/keda</code></td>
 </tr>
+<tr>
+<td>kube-prometheus-stack (Prometheus Operator 0.94.2, Prometheus, Alertmanager, Grafana)</td>
+<td>92.18.0</td>
+<td><code>monitoring</code></td>
+<td>Helm, values in <a href="../observability/k8s/values/"><code>deploy/observability/k8s/values</code></a></td>
+</tr>
+<tr>
+<td>Tempo, Loki, Alloy (agents and tail sampler)</td>
+<td>2.10.10, 3.7.9, chart 1.15.0</td>
+<td><code>monitoring</code></td>
+<td>Helm, same values directory (<a href="../observability/README.html">observability README</a>)</td>
+</tr>
 </tbody>
 </table>
 <p><code>verify.sh --server</code> checks every manifest against exactly these CRD versions.</p>

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the simulations against the local compose stack with the performance overlay (compose.performance.yaml), one at a
-# time, then checks p99 against the baseline (scripts/regression.py). Search needs the "search" profile; order, payment
-# and cart are stopped while it runs so OpenSearch fits in a 4 GB Docker VM, and started again afterwards.
+# time, then checks p99 against the baseline (scripts/regression.py). Search needs the "search" profile; order, payment,
+# cart, the storefront and Alloy are stopped while it runs so OpenSearch fits in a 4 GB Docker VM, and started again afterwards.
 #   ./run-compose.sh                          Browse Cart Checkout Search
 #   ./run-compose.sh Browse Search            only these
 #   UPDATE_BASELINE=1 ./run-compose.sh        accept this run as the new baseline
@@ -13,7 +13,8 @@ export COMPOSE_PARALLEL_LIMIT=1   # one image build at a time: parallel Gradle b
 files=(-f compose.yaml -f "$here/compose.performance.yaml")
 
 simulations=("$@"); [[ ${#simulations[@]} -gt 0 ]] || simulations=(Browse Cart Checkout Search)
-search_idle="order-service payment-service cart-service"
+# Not used by the search simulation; stopped so OpenSearch fits (it is the first thing the kernel kills when memory runs out).
+search_idle="order-service payment-service cart-service storefront redis-session alloy"
 search_services="opensearch search-service"
 failed=()
 

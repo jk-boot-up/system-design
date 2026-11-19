@@ -2,6 +2,7 @@
 // stripping), so there is no separate server build. Pages, loaders and actions are the React Router build; this file only
 // adds what a production server needs around them: static assets with long-lived caching, security headers, probes,
 // metrics, a request size limit and a graceful shutdown that drains in-flight requests.
+import { flushTraces } from './tracing.ts';   // first: instruments Node's HTTP server before Express loads
 import { collectDefaultMetrics, Histogram, Registry } from '@prometheus-io/client';
 import { createRequestHandler } from '@react-router/express';
 import compression from 'compression';
@@ -118,6 +119,7 @@ function shutdown(signal: string): void {
   force.unref();
   server.close(async () => {
     await lifecycle?.shutdown().catch(() => undefined);
+    await flushTraces();
     process.exit(0);
   });
   server.closeIdleConnections();

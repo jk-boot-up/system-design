@@ -136,3 +136,20 @@ gateway:
     browse:   { rate: 20, burst: 40 }    # per user or address, every route
     checkout: { rate: 0.2, burst: 3 }    # per user: three orders, then one every five seconds
     hot-sku:  { rate: 200, burst: 400 }  # per SKU across all users: flash-sale admission control
+
+# Observability (SPEC 8.2). Spans are exported when MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT is set (compose,
+# Kubernetes); logs are JSON with traceId and spanId when LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs. Every request is sampled here:
+# the collector keeps errors, slow requests and a share of the rest (tail sampling).
+management.tracing.sampling.probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+# Metrics are scraped by Prometheus (/actuator/prometheus); the OpenTelemetry starter would also push them over OTLP.
+management.otlp.metrics.export.enabled: false
+# Latency histograms for p95/p99 panels, bounded to keep the series count down.
+management.metrics.distribution.percentiles-histogram.http.server.requests: true
+management.metrics.distribution.minimum-expected-value.http.server.requests: 5ms
+management.metrics.distribution.maximum-expected-value.http.server.requests: 5s
+# Per-route latency at the edge of the system, with buckets at the SPEC 2.2 N2 budgets (100 ms add to cart, 150 ms product
+# page, 300 ms search, 1.5 s place order): the latency SLOs count requests under these exact thresholds.
+management.metrics.distribution.percentiles-histogram.spring.cloud.gateway.requests: true
+management.metrics.distribution.minimum-expected-value.spring.cloud.gateway.requests: 5ms
+management.metrics.distribution.maximum-expected-value.spring.cloud.gateway.requests: 5s
+management.metrics.distribution.slo.spring.cloud.gateway.requests: 100ms,150ms,300ms,1500ms

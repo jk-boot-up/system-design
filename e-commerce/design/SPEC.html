@@ -687,14 +687,14 @@ reservations(order_id uuid, sku text, quantity int, status text, expires_at time
 </ul>
 <h3 id="82-observability">8.2 Observability<a class="headerlink" href="#82-observability" title="Permanent link">#</a></h3>
 <ul>
-<li><strong>Tracing:</strong> OpenTelemetry Java agent for all services. Trace context flows through HTTP headers and Kafka event headers. Traces go to Tempo.</li>
+<li><strong>Tracing:</strong> OpenTelemetry in every service (Java: Spring Boot's OpenTelemetry starter; storefront: the OpenTelemetry Node SDK), exported to a collector (Grafana Alloy) that tail-samples and sends traces to Tempo. Trace context flows through HTTP headers, Kafka event headers and the transactional outbox (each row keeps the <code>traceparent</code> of the request that wrote it) (<a href="adr/0013-observability-with-opentelemetry-alloy-and-slos-at-the-gateway.html">ADR 0013</a>).</li>
 <li><strong>Metrics:</strong></li>
 <li>Micrometer exports to Prometheus.</li>
 <li>RED metrics per endpoint.</li>
 <li>Business metrics: orders/min, payment decline rate, stock-outs, saga compensations.</li>
 <li>Kafka consumer lag.</li>
 <li><strong>Logs:</strong> structured JSON with <code>traceId</code> and <code>spanId</code>, sent to Loki.</li>
-<li><strong>SLOs and alerts:</strong> multi-window burn-rate alerts on availability and latency SLOs; DLQ depth &gt; 0; outbox backlog age &gt; 30 s.</li>
+<li><strong>SLOs and alerts:</strong> multi-window burn-rate alerts on availability and latency SLOs, measured per route at the gateway; DLQ depth &gt; 0; outbox backlog age &gt; 30 s; a topic growing much faster than its outbox publishes (<a href="../deploy/observability/README.html">deploy/observability</a>).</li>
 </ul>
 <h3 id="83-resilience">8.3 Resilience<a class="headerlink" href="#83-resilience" title="Permanent link">#</a></h3>
 <table>

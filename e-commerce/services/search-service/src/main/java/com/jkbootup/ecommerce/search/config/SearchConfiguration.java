@@ -1,5 +1,6 @@
 package com.jkbootup.ecommerce.search.config;
 
+import io.micrometer.observation.ObservationRegistry;
 import com.jkbootup.ecommerce.search.adapter.messaging.EventParser;
 import com.jkbootup.ecommerce.search.adapter.messaging.IndexingListeners;
 import com.jkbootup.ecommerce.search.adapter.opensearch.IndexBootstrap;
@@ -34,10 +35,11 @@ public class SearchConfiguration {
                                 @Value("${search.opensearch.alias:products}") String alias,
                                 @Value("${search.opensearch.index:products-v1}") String index,
                                 @Value("${search.opensearch.timeout:2s}") Duration timeout,
-                                @Value("${search.opensearch.refresh-on-write:false}") boolean refreshOnWrite) {
+                                @Value("${search.opensearch.refresh-on-write:false}") boolean refreshOnWrite,
+                                ObservationRegistry observations) {
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build());
         factory.setReadTimeout(timeout);
-        RestClient http = RestClient.builder().baseUrl(url).requestFactory(factory).build();
+        RestClient http = RestClient.builder().baseUrl(url).requestFactory(factory).observationRegistry(observations).build();
         new IndexBootstrap(http, alias, index).ensureIndex();         // fail start-up rather than let writes auto-create an index
         return new OpenSearchIndex(http, json, alias, refreshOnWrite);
     }

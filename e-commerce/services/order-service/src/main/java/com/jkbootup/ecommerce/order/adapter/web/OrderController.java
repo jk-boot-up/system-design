@@ -6,6 +6,8 @@ import com.jkbootup.ecommerce.order.application.OrderQueries;
 import com.jkbootup.ecommerce.order.application.PlaceOrderCommand;
 import com.jkbootup.ecommerce.order.domain.Order;
 import com.jkbootup.ecommerce.order.domain.OrderLine;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,10 +57,16 @@ public class OrderController {
 
     private final CheckoutSaga saga;
     private final OrderQueries queries;
+    /** checkout_outcomes_total{outcome}: the saga's results (SPEC 8.2 business metrics; replays are not counted again). */
+    private final Map<CheckoutResult.Outcome, Counter> outcomes = new EnumMap<>(CheckoutResult.Outcome.class);
 
-    public OrderController(CheckoutSaga saga, OrderQueries queries) {
+    public OrderController(CheckoutSaga saga, OrderQueries queries, MeterRegistry meters) {
         this.saga = saga;
         this.queries = queries;
+        for (CheckoutResult.Outcome o : CheckoutResult.Outcome.values()) {
+            outcomes.put(o, Counter.builder("checkout.outcomes").description("Checkout attempts by outcome")
+                    .tag("outcome", o.name()).register(meters));
+        }
     }
 
     @PostMapping
@@ -67,6 +76,7 @@ public class OrderController {
         String email = jwt.getClaimAsString("email");
         CheckoutResult r = saga.place(new PlaceOrderCommand(customer(jwt), email == null ? "" : email, key, request.paymentToken()));
         OrderView view = OrderView.of(r.order());
+        if (!r.replay()) outcomes.get(r.outcome()).increment();
         return switch (r.outcome()) {
             case CONFIRMED -> ResponseEntity.status(r.replay() ? HttpStatus.OK : HttpStatus.CREATED)
                     .location(URI.create("/api/v1/orders/" + view.id())).body(view);

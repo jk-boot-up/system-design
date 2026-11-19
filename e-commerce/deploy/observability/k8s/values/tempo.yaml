@@ -1,0 +1,13 @@
+# helm upgrade --install tempo grafana/tempo -n monitoring -f deploy/observability/k8s/values/tempo.yaml
+# Single-binary Tempo with traces in object storage; move to the tempo-distributed chart past about 50,000 spans/s.
+tempo:
+  repository: grafana/tempo
+  tag: 2.10.10
+  retention: 168h
+  storage:
+    trace:
+      backend: s3
+      s3: { bucket: e-commerce-traces, endpoint: s3.eu-central-1.amazonaws.com }   # credentials from the pod's IAM role
+  receivers:
+    otlp: { protocols: { grpc: { endpoint: "0.0.0.0:4317" } } }
+  resources: { requests: { cpu: 500m, memory: 2Gi }, limits: { memory: 4Gi } }

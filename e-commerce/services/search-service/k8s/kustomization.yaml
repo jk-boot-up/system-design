@@ -9,5 +9,7 @@ resources: [deployment.yaml, service.yaml, hpa.yaml, pdb.yaml, networkpolicy.yam
 configMapGenerator:
   - name: search-service
     literals:
+      - MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT=http://alloy.monitoring:4318/v1/traces
+      - LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs
       - OPENSEARCH_URL=http://opensearch:9200
       - KAFKA_BOOTSTRAP=kafka-bootstrap:9092

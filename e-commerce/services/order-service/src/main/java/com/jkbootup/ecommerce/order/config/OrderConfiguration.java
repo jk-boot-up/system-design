@@ -1,5 +1,7 @@
 package com.jkbootup.ecommerce.order.config;
 
+import io.micrometer.observation.ObservationRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
 import com.jkbootup.ecommerce.order.adapter.client.CartHttpClient;
 import com.jkbootup.ecommerce.order.adapter.client.InventoryHttpClient;
 import com.jkbootup.ecommerce.order.adapter.client.PaymentHttpClient;
@@ -54,6 +56,7 @@ public class OrderConfiguration {
 
     @Bean
     CheckoutSaga checkoutSaga(OrderRepository orders, TransactionTemplate tx, Clock clock, JsonMapper json,
+                              ObservationRegistry observations,
                               @Value("${clients.cart.url:http://localhost:8083}") String cartUrl,
                               @Value("${clients.inventory.url:http://localhost:8084}") String inventoryUrl,
                               @Value("${clients.payment.url:http://localhost:8086}") String paymentUrl,
@@ -61,9 +64,9 @@ public class OrderConfiguration {
                               @Value("${clients.read-timeout:800ms}") Duration read,
                               @Value("${clients.payment.read-timeout:2s}") Duration paymentRead) {
         return new CheckoutSaga(orders,
-                new CartHttpClient(client(cartUrl, connect, read)),
-                new InventoryHttpClient(client(inventoryUrl, connect, read), json),
-                new PaymentHttpClient(client(paymentUrl, connect, paymentRead), json),
+                new CartHttpClient(client(cartUrl, connect, read, observations)),
+                new InventoryHttpClient(client(inventoryUrl, connect, read, observations), json),
+                new PaymentHttpClient(client(paymentUrl, connect, paymentRead, observations), json),
                 new SpringTransactions(tx), new UuidV7(), clock);
     }
 
@@ -98,8 +101,9 @@ public class OrderConfiguration {
     @Bean
     @ConditionalOnProperty(name = "order.jobs.enabled", havingValue = "true", matchIfMissing = true)
     OutboxRelay outboxRelay(JdbcClient jdbc, KafkaTemplate<String, String> kafka, TransactionTemplate tx,
-                            @Value("${order.outbox.batch-size:500}") int batchSize) {
-        return new OutboxRelay(jdbc, kafka, tx, batchSize);
+                            @Value("${order.outbox.batch-size:500}") int batchSize,
+                            MeterRegistry meters) {
+        return new OutboxRelay(jdbc, kafka, tx, batchSize, meters);
     }
 
     @Bean
@@ -108,9 +112,10 @@ public class OrderConfiguration {
                 .withJdbcTemplate(new JdbcTemplate(dataSource)).usingDbTime().build());
     }
 
-    private static RestClient client(String baseUrl, Duration connect, Duration read) {
+    /** With the observation registry: a client span per call, and the trace context sent along (traceparent). */
+    private static RestClient client(String baseUrl, Duration connect, Duration read, ObservationRegistry observations) {
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(connect).build());
         factory.setReadTimeout(read);
-        return RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
+        return RestClient.builder().baseUrl(baseUrl).requestFactory(factory).observationRegistry(observations).build();
     }
 }

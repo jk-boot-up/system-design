@@ -38,3 +38,17 @@ clients:
   catalog:
     url: ${CATALOG_URL:http://localhost:8081}
     timeout: 300ms
+
+# Observability (SPEC 8.2). Spans are exported when MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT is set (compose,
+# Kubernetes); logs are JSON with traceId and spanId when LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs. Every request is sampled here:
+# the collector keeps errors, slow requests and a share of the rest (tail sampling).
+management.tracing.sampling.probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+# Metrics are scraped by Prometheus (/actuator/prometheus); the OpenTelemetry starter would also push them over OTLP.
+management.otlp.metrics.export.enabled: false
+# Trace context in Kafka headers: producer spans, and consumer spans that continue the producer's trace.
+spring.kafka.template.observation-enabled: true
+spring.kafka.listener.observation-enabled: true
+# Latency histograms for p95/p99 panels, bounded to keep the series count down.
+management.metrics.distribution.percentiles-histogram.http.server.requests: true
+management.metrics.distribution.minimum-expected-value.http.server.requests: 5ms
+management.metrics.distribution.maximum-expected-value.http.server.requests: 5s

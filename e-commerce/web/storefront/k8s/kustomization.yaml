@@ -15,6 +15,7 @@ configMapGenerator:
       - GATEWAY_URL=http://api-gateway
       - OIDC_ISSUER=https://id.shop.example/realms/shop
       - OIDC_BACKCHANNEL_ORIGIN=http://keycloak:8080
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://alloy.monitoring:4318/v1/traces
       - OIDC_CLIENT_ID=shop-storefront
       - REDIS_URL=redis://redis-session:6379
       - IMAGE_BASE_URL=https://cdn.shop.example/product-images

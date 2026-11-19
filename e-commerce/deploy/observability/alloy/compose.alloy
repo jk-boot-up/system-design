@@ -1,0 +1,66 @@
+// Grafana Alloy, the OpenTelemetry collector of the local stack (deploy/compose). In the core stack, so services always
+// have a collector to export to; Tempo and Loki come with the "observability" profile, and until they run Alloy retries
+// and drops.
+//   traces: services --OTLP--> Alloy --> Tempo
+//   logs:   container stdout (Docker API) --> Alloy: level label, trace_id structured metadata --> Loki
+
+otelcol.receiver.otlp "default" {
+  grpc { endpoint = "0.0.0.0:4317" }
+  http { endpoint = "0.0.0.0:4318" }
+  output { traces = [otelcol.processor.batch.default.input] }
+}
+
+otelcol.processor.batch "default" {
+  output { traces = [otelcol.exporter.otlp.tempo.input] }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls { insecure = true }
+  }
+}
+
+// Logs of this compose project's containers only. The Docker socket is mounted read-only; that still lets Alloy see every
+// container on the machine, which is acceptable on a laptop and is why Kubernetes reads pod log files instead.
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=e-commerce"]
+  }
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.containers.targets
+  relabel_rules = discovery.relabel.containers.rules
+  labels        = { "env" = "local" }
+  forward_to    = [loki.process.structured.receiver]
+}
+
+// Java services log ECS JSON ({"log":{"level"}}, traceId); the storefront logs JSON (level, traceId). Other lines pass unchanged.
+loki.process "structured" {
+  stage.json {
+    expressions = { level = "log.level || level", trace_id = "traceId || trace_id" }
+  }
+  stage.labels {
+    values = { level = "" }
+  }
+  stage.structured_metadata {
+    values = { trace_id = "" }
+  }
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint { url = "http://loki:3100/loki/api/v1/push" }
+}

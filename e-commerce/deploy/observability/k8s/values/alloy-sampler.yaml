@@ -1,0 +1,45 @@
+# helm upgrade --install alloy-sampler grafana/alloy --version 1.15.0 -n monitoring -f deploy/observability/k8s/values/alloy-sampler.yaml
+# Tail sampling of whole traces (the node agents route each trace to one replica by trace id). Services sample every
+# request; this keeps every trace with an error, every trace slower than a second and 10 % of the rest.
+controller: { type: statefulset, replicas: 2 }
+alloy:
+  extraPorts:
+    - { name: otlp-grpc, port: 4317, targetPort: 4317, protocol: TCP }
+  resources: { requests: { cpu: 500m, memory: 1Gi }, limits: { memory: 2Gi } }
+  configMap:
+    content: |
+      otelcol.receiver.otlp "default" {
+        grpc { endpoint = "0.0.0.0:4317" }
+        output { traces = [otelcol.processor.tail_sampling.default.input] }
+      }
+
+      otelcol.processor.tail_sampling "default" {
+        decision_wait = "10s"
+        policy {
+          name = "errors"
+          type = "status_code"
+          status_code { status_codes = ["ERROR"] }
+        }
+        policy {
+          name = "slow"
+          type = "latency"
+          latency { threshold_ms = 1000 }
+        }
+        policy {
+          name = "sample"
+          type = "probabilistic"
+          probabilistic { sampling_percentage = 10 }
+        }
+        output { traces = [otelcol.processor.batch.default.input] }
+      }
+
+      otelcol.processor.batch "default" {
+        output { traces = [otelcol.exporter.otlp.tempo.input] }
+      }
+
+      otelcol.exporter.otlp "tempo" {
+        client {
+          endpoint = "tempo.monitoring:4317"
+          tls { insecure = true }
+        }
+      }

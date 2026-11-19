@@ -6,6 +6,7 @@ import com.jkbootup.ecommerce.catalog.domain.Ids;
 import com.jkbootup.ecommerce.catalog.domain.Product;
 import com.jkbootup.ecommerce.catalog.domain.ProductDetails;
 import com.jkbootup.ecommerce.catalog.domain.ProductImage;
+import com.jkbootup.ecommerce.catalog.observability.TraceContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -53,9 +54,10 @@ public class OutboxProductEvents implements ProductEvents {
         envelope.put("aggregateId", p.id().toString());
         envelope.put("payload", payload);
         jdbc.sql("""
-                        insert into outbox (id, aggregate_type, aggregate_id, event_type, topic, payload)
-                        values (:id, 'Product', :agg, 'catalog.ProductChanged', :topic, cast(:payload as jsonb))""")
+                        insert into outbox (id, aggregate_type, aggregate_id, event_type, topic, payload, traceparent)
+                        values (:id, 'Product', :agg, 'catalog.ProductChanged', :topic, cast(:payload as jsonb), :traceparent)""")
                 .param("id", eventId).param("agg", p.id().toString()).param("topic", TOPIC)
-                .param("payload", json.writeValueAsString(envelope)).update();
+                .param("payload", json.writeValueAsString(envelope))
+                .param("traceparent", TraceContext.currentTraceparent()).update();
     }
 }

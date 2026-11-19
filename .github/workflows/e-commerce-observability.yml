@@ -1,0 +1,22 @@
+name: e-commerce / observability
+
+on:
+  push:
+    paths: ['e-commerce/deploy/observability/**', '.github/workflows/e-commerce-observability.yml']
+  pull_request:
+    paths: ['e-commerce/deploy/observability/**', '.github/workflows/e-commerce-observability.yml']
+
+defaults:
+  run:
+    working-directory: e-commerce/deploy/observability
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13' }
+      - name: Generated rules and dashboards up to date, rules valid and tested, Alloy configs parse, objects build
+        run: ./check.sh

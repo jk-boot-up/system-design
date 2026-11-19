@@ -1,0 +1,15 @@
+# Added to every shop pod's own policy (policies are additive): Prometheus in "monitoring" may scrape, and pods may send
+# traces to Alloy there. Pod logs are read from the node by Alloy's DaemonSet and need no network path.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: observability
+  namespace: e-commerce-shop
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [ { namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } } } ]
+  egress:
+    - to: [ { namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } } } ]
+      ports: [ { port: 4317 }, { port: 4318 } ]

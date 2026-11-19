@@ -334,14 +334,14 @@ The `check (available >= 0)` constraint is a second line of defence against over
 
 ### 8.2 Observability
 
-* **Tracing:** OpenTelemetry Java agent for all services. Trace context flows through HTTP headers and Kafka event headers. Traces go to Tempo.
+* **Tracing:** OpenTelemetry in every service (Java: Spring Boot's OpenTelemetry starter; storefront: the OpenTelemetry Node SDK), exported to a collector (Grafana Alloy) that tail-samples and sends traces to Tempo. Trace context flows through HTTP headers, Kafka event headers and the transactional outbox (each row keeps the `traceparent` of the request that wrote it) ([ADR 0013](adr/0013-observability-with-opentelemetry-alloy-and-slos-at-the-gateway.md)).
 * **Metrics:**
   * Micrometer exports to Prometheus.
   * RED metrics per endpoint.
   * Business metrics: orders/min, payment decline rate, stock-outs, saga compensations.
   * Kafka consumer lag.
 * **Logs:** structured JSON with `traceId` and `spanId`, sent to Loki.
-* **SLOs and alerts:** multi-window burn-rate alerts on availability and latency SLOs; DLQ depth > 0; outbox backlog age > 30 s.
+* **SLOs and alerts:** multi-window burn-rate alerts on availability and latency SLOs, measured per route at the gateway; DLQ depth > 0; outbox backlog age > 30 s; a topic growing much faster than its outbox publishes ([deploy/observability](../deploy/observability/README.md)).
 
 ### 8.3 Resilience
 

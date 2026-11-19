@@ -2,6 +2,7 @@ package com.jkbootup.ecommerce.inventory.adapter.persistence;
 
 import com.jkbootup.ecommerce.inventory.application.port.StockEvents;
 import com.jkbootup.ecommerce.inventory.domain.StockLevel;
+import com.jkbootup.ecommerce.inventory.observability.TraceContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -34,9 +35,10 @@ public class OutboxStockEvents implements StockEvents {
         envelope.put("payload", Map.of("sku", level.sku().value(), "available", level.available(), "inStock", level.inStock(),
                 "stockVersion", level.version()));
         jdbc.sql("""
-                        insert into outbox (id, aggregate_type, aggregate_id, event_type, topic, payload)
-                        values (:id, 'Stock', :agg, 'inventory.StockChanged', :topic, cast(:payload as jsonb))""")
+                        insert into outbox (id, aggregate_type, aggregate_id, event_type, topic, payload, traceparent)
+                        values (:id, 'Stock', :agg, 'inventory.StockChanged', :topic, cast(:payload as jsonb), :traceparent)""")
                 .param("id", eventId).param("agg", level.sku().value()).param("topic", TOPIC)
-                .param("payload", json.writeValueAsString(envelope)).update();
+                .param("payload", json.writeValueAsString(envelope))
+                .param("traceparent", TraceContext.currentTraceparent()).update();
     }
 }

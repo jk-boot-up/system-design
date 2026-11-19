@@ -1,0 +1,58 @@
+# helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack --version 92.18.0 \
+#   -n monitoring --create-namespace -f deploy/observability/k8s/values/kube-prometheus-stack.yaml
+# Prometheus Operator, Prometheus, Alertmanager and Grafana. The shop's PodMonitors and PrometheusRules carry the label
+# release=kube-prometheus-stack; dashboards arrive as ConfigMaps labelled grafana_dashboard.
+prometheus:
+  prometheusSpec:
+    replicas: 2
+    retention: 15d
+    retentionSize: 45GB
+    ruleSelector: { matchLabels: { release: kube-prometheus-stack } }
+    podMonitorSelector: { matchLabels: { release: kube-prometheus-stack } }
+    ruleNamespaceSelector: {}
+    podMonitorNamespaceSelector: {}
+    enableFeatures: [exemplar-storage]
+    storageSpec:
+      volumeClaimTemplate:
+        spec: { resources: { requests: { storage: 50Gi } } }
+    resources: { requests: { cpu: "1", memory: 4Gi }, limits: { memory: 6Gi } }
+alertmanager:
+  config:
+    route:
+      receiver: ticket
+      group_by: [alertname, slo, service, topic]
+      routes:
+        - { matchers: [severity="page"], receiver: page, repeat_interval: 1h }
+    receivers:
+      # Point these at the on-call tool (PagerDuty, Opsgenie) and the team's channel; keys via alertmanagerSpec.secrets.
+      - name: page
+      - name: ticket
+    inhibit_rules:
+      # A fast burn already pages; do not also open the slow-burn ticket for the same SLO.
+      - source_matchers: [alertname="ErrorBudgetBurnFast"]
+        target_matchers: [alertname="ErrorBudgetBurnSlow"]
+        equal: [slo]
+grafana:
+  admin: { existingSecret: grafana-admin, userKey: user, passwordKey: password }
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+      folderAnnotation: grafana_folder
+      provider: { foldersFromFilesStructure: true }
+  additionalDataSources:
+    - name: Tempo
+      uid: tempo
+      type: tempo
+      url: http://tempo.monitoring:3200
+      jsonData:
+        tracesToLogsV2: { datasourceUid: loki, spanStartTimeShift: -2m, spanEndTimeShift: 2m, filterByTraceID: true, tags: [ { key: service.name, value: service } ] }
+        tracesToMetrics: { datasourceUid: prometheus }
+        nodeGraph: { enabled: true }
+    - name: Loki
+      uid: loki
+      type: loki
+      url: http://loki-gateway.monitoring
+      jsonData:
+        derivedFields: [ { name: trace, matcherType: label, matcherRegex: trace_id, datasourceUid: tempo, url: "$${__value.raw}", urlDisplayLabel: Open trace } ]

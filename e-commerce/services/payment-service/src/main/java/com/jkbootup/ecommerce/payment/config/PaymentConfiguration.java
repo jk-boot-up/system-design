@@ -1,5 +1,6 @@
 package com.jkbootup.ecommerce.payment.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import com.jkbootup.ecommerce.payment.adapter.messaging.OutboxRelay;
 import com.jkbootup.ecommerce.payment.adapter.persistence.JdbcPaymentRepository;
 import com.jkbootup.ecommerce.payment.adapter.persistence.OutboxPaymentEvents;
@@ -75,8 +76,9 @@ public class PaymentConfiguration {
     @Bean
     @ConditionalOnProperty(name = "payment.jobs.enabled", havingValue = "true", matchIfMissing = true)
     OutboxRelay outboxRelay(JdbcClient jdbc, KafkaTemplate<String, String> kafka, TransactionTemplate tx,
-                            @Value("${payment.outbox.batch-size:500}") int batchSize) {
-        return new OutboxRelay(jdbc, kafka, tx, batchSize);
+                            @Value("${payment.outbox.batch-size:500}") int batchSize,
+                            MeterRegistry meters) {
+        return new OutboxRelay(jdbc, kafka, tx, batchSize, meters);
     }
 
     @Bean

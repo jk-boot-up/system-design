@@ -1,0 +1,99 @@
+# promtool test rules prometheus/tests/alerts.test.yml   (run by CI and by deploy/observability/check.sh)
+rule_files: [../rules/slo.rules.yml, ../rules/platform.rules.yml]
+evaluation_interval: 30s
+tests:
+  # The incident that motivated the outbox alerts: the relay kept re-sending one batch, nothing new got through.
+  - interval: 30s
+    input_series:
+      - series: 'outbox_oldest_unpublished_age_seconds{service="catalog-service", instance="a"}'
+        values: '0 5 35 65 95 125 155'
+      - series: 'outbox_oldest_unpublished_age_seconds{service="order-service", instance="b"}'
+        values: '0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: OutboxBacklogStale
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: OutboxBacklogStale
+        exp_alerts:
+          - exp_labels: { severity: page, service: catalog-service }
+            exp_annotations:
+              summary: "catalog-service: events are not reaching Kafka"
+              description: "The oldest unpublished outbox event is 2m 35s old (limit 30 s). Downstream services see stale data until the relay catches up."
+              runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#outbox-backlog-stale
+
+  - interval: 1m
+    input_series:
+      - series: 'kafka_topic_partition_current_offset{topic="order.events.dlq", partition="0"}'
+        values: '0 0 2 2 2'
+      - series: 'kafka_topic_partition_oldest_offset{topic="order.events.dlq", partition="0"}'
+        values: '0 0 0 0 0'
+      - series: 'kafka_topic_partition_current_offset{topic="order.events", partition="0"}'
+        values: '0 10 20 30 40'
+      - series: 'kafka_topic_partition_oldest_offset{topic="order.events", partition="0"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: DeadLetterQueueNotEmpty
+        exp_alerts:
+          - exp_labels: { severity: ticket, topic: order.events.dlq }
+            exp_annotations:
+              summary: "order.events.dlq holds 2 events"
+              description: "Events failed five times and were parked. Find the cause in the consumer's logs (trace id in the event headers), fix it, then replay."
+              runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#dead-letter-queue
+
+  # 4,000 messages a second into catalog.events while the outbox publishes almost nothing.
+  - interval: 1m
+    input_series:
+      - series: 'kafka_topic_partition_current_offset{topic="catalog.events", partition="0"}'
+        values: '0+240000x15'
+      - series: 'outbox_events_published_total{service="catalog-service", type="catalog.ProductChanged"}'
+        values: '0+6x15'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: TopicGrowingFasterThanItsEvents
+        exp_alerts:
+          - exp_labels: { severity: page, topic: catalog.events }
+            exp_annotations:
+              summary: "catalog.events receives far more messages than its outbox publishes"
+              description: "A producer is re-sending (4k messages/s). Duplicates are deduplicated by event id, but they fill the disk and delay every consumer."
+              runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#topic-growing-faster-than-its-events
+
+  # Checkout: 5 % of orders fail for 20 minutes (budget 0.1 %, so a 50x burn) pages; the rest of the system stays quiet.
+  - interval: 1m
+    input_series:
+      - series: 'spring_cloud_gateway_requests_seconds_count{routeId="checkout", httpMethod="POST", outcome="SUCCESS"}'
+        values: '0+95x80'
+      - series: 'spring_cloud_gateway_requests_seconds_count{routeId="checkout", httpMethod="POST", outcome="SERVER_ERROR"}'
+        values: '0x60 0+5x20'
+      - series: 'spring_cloud_gateway_requests_seconds_count{routeId="catalog", httpMethod="GET", outcome="SUCCESS"}'
+        values: '0+1000x80'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: ErrorBudgetBurnFast
+        exp_alerts: []
+      - eval_time: 80m
+        alertname: ErrorBudgetBurnFast
+        exp_alerts:
+          - exp_labels: { severity: page, slo: checkout-availability }
+            exp_annotations:
+              summary: "checkout-availability is burning its error budget fast"
+              description: "checkout-availability: more than 0.1000% of requests failing (objective 99.90% over 30 days). Check the SLO dashboard, then the service's RED dashboard and the traces of failing requests."
+              runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#error-budget-burn
+
+  # Search slower than 300 ms for 10 % of requests: a latency burn (budget 1 %), paged.
+  - interval: 1m
+    input_series:
+      - series: 'spring_cloud_gateway_requests_seconds_bucket{routeId="search", httpMethod="GET", le="0.3"}'
+        values: '0+90x70'
+      - series: 'spring_cloud_gateway_requests_seconds_count{routeId="search", httpMethod="GET", outcome="SUCCESS"}'
+        values: '0+100x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: ErrorBudgetBurnFast
+        exp_alerts:
+          - exp_labels: { severity: page, slo: search-latency }
+            exp_annotations:
+              summary: "search-latency is burning its error budget fast"
+              description: "search-latency: more than 1% of requests slower than 300 ms (objective 99.00% over 30 days). Check the SLO dashboard, then the service's RED dashboard and the traces of failing requests."
+              runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#error-budget-burn

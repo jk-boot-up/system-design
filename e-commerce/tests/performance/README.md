@@ -36,7 +36,7 @@ UPDATE_BASELINE=1 ./run-compose.sh     # accept this run as the new local baseli
 from one address, while real visitors come from many, so the overlay lifts the **per-address** limits (edge 50 r/s, gateway
 20 r/s per anonymous address); otherwise the test would measure the limiter. The per-user checkout limit and per-SKU
 admission control stay on, which is why every checkout visitor has an account of its own. For Search the runner stops
-order, payment and cart while OpenSearch runs, so it fits in a 4 GB Docker VM.
+order, payment, cart, the storefront and Alloy while OpenSearch runs, and starts them again afterwards.
 
 One simulation by hand: `./gradlew gatlingRun --simulation com.jkbootup.ecommerce.performance.BrowseSimulation`.
 Reports: `build/reports/gatling/<simulation>-<time>/index.html`.
@@ -64,7 +64,13 @@ Apple silicon, the whole system in a 4 GB Docker VM, local rates, after warm-up 
 | product page | 9 ms | 150 ms |
 | add to cart | 54 ms | 100 ms |
 | place order | 320 ms | 1,500 ms |
-| search | not yet measured: in the local run this run's products were not searchable within 90 s (under investigation) | 300 ms |
+| search | not measurable in a 4 GB Docker VM (below) | 300 ms |
+
+**Search needs more than 4 GB.** Seeding and indexing work (50 products searchable within the wait), and a warm search
+answers in about 20 ms. Under the simulation, though, the VM runs out of memory and CPU: the kernel OOM-kills OpenSearch
+(the largest process), or OpenSearch slows until search-service gives up (`TaskCancelledException: channel closed`, disk
+health checks of 21 s), and searches return 503. Run it with 6 GB or more, or on the staging cluster; until then there is
+no local search baseline and the nightly job reports search as failed.
 
 These numbers show the budgets are reachable and catch regressions on one machine; they say nothing about capacity. The
 target rates belong on a production-like cluster (`PERF_LOAD=target`, the k8s staging overlay, several load generators).

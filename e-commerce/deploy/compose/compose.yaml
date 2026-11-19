@@ -2,7 +2,9 @@
 #   docker compose up -d --build                     core: checkout path (fits in about 4 GB)
 #   docker compose --profile search up -d             + OpenSearch and search-service
 #   docker compose --profile all up -d                everything (about 10 GB)
-# Profiles: search, reviews, async (RabbitMQ, notification, recommendation), analytics (ClickHouse, Prometheus, Grafana), all.
+#   docker compose --profile observability up -d      + Tempo, Loki, Prometheus, Grafana, kafka-exporter (about 1.2 GB more)
+# Profiles: search, reviews, async (RabbitMQ, notification, recommendation), analytics (ClickHouse, Prometheus, Grafana),
+# observability, all. Alloy, the OpenTelemetry collector, is always on: services export traces to it.
 name: e-commerce
 
 x-java: &java
@@ -14,6 +16,9 @@ x-java: &java
     # Keys from inside the network; the issuer claim is still checked against the public URL above.
     SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/shop/protocol/openid-connect/certs
     JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError -XX:TieredStopAtLevel=1
+    # Observability (deploy/observability): spans to Alloy, JSON logs with trace ids on stdout.
+    MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: http://alloy:4318/v1/traces
+    LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
 
 x-kafka-ready: &kafka-ready
   kafka-init: { condition: service_completed_successfully }
@@ -45,6 +50,7 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_HEAP_OPTS: -Xms256m -Xmx384m
+      KAFKA_LOG_DIRS: /var/lib/kafka/data   # the image defaults to /tmp/kafka-logs, outside the volume
     ports: ["9092:9092"]
     volumes: [ "kafka:/var/lib/kafka/data" ]
     healthcheck:
@@ -83,6 +89,7 @@ services:
       test: [CMD-SHELL, "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
       interval: 5s
       retries: 60
+    restart: unless-stopped      # without it, one OOM kill under memory pressure leaves the stack without sign-in
     mem_limit: 768m
 
   # Sessions of the storefront: never evicted, persisted (design/16 §16.4), apart from the shared Redis.
@@ -151,12 +158,49 @@ services:
     mem_limit: 1536m
     profiles: [analytics, all]
 
+  # ───────────────────────────── observability (deploy/observability) ─────────────────────────────
+  alloy:
+    image: grafana/alloy:v1.21.3
+    command: [run, --server.http.listen-addr=0.0.0.0:12345, --storage.path=/tmp/alloy, /etc/alloy/config.alloy]
+    volumes:
+      - ../observability/alloy/compose.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports: ["127.0.0.1:12345:12345"]
+    restart: unless-stopped
+    mem_limit: 160m
+
+  tempo:
+    image: grafana/tempo:2.10.10
+    command: [-config.file=/etc/tempo.yaml]
+    volumes: [ "../observability/tempo/compose.yaml:/etc/tempo.yaml:ro" ]
+    ports: ["127.0.0.1:3200:3200"]
+    mem_limit: 256m
+    profiles: [observability, all]
+
+  loki:
+    image: grafana/loki:3.7.9
+    command: [-config.file=/etc/loki.yaml]
+    volumes: [ "../observability/loki/compose.yaml:/etc/loki.yaml:ro" ]
+    ports: ["127.0.0.1:3100:3100"]
+    mem_limit: 256m
+    profiles: [observability, all]
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.11.0
+    command: [--kafka.server=kafka:29092, --kafka.version=3.9.0]
+    depends_on: { <<: *kafka-ready }
+    restart: unless-stopped
+    mem_limit: 64m
+    profiles: [observability, all]
+
   prometheus:
     image: prom/prometheus:v3.15.1
     ports: ["9090:9090"]
-    volumes: [ "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" ]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../observability/prometheus/rules:/etc/prometheus/rules:ro
     mem_limit: 256m
-    profiles: [analytics, all]
+    profiles: [analytics, observability, all]
 
   grafana:
     image: grafana/grafana:13.2.6
@@ -169,9 +213,10 @@ services:
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ../../services/analytics/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    depends_on: [prometheus, analytics]
-    mem_limit: 256m
-    profiles: [analytics, all]
+      - ../observability/grafana/dashboards:/var/lib/grafana/dashboards-platform:ro
+    depends_on: [prometheus]
+    mem_limit: 320m          # 256 MB is not enough once the ClickHouse plugin is loaded
+    profiles: [analytics, observability, all]
 
   # ───────────────────────────── services ─────────────────────────────
   catalog-service:
@@ -301,6 +346,7 @@ services:
       GATEWAY_URL: http://api-gateway:8080
       OIDC_ISSUER: http://localhost:8180/realms/shop
       OIDC_BACKCHANNEL_ORIGIN: http://keycloak:8080
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://alloy:4318/v1/traces
       OIDC_ALLOW_HTTP: "true"
       OIDC_CLIENT_ID: shop-storefront
       OIDC_CLIENT_SECRET: dev-storefront-secret-change-me-0123456789

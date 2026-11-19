@@ -1,6 +1,10 @@
 apiVersion: 1
 providers:
-  - name: e-commerce
+  - name: e-commerce-analytics
     folder: E-commerce
     type: file
     options: { path: /var/lib/grafana/dashboards }
+  - name: e-commerce-platform
+    folder: E-commerce
+    type: file
+    options: { path: /var/lib/grafana/dashboards-platform }

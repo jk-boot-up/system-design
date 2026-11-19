@@ -15,7 +15,7 @@ FROM gcr.io/distroless/nodejs26-debian13:nonroot
 WORKDIR /app
 ENV NODE_ENV=production PORT=8090
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json /app/server.ts ./
+COPY --from=build /app/package.json /app/server.ts /app/tracing.ts ./
 COPY --from=build /out/build ./build
 USER nonroot
 EXPOSE 8090

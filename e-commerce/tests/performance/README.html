@@ -109,7 +109,7 @@ UPDATE_BASELINE=1 ./run-compose.sh     # accept this run as the new local baseli
 from one address, while real visitors come from many, so the overlay lifts the <strong>per-address</strong> limits (edge 50 r/s, gateway
 20 r/s per anonymous address); otherwise the test would measure the limiter. The per-user checkout limit and per-SKU
 admission control stay on, which is why every checkout visitor has an account of its own. For Search the runner stops
-order, payment and cart while OpenSearch runs, so it fits in a 4 GB Docker VM.</p>
+order, payment, cart, the storefront and Alloy while OpenSearch runs, and starts them again afterwards.</p>
 <p>One simulation by hand: <code>./gradlew gatlingRun --simulation com.jkbootup.ecommerce.performance.BrowseSimulation</code>.
 Reports: <code>build/reports/gatling/&lt;simulation&gt;-&lt;time&gt;/index.html</code>.</p>
 <h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">#</a></h2>
@@ -197,11 +197,16 @@ Reports: <code>build/reports/gatling/&lt;simulation&gt;-&lt;time&gt;/index.html<
 </tr>
 <tr>
 <td>search</td>
-<td>not yet measured: in the local run this run's products were not searchable within 90 s (under investigation)</td>
+<td>not measurable in a 4 GB Docker VM (below)</td>
 <td>300 ms</td>
 </tr>
 </tbody>
 </table>
+<p><strong>Search needs more than 4 GB.</strong> Seeding and indexing work (50 products searchable within the wait), and a warm search
+answers in about 20 ms. Under the simulation, though, the VM runs out of memory and CPU: the kernel OOM-kills OpenSearch
+(the largest process), or OpenSearch slows until search-service gives up (<code>TaskCancelledException: channel closed</code>, disk
+health checks of 21 s), and searches return 503. Run it with 6 GB or more, or on the staging cluster; until then there is
+no local search baseline and the nightly job reports search as failed.</p>
 <p>These numbers show the budgets are reachable and catch regressions on one machine; they say nothing about capacity. The
 target rates belong on a production-like cluster (<code>PERF_LOAD=target</code>, the k8s staging overlay, several load generators).</p>
 <p>CI: <a href="../../../.github/workflows/e-commerce-performance.yml">e-commerce-performance.yml</a> runs nightly and compares with the last

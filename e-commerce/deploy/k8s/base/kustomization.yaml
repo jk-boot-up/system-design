@@ -6,6 +6,7 @@ resources:
   - namespaces.yaml
   - shop
   - platform
+  - ../../observability       # PodMonitors, PrometheusRules, dashboards, the shop's observability network policy
 # Images come from the shop registry. The release pipeline pins each overlay to the tested version with
 # `kustomize edit set image e-commerce/<name>=registry.shop.example/e-commerce/<name>:<version>` in that overlay.
 images:

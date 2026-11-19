@@ -43,3 +43,8 @@ spec:
       replica.selector.class: org.apache.kafka.common.replica.RackAwareReplicaSelector
   entityOperator:
     topicOperator: {}
+  # Consumer lag and topic offsets for Prometheus (deploy/observability): lag alerts, dead-letter depth, KEDA's view.
+  kafkaExporter:
+    topicExcludeRegex: "__.*"
+    groupRegex: ".*"
+    resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { memory: 128Mi } }

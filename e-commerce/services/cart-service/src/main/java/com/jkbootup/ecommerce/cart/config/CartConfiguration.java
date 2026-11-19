@@ -1,5 +1,6 @@
 package com.jkbootup.ecommerce.cart.config;
 
+import io.micrometer.observation.ObservationRegistry;
 import com.jkbootup.ecommerce.cart.adapter.client.CatalogPricingClient;
 import com.jkbootup.ecommerce.cart.adapter.messaging.OrderConfirmedListener;
 import com.jkbootup.ecommerce.cart.adapter.redis.RedisCartRepository;
@@ -29,10 +30,11 @@ public class CartConfiguration {
                             @Value("${cart.ttl:30d}") Duration ttl,
                             @Value("${clients.catalog.url:http://localhost:8081}") String catalogUrl,
                             @Value("${clients.catalog.timeout:300ms}") Duration timeout,
-                            @Value("${cart.price-cache:30s}") Duration priceCache) {
+                            @Value("${cart.price-cache:30s}") Duration priceCache,
+                            ObservationRegistry observations) {
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofMillis(200)).build());
         factory.setReadTimeout(timeout);
-        RestClient catalog = RestClient.builder().baseUrl(catalogUrl).requestFactory(factory).build();
+        RestClient catalog = RestClient.builder().baseUrl(catalogUrl).requestFactory(factory).observationRegistry(observations).build();
         return new CartService(new RedisCartRepository(redis, ttl), new CatalogPricingClient(catalog, priceCache),
                 new RedisProcessedEvents(redis));
     }

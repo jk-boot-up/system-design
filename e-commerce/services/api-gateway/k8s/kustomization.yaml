@@ -9,6 +9,8 @@ resources: [deployment.yaml, service.yaml, hpa.yaml, pdb.yaml, networkpolicy.yam
 configMapGenerator:
   - name: api-gateway
     literals:
+      - MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT=http://alloy.monitoring:4318/v1/traces
+      - LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs
       - REDIS_URL=redis://redis-ratelimit:6379
       - JWT_ISSUER=https://id.shop.example/realms/shop
       - JWT_AUDIENCE=shop-api

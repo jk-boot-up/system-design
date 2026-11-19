@@ -65,15 +65,26 @@ public final class Seed {
         return out;
     }
 
-    /** Waits until search returns this run's products: indexing travels through Kafka. */
+    /**
+     * Waits until search returns this run's products: indexing travels through the catalog outbox and Kafka. On timeout
+     * the message says what search last answered; "0 found" with status 200 usually means a consumer backlog (see the
+     * "Checkout, events and Kafka" dashboard), a 503 that search-service or OpenSearch is not ready.
+     */
     public void awaitIndexed(int count) {
         Instant deadline = Instant.now().plusSeconds(90);
+        String last = "no answer";
         while (Instant.now().isBefore(deadline)) {
-            HttpResponse<String> res = raw("GET", "/api/v1/search?limit=1&q=" + runTag, null, null);
-            if (res.statusCode() == 200 && read(res).path("total").asInt() >= count) return;
+            try {
+                HttpResponse<String> res = raw("GET", "/api/v1/search?limit=1&q=" + runTag, null, null);
+                int found = res.statusCode() == 200 ? read(res).path("total").asInt() : 0;
+                if (found >= count) return;
+                last = "status " + res.statusCode() + ", " + found + " found";
+            } catch (IllegalStateException e) {   // a timeout while search warms up: not ready yet
+                last = e.getMessage();
+            }
             sleep(1_000);
         }
-        throw new IllegalStateException("search did not index " + count + " products of " + runTag + " within 90 s");
+        throw new IllegalStateException("search did not index " + count + " products of " + runTag + " within 90 s (last: " + last + ")");
     }
 
     // ── shoppers ──────────────────────────────────────────────────────────────────────────────────────────────────────

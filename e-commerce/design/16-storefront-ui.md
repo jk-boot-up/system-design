@@ -300,7 +300,7 @@ Error pages never show stack traces or upstream messages. Loading states are ske
 | API client and types | `openapi-typescript` + `openapi-fetch` from each service's `contracts/openapi.yaml`; Zod for runtime checks | The services are contract-first; a breaking API change fails the UI build |
 | Browser data | Route loaders and actions; order status polling with React Router's `useRevalidator` | The server already loads data; no client store or query library needed |
 | Styling | Tailwind CSS 4 with design tokens as CSS variables (light and dark) | Most used approach, no runtime cost, works with a strict CSP (styles from files, no CSS-in-JS) |
-| Logging, metrics, tracing | `pino` (JSON, tokens and cookies redacted); `@prometheus-io/client` (the maintained successor of `prom-client`) on `/metrics`; `X-Request-Id` forwarded to the gateway; OpenTelemetry arrives with P5 | One trace from click to database |
+| Logging, metrics, tracing | `pino` (JSON, tokens and cookies redacted); `@prometheus-io/client` (the maintained successor of `prom-client`) on `/metrics`; `X-Request-Id` forwarded to the gateway; OpenTelemetry Node SDK (`tracing.ts`): a span per page or data request and per `fetch`, `traceparent` sent to the gateway, query strings left out, `traceId` in every log line | One trace from click to database |
 | Tests | Vitest 5 + Testing Library + MSW 3; Playwright 1.65 + axe-core; OWASP ZAP baseline scan | §16.13 |
 
 **Patch policy:** Renovate opens updates daily; framework and runtime security fixes ship within 72 hours (critical) or 7

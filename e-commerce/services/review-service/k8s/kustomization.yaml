@@ -9,6 +9,8 @@ resources: [deployment.yaml, service.yaml, hpa.yaml, pdb.yaml, networkpolicy.yam
 configMapGenerator:
   - name: review-service
     literals:
+      - MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT=http://alloy.monitoring:4318/v1/traces
+      - LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs
       - CASSANDRA_CONTACT_POINTS=cassandra-dc1-service:9042
       - CASSANDRA_DC=dc1
       - "CASSANDRA_REPLICATION={'class': 'NetworkTopologyStrategy', 'dc1': 3}"

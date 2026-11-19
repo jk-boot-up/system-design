@@ -1,5 +1,6 @@
 package com.jkbootup.ecommerce.payment.adapter.persistence;
 
+import com.jkbootup.ecommerce.payment.observability.TraceContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -29,9 +30,10 @@ public class OutboxWriter {
         envelope.put("aggregateId", aggregateId);
         envelope.put("payload", payload);
         jdbc.sql("""
-                        insert into outbox (id, aggregate_type, aggregate_id, event_type, topic, payload)
-                        values (:id, :at, :agg, :type, :topic, cast(:payload as jsonb))""")
+                        insert into outbox (id, aggregate_type, aggregate_id, event_type, topic, payload, traceparent)
+                        values (:id, :at, :agg, :type, :topic, cast(:payload as jsonb), :traceparent)""")
                 .param("id", eventId).param("at", aggregateType).param("agg", aggregateId).param("type", type)
-                .param("topic", topic).param("payload", json.writeValueAsString(envelope)).update();
+                .param("topic", topic).param("payload", json.writeValueAsString(envelope))
+                .param("traceparent", TraceContext.currentTraceparent()).update();
     }
 }
