@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walkthrough</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#141b2e;--panel2:#1b243d;--line:#2a3554;--fg:#e8edf7;--mut:#93a0bd;--accent:#6d8cff;--req:#6d8cff;--res:#2fc46b;--evt:#f5a524;--err:#f0525b;--node:#18213a;--glow:rgba(109,140,255,.55)}
+[data-theme="medium"]{--bg:#283041;--panel:#333b50;--panel2:#3d465c;--line:#56607a;--fg:#eef1f7;--mut:#b7bfd2;--accent:#8aa5ff;--req:#8aa5ff;--res:#4fd88a;--evt:#ffb84d;--err:#ff7078;--node:#2f3850;--glow:rgba(138,165,255,.55)}
+[data-theme="light"]{--bg:#f3f5fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d3d9e8;--fg:#18202f;--mut:#5b6780;--accent:#3d63f2;--req:#3d63f2;--res:#138a45;--evt:#c77700;--err:#cc2b35;--node:#ffffff;--glow:rgba(61,99,242,.35)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{display:flex;gap:14px;align-items:center;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:17px;margin:0}
+header .sub{color:var(--mut);font-size:13px}
+.grow{flex:1}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button,.btn{background:var(--panel);color:var(--mut);border:0;padding:6px 11px;cursor:pointer;font:inherit;font-size:13px}
+.seg button.on{background:var(--accent);color:#fff}
+.btn{border:1px solid var(--line);border-radius:10px}
+.btn:hover,.seg button:hover{color:var(--fg)}
+.btn.on{border-color:var(--accent);color:var(--fg)}
+main{flex:1;display:grid;grid-template-columns:230px 1fr 340px;min-height:0}
+@media (max-width:1100px){main{grid-template-columns:1fr}aside.left{display:none}}
+aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:12px}
+aside.right{border-right:0;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.scn{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;color:var(--fg);padding:9px 10px;border-radius:10px;cursor:pointer;font:inherit;margin-bottom:4px}
+.scn small{display:block;color:var(--mut);font-size:12px}
+.scn.on{background:var(--panel2);border-color:var(--accent)}
+.stage{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:10px}
+.stage svg{width:100%;height:100%;max-height:calc(100vh - 150px)}
+.edge{stroke:var(--line);stroke-width:2;fill:none}
+.edge.dashed{stroke-dasharray:6 6}
+.edge.hot{stroke:var(--accent);stroke-width:3}
+.node rect{fill:var(--node);stroke:var(--line);stroke-width:1.5;transition:all .25s}
+.node text{fill:var(--fg);font-size:21px;font-weight:650}
+.node text.tech{fill:var(--mut);font-size:16px;font-weight:500}
+.node text.icon{font-size:28px}
+.node.active rect{stroke:var(--accent);stroke-width:3;filter:drop-shadow(0 0 10px var(--glow))}
+.node.ok rect{stroke:var(--res);stroke-width:3}
+.node.bad rect{stroke:var(--err);stroke-width:3}
+.node.dim{opacity:.35}
+.badge rect{rx:9}
+.badge text{font-size:14px;font-weight:700;fill:#fff}
+.pkt circle{stroke:#fff;stroke-width:2}
+.pkt text{font-size:17px;font-weight:700;paint-order:stroke;stroke:var(--bg);stroke-width:4px;fill:var(--fg)}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+.card h3{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+.say{font-size:16px;min-height:5.5em}
+.kv{width:100%;border-collapse:collapse;font-size:13px}
+.kv td{padding:3px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.kv td:first-child{color:var(--mut);white-space:nowrap}
+.kv tr.changed td{color:var(--evt);font-weight:600}
+.log{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;max-height:220px;overflow:auto;margin:0;padding:0;list-style:none}
+.log li{padding:2px 0;border-bottom:1px dashed var(--line)}
+.log .req{color:var(--req)}.log .res{color:var(--res)}.log .event{color:var(--evt)}.log .error{color:var(--err)}
+footer{display:flex;gap:10px;align-items:center;padding:10px 18px;background:var(--panel);border-top:1px solid var(--line);flex-wrap:wrap}
+.progress{flex:1;height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;min-width:120px;cursor:pointer}
+.progress div{height:100%;width:0;background:var(--accent);transition:width .3s}
+.count{color:var(--mut);font-size:13px;min-width:90px;text-align:right}
+.legend{display:flex;gap:12px;font-size:12px;color:var(--mut)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+kbd{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px}
+
+</style>
+</head>
+<body>
+<header>
+  <div><h1 id="title"></h1><div class="sub" id="subtitle"></div></div>
+  <div class="grow"></div>
+  <div class="legend" aria-hidden="true">
+    <span><i style="background:var(--req)"></i>request</span><span><i style="background:var(--res)"></i>response</span>
+    <span><i style="background:var(--evt)"></i>event</span><span><i style="background:var(--err)"></i>failure</span>
+  </div>
+  <button class="btn" id="narrate" aria-pressed="false" title="Narration on/off (N)">🔇 Narration off</button>
+  <div class="seg" role="group" aria-label="Theme">
+    <button data-set-theme="light">☀ Light</button><button data-set-theme="medium">◐ Medium</button><button data-set-theme="dark">☾ Dark</button>
+  </div>
+  <a class="btn" href="../README.html" title="Back to the design document">⟵ Design</a>
+</header>
+<main>
+  <aside class="left"><div id="scenarios" role="list" aria-label="Scenarios"></div></aside>
+  <section class="stage" id="stage"></section>
+  <aside class="right">
+    <div class="card"><h3>Narration</h3><div class="say" id="say" aria-live="polite"></div></div>
+    <div class="card"><h3 id="stateTitle">State</h3><table class="kv"><tbody id="state"></tbody></table></div>
+    <div class="card"><h3>Message log</h3><ul class="log" id="log"></ul></div>
+  </aside>
+</main>
+<footer>
+  <button class="btn" id="restart" title="Restart scenario">⟲</button>
+  <button class="btn" id="prev" title="Previous step (←)">◀</button>
+  <button class="btn" id="play" title="Play / pause (space)">▶ Play</button>
+  <button class="btn" id="next" title="Next step (→)">▶|</button>
+  <div class="progress" id="progress" title="Jump to a step"><div id="bar"></div></div>
+  <span class="count" id="count"></span>
+  <label class="sub">Speed <select id="speed"><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
+  <label class="sub"><input type="checkbox" id="autoNext" checked> continue to next scenario</label>
+  <span class="sub"><kbd>space</kbd> play · <kbd>←</kbd><kbd>→</kbd> step · <kbd>N</kbd> narration · <kbd>T</kbd> theme</span>
+</footer>
+<script>
+window.WALKTHROUGH = {"title": "E-commerce platform", "subtitle": "The whole system in motion: architecture, browsing, carts, checkout and its failures, events, a flash sale", "nodes": [{"id": "cust", "label": "Customer", "kind": "client", "tech": "browser", "x": 130, "y": 80}, {"id": "edge", "label": "NGINX edge", "kind": "edge", "tech": "TLS · limits · cache", "x": 400, "y": 80}, {"id": "sf", "label": "storefront", "kind": "service", "tech": "SSR + BFF · Node", "x": 670, "y": 80}, {"id": "kc", "label": "Keycloak", "kind": "external", "tech": "OIDC · realm shop", "x": 940, "y": 80}, {"id": "gw", "label": "api-gateway", "kind": "edge", "tech": "JWT · rate limits · admission", "x": 400, "y": 240}, {"id": "cat", "label": "catalog-service", "kind": "service", "tech": "products · prices", "x": 670, "y": 240}, {"id": "srch", "label": "search-service", "kind": "service", "tech": "read model", "x": 940, "y": 240}, {"id": "cart", "label": "cart-service", "kind": "service", "tech": "carts", "x": 1210, "y": 240}, {"id": "rev", "label": "review-service", "kind": "service", "tech": "reviews · Cassandra", "x": 1480, "y": 240}, {"id": "kafka", "label": "Kafka", "kind": "queue", "tech": "domain events", "x": 130, "y": 400}, {"id": "ord", "label": "order-service", "kind": "service", "tech": "checkout saga", "x": 670, "y": 400}, {"id": "inv", "label": "inventory-service", "kind": "service", "tech": "stock · reservations", "x": 940, "y": 400}, {"id": "pay", "label": "payment-service", "kind": "service", "tech": "authorise · capture", "x": 1210, "y": 400}, {"id": "psp", "label": "Payment provider", "kind": "external", "tech": "cards, tokenised", "x": 1480, "y": 400}, {"id": "notif", "label": "notification-service", "kind": "service", "tech": "emails · Go", "x": 130, "y": 560}, {"id": "ana", "label": "analytics", "kind": "analytics", "tech": "ClickHouse", "x": 400, "y": 560}, {"id": "pg", "label": "PostgreSQL", "kind": "db", "tech": "one database per service", "x": 670, "y": 560}, {"id": "os", "label": "OpenSearch", "kind": "search", "tech": "products index", "x": 940, "y": 560}, {"id": "redis", "label": "Redis", "kind": "cache", "tech": "carts · cache · limits", "x": 1210, "y": 560}, {"id": "reco", "label": "recommendations", "kind": "service", "tech": "bought together · Python", "x": 1480, "y": 560}], "edges": [{"from": "cust", "to": "edge"}, {"from": "edge", "to": "sf"}, {"from": "edge", "to": "kc"}, {"from": "sf", "to": "gw"}, {"from": "edge", "to": "gw"}, {"from": "gw", "to": "cat"}, {"from": "gw", "to": "srch"}, {"from": "gw", "to": "cart"}, {"from": "gw", "to": "rev"}, {"from": "gw", "to": "ord"}, {"from": "ord", "to": "cart"}, {"from": "ord", "to": "inv"}, {"from": "ord", "to": "pay"}, {"from": "pay", "to": "psp"}, {"from": "cart", "to": "cat"}, {"from": "cat", "to": "pg"}, {"from": "ord", "to": "pg"}, {"from": "inv", "to": "pg"}, {"from": "pay", "to": "pg"}, {"from": "cart", "to": "redis"}, {"from": "cat", "to": "redis"}, {"from": "srch", "to": "os"}, {"from": "ord", "to": "kafka"}, {"from": "cat", "to": "kafka"}, {"from": "inv", "to": "kafka"}, {"from": "kafka", "to": "srch"}, {"from": "kafka", "to": "cart"}, {"from": "kafka", "to": "notif"}, {"from": "kafka", "to": "ana"}, {"from": "kafka", "to": "reco"}, {"from": "kafka", "to": "inv"}], "scenarios": [{"id": "tour", "title": "Architecture tour", "summary": "Edge, web, API, services, events, stores", "steps": [{"say": "Every request enters through the NGINX edge: TLS ends here, each address is rate-limited, and public assets are cached.", "active": ["cust", "edge"], "packets": [{"from": "cust", "to": "edge", "label": "HTTPS", "kind": "req"}]}, {"say": "Pages come from the storefront, which renders on the server and keeps the user's tokens in its own session store. Sign-in goes to Keycloak.", "active": ["edge", "sf", "kc"], "packets": [{"from": "edge", "to": "sf", "label": "pages", "kind": "req"}, {"from": "edge", "to": "kc", "label": "sign-in", "kind": "req"}]}, {"say": "API calls go through api-gateway: it validates the JWT, applies rate limits per user and per address, and protects hot products with admission control.", "active": ["sf", "gw"], "packets": [{"from": "sf", "to": "gw", "label": "/api/v1/…", "kind": "req"}]}, {"say": "Behind it, eleven services each own one part of the shop and their own data. None shares a database or a line of code with another.", "active": ["cat", "srch", "cart", "rev", "ord", "inv", "pay", "notif", "ana", "reco"]}, {"say": "Only checkout calls other services synchronously: order-service runs the saga across cart, inventory and payment. Everything else learns about changes from events.", "active": ["ord", "cart", "inv", "pay"], "packets": [{"from": "ord", "to": "inv", "label": "reserve", "kind": "req"}, {"from": "ord", "to": "pay", "label": "authorise", "kind": "req"}]}, {"say": "Events go through Kafka, written first to an outbox table in the same transaction as the change, so an event is published if and only if the change committed.", "active": ["ord", "cat", "inv", "kafka"], "packets": [{"from": "ord", "to": "kafka", "label": "order.events", "kind": "event"}, {"from": "cat", "to": "kafka", "label": "catalog.events", "kind": "event"}]}, {"say": "Each store fits its job: PostgreSQL for orders, stock, payments and the catalogue; Redis for carts and caches; OpenSearch for search; Cassandra for reviews; ClickHouse for analytics.", "active": ["pg", "redis", "os", "rev", "ana"], "ok": ["pg", "redis", "os"]}]}, {"id": "browse", "title": "Browse and search", "summary": "Cached product pages, search from a read model", "steps": [{"say": "Ada opens a product page. The edge serves anonymous public pages from its cache when it can.", "active": ["cust", "edge"], "packets": [{"from": "cust", "to": "edge", "label": "GET /products/trail-shoe", "kind": "req"}]}, {"say": "On a miss the storefront asks the API for the product. catalog-service looks in Redis first: a cache hit never touches PostgreSQL.", "active": ["sf", "gw", "cat", "redis"], "packets": [{"from": "sf", "to": "gw", "label": "GET /api/v1/products/id", "kind": "req"}, {"from": "gw", "to": "cat", "label": "GET", "kind": "req"}, {"from": "cat", "to": "redis", "label": "GET product:id", "kind": "req"}]}, {"say": "On a cache miss it reads PostgreSQL and stores the result in Redis for 10 minutes.", "active": ["cat", "pg", "redis"], "packets": [{"from": "cat", "to": "pg", "label": "SELECT product", "kind": "req"}, {"from": "cat", "to": "redis", "label": "SET 10 min", "kind": "req"}]}, {"say": "Ada searches for trail shoes. search-service answers from OpenSearch, a read model shaped for search: full text, filters by brand and price, facets and cursor pages.", "active": ["gw", "srch", "os"], "packets": [{"from": "gw", "to": "srch", "label": "GET /api/v1/search?q=trail", "kind": "req"}, {"from": "srch", "to": "os", "label": "query", "kind": "req"}]}, {"say": "Both answers come back well inside their budgets: 150 ms for a product page, 300 ms for a search, at the 99th percentile.", "active": ["cust"], "packets": [{"from": "gw", "to": "sf", "label": "200 OK", "kind": "res"}, {"from": "sf", "to": "cust", "label": "page", "kind": "res"}], "ok": ["cat", "srch"]}]}, {"id": "cart", "title": "Add to cart", "summary": "Guest cart, prices from catalog, merge at sign-in", "steps": [{"say": "Ada is not signed in yet. The storefront gives her a random guest cookie and sends it to the API as a guest id.", "active": ["cust", "sf"], "packets": [{"from": "cust", "to": "sf", "label": "Add to cart", "kind": "req"}]}, {"say": "The gateway checks the per-SKU admission limit, then cart-service adds the line to her cart in Redis.", "active": ["gw", "cart", "redis"], "packets": [{"from": "sf", "to": "gw", "label": "PUT /api/v1/cart/items/sku", "kind": "req"}, {"from": "gw", "to": "cart", "label": "PUT", "kind": "req"}, {"from": "cart", "to": "redis", "label": "HSET cart:guest", "kind": "req"}]}, {"say": "To show the cart, cart-service fetches current prices from catalog-service for the SKUs it has not cached in the last 30 seconds.", "active": ["cart", "cat"], "packets": [{"from": "cart", "to": "cat", "label": "prices by SKU", "kind": "req"}]}, {"say": "Ada signs in through Keycloak. The storefront starts a new session and merges the guest cart into her account's cart, then clears the guest cookie.", "active": ["sf", "kc", "cart"], "packets": [{"from": "sf", "to": "kc", "label": "code + PKCE", "kind": "req"}, {"from": "sf", "to": "gw", "label": "POST /api/v1/cart/merge", "kind": "req"}], "ok": ["cart"]}]}, {"id": "checkout", "title": "Checkout that succeeds", "summary": "Reserve, authorise, commit, capture, confirm", "steps": [{"say": "Ada presses Place order. The storefront adds the idempotency key it created when the checkout page opened, and her access token from the server-side session. The browser never sees the token.", "active": ["cust", "edge", "sf"], "packets": [{"from": "cust", "to": "edge", "label": "POST /checkout", "kind": "req"}, {"from": "edge", "to": "sf", "label": "POST /checkout", "kind": "req"}]}, {"say": "The gateway checks the token's signature, issuer and audience, applies her per-user checkout limit, and routes to order-service.", "active": ["sf", "gw", "ord"], "packets": [{"from": "sf", "to": "gw", "label": "POST /api/v1/orders · key", "kind": "req"}, {"from": "gw", "to": "ord", "label": "place order", "kind": "req"}]}, {"say": "order-service stores the key and a PENDING order in one transaction, then asks cart-service for a snapshot of the cart with prices. It never trusts prices sent by a client.", "active": ["ord", "pg", "cart"], "packets": [{"from": "ord", "to": "pg", "label": "INSERT order PENDING", "kind": "req"}, {"from": "ord", "to": "cart", "label": "GET checkout-snapshot", "kind": "req"}]}, {"say": "inventory-service reserves the stock with one conditional update per line, so two buyers can never take the last pair.", "active": ["ord", "inv", "pg"], "packets": [{"from": "ord", "to": "inv", "label": "POST /internal/reservations", "kind": "req"}, {"from": "inv", "to": "pg", "label": "UPDATE … WHERE available >= qty", "kind": "req"}], "badges": [{"node": "inv", "text": "reserved", "tone": "ok"}]}, {"say": "payment-service asks the provider to authorise the card token. The platform never sees a card number.", "active": ["ord", "pay", "psp"], "packets": [{"from": "ord", "to": "pay", "label": "authorise", "kind": "req"}, {"from": "pay", "to": "psp", "label": "authorise token", "kind": "req"}], "badges": [{"node": "pay", "text": "authorised", "tone": "ok"}]}, {"say": "order-service commits the reservation and captures the payment. Each step is saved before the next, so a crash resumes where it stopped.", "active": ["ord", "inv", "pay"], "packets": [{"from": "ord", "to": "inv", "label": "commit", "kind": "req"}, {"from": "ord", "to": "pay", "label": "capture", "kind": "req"}]}, {"say": "The order becomes CONFIRMED, and an OrderConfirmed event is written to the outbox in the same transaction.", "active": ["ord", "pg"], "packets": [{"from": "ord", "to": "pg", "label": "UPDATE CONFIRMED + outbox", "kind": "req"}], "ok": ["ord"]}, {"say": "Ada gets 201 Created. A double-click or retry with the same key returns this same order and calls nothing again.", "active": ["cust"], "packets": [{"from": "ord", "to": "gw", "label": "201 Created", "kind": "res"}, {"from": "sf", "to": "cust", "label": "Order placed", "kind": "res"}], "ok": ["ord", "inv", "pay"]}]}, {"id": "oos", "title": "Out of stock", "summary": "The reservation fails; nothing is charged", "steps": [{"say": "Ada presses Place order. The storefront adds the idempotency key it created when the checkout page opened, and her access token from the server-side session. The browser never sees the token.", "active": ["cust", "edge", "sf"], "packets": [{"from": "cust", "to": "edge", "label": "POST /checkout", "kind": "req"}, {"from": "edge", "to": "sf", "label": "POST /checkout", "kind": "req"}]}, {"say": "The gateway checks the token's signature, issuer and audience, applies her per-user checkout limit, and routes to order-service.", "active": ["sf", "gw", "ord"], "packets": [{"from": "sf", "to": "gw", "label": "POST /api/v1/orders · key", "kind": "req"}, {"from": "gw", "to": "ord", "label": "place order", "kind": "req"}]}, {"say": "order-service stores the key and a PENDING order in one transaction, then asks cart-service for a snapshot of the cart with prices. It never trusts prices sent by a client.", "active": ["ord", "pg", "cart"], "packets": [{"from": "ord", "to": "pg", "label": "INSERT order PENDING", "kind": "req"}, {"from": "ord", "to": "cart", "label": "GET checkout-snapshot", "kind": "req"}]}, {"say": "inventory-service cannot reserve one of the lines: someone bought the last pair a moment ago.", "active": ["ord", "inv"], "packets": [{"from": "ord", "to": "inv", "label": "reserve", "kind": "req"}, {"from": "inv", "to": "ord", "label": "OUT_OF_STOCK", "kind": "error"}], "bad": ["inv"]}, {"say": "order-service cancels the order with reason OUT_OF_STOCK. Payment is never called, so nothing is authorised.", "active": ["ord", "pg"], "packets": [{"from": "ord", "to": "pg", "label": "UPDATE CANCELLED", "kind": "req"}], "dim": ["pay", "psp"], "badges": [{"node": "ord", "text": "cancelled", "tone": "warn"}]}, {"say": "Ada gets 409 Conflict naming the SKU, and the storefront shows which item to remove.", "active": ["cust"], "packets": [{"from": "ord", "to": "gw", "label": "409 OUT_OF_STOCK", "kind": "error"}, {"from": "sf", "to": "cust", "label": "Item sold out", "kind": "res"}]}]}, {"id": "declined", "title": "Payment declined", "summary": "Release the stock, cancel, tell the customer", "steps": [{"say": "Ada presses Place order. The storefront adds the idempotency key it created when the checkout page opened, and her access token from the server-side session. The browser never sees the token.", "active": ["cust", "edge", "sf"], "packets": [{"from": "cust", "to": "edge", "label": "POST /checkout", "kind": "req"}, {"from": "edge", "to": "sf", "label": "POST /checkout", "kind": "req"}]}, {"say": "The gateway checks the token's signature, issuer and audience, applies her per-user checkout limit, and routes to order-service.", "active": ["sf", "gw", "ord"], "packets": [{"from": "sf", "to": "gw", "label": "POST /api/v1/orders · key", "kind": "req"}, {"from": "gw", "to": "ord", "label": "place order", "kind": "req"}]}, {"say": "order-service stores the key and a PENDING order in one transaction, then asks cart-service for a snapshot of the cart with prices. It never trusts prices sent by a client.", "active": ["ord", "pg", "cart"], "packets": [{"from": "ord", "to": "pg", "label": "INSERT order PENDING", "kind": "req"}, {"from": "ord", "to": "cart", "label": "GET checkout-snapshot", "kind": "req"}]}, {"say": "Stock is reserved.", "active": ["ord", "inv"], "packets": [{"from": "ord", "to": "inv", "label": "reserve", "kind": "req"}], "badges": [{"node": "inv", "text": "reserved", "tone": "ok"}]}, {"say": "The provider declines the card.", "active": ["pay", "psp"], "packets": [{"from": "ord", "to": "pay", "label": "authorise", "kind": "req"}, {"from": "psp", "to": "pay", "label": "declined", "kind": "error"}], "bad": ["pay"]}, {"say": "order-service compensates: it releases the reservation so the stock is available to others, and cancels the order with reason PAYMENT_DECLINED.", "active": ["ord", "inv"], "packets": [{"from": "ord", "to": "inv", "label": "release", "kind": "req"}], "badges": [{"node": "ord", "text": "compensated", "tone": "warn"}]}, {"say": "Ada gets 402 Payment Required and can try another card. The new attempt is a new checkout with a new key.", "active": ["cust"], "packets": [{"from": "ord", "to": "gw", "label": "402 PAYMENT_DECLINED", "kind": "error"}, {"from": "sf", "to": "cust", "label": "Card declined", "kind": "res"}]}]}, {"id": "timeout", "title": "Payment timeout", "summary": "Outcome unknown: void, release, reconcile", "steps": [{"say": "Ada presses Place order. The storefront adds the idempotency key it created when the checkout page opened, and her access token from the server-side session. The browser never sees the token.", "active": ["cust", "edge", "sf"], "packets": [{"from": "cust", "to": "edge", "label": "POST /checkout", "kind": "req"}, {"from": "edge", "to": "sf", "label": "POST /checkout", "kind": "req"}]}, {"say": "The gateway checks the token's signature, issuer and audience, applies her per-user checkout limit, and routes to order-service.", "active": ["sf", "gw", "ord"], "packets": [{"from": "sf", "to": "gw", "label": "POST /api/v1/orders · key", "kind": "req"}, {"from": "gw", "to": "ord", "label": "place order", "kind": "req"}]}, {"say": "order-service stores the key and a PENDING order in one transaction, then asks cart-service for a snapshot of the cart with prices. It never trusts prices sent by a client.", "active": ["ord", "pg", "cart"], "packets": [{"from": "ord", "to": "pg", "label": "INSERT order PENDING", "kind": "req"}, {"from": "ord", "to": "cart", "label": "GET checkout-snapshot", "kind": "req"}]}, {"say": "Stock is reserved and the authorisation is sent, but the provider does not answer in time.", "active": ["ord", "pay", "psp"], "packets": [{"from": "ord", "to": "pay", "label": "authorise", "kind": "req"}, {"from": "pay", "to": "psp", "label": "…", "kind": "error"}], "bad": ["psp"]}, {"say": "order-service cannot know whether the card was charged. It voids the authorisation to be safe and releases the stock.", "active": ["ord", "pay", "inv"], "packets": [{"from": "ord", "to": "pay", "label": "void", "kind": "req"}, {"from": "ord", "to": "inv", "label": "release", "kind": "req"}], "badges": [{"node": "ord", "text": "unknown", "tone": "warn"}]}, {"say": "The order is cancelled with reason PAYMENT_UNKNOWN. Ada gets 504 and is told she will not be charged.", "active": ["cust"], "packets": [{"from": "ord", "to": "gw", "label": "504 PAYMENT_UNKNOWN", "kind": "error"}, {"from": "sf", "to": "cust", "label": "You were not charged", "kind": "res"}]}, {"say": "payment-service's reconciler later asks the provider what really happened and refunds any charge that went through. An alert fires if timeouts keep happening.", "active": ["pay", "psp"], "packets": [{"from": "pay", "to": "psp", "label": "status?", "kind": "req"}, {"from": "pay", "to": "psp", "label": "refund", "kind": "req"}], "ok": ["pay"]}]}, {"id": "cancel", "title": "Cancellation and refund", "summary": "Refund, return stock, cancel, notify", "steps": [{"say": "Ada cancels a confirmed order from her order page.", "active": ["cust", "sf", "gw"], "packets": [{"from": "cust", "to": "sf", "label": "Cancel order", "kind": "req"}, {"from": "sf", "to": "gw", "label": "POST /api/v1/orders/id/cancel", "kind": "req"}]}, {"say": "order-service checks that the order is hers. Someone else's order answers 404, so ids cannot be probed. The order moves to CANCELLING.", "active": ["ord", "pg"], "packets": [{"from": "gw", "to": "ord", "label": "cancel", "kind": "req"}, {"from": "ord", "to": "pg", "label": "UPDATE CANCELLING", "kind": "req"}]}, {"say": "It refunds the payment and returns the stock. If either fails, the order stays CANCELLING and saga recovery retries every 15 seconds.", "active": ["ord", "pay", "inv"], "packets": [{"from": "ord", "to": "pay", "label": "refund", "kind": "req"}, {"from": "ord", "to": "inv", "label": "return stock", "kind": "req"}]}, {"say": "The order becomes CANCELLED and OrderCancelled is published. notification-service emails Ada; inventory releases anything still held, as a safety net.", "active": ["ord", "kafka", "notif", "inv"], "packets": [{"from": "ord", "to": "kafka", "label": "OrderCancelled", "kind": "event"}, {"from": "kafka", "to": "notif", "label": "email", "kind": "event"}, {"from": "kafka", "to": "inv", "label": "release", "kind": "event"}], "ok": ["ord"]}]}, {"id": "fanout", "title": "Event fan-out", "summary": "One order, many consumers, exactly-once effects", "steps": [{"say": "A confirmed order leaves an OrderConfirmed row in order-service's outbox. The relay sends it to Kafka within about 100 ms and marks only what Kafka acknowledged.", "active": ["ord", "pg", "kafka"], "packets": [{"from": "ord", "to": "kafka", "label": "order.events", "kind": "event"}]}, {"say": "The relay sends inside the request's trace, so the trace that began with Ada's click continues into every consumer.", "active": ["ord", "kafka"], "badges": [{"node": "kafka", "text": "traceparent", "tone": "ok"}]}, {"say": "cart-service clears Ada's cart; notification-service sends her confirmation email through RabbitMQ.", "active": ["kafka", "cart", "notif"], "packets": [{"from": "kafka", "to": "cart", "label": "clear cart", "kind": "event"}, {"from": "kafka", "to": "notif", "label": "send email", "kind": "event"}]}, {"say": "recommendation-service learns which products are bought together; analytics loads the order into ClickHouse.", "active": ["kafka", "reco", "ana"], "packets": [{"from": "kafka", "to": "reco", "label": "pairs", "kind": "event"}, {"from": "kafka", "to": "ana", "label": "load", "kind": "event"}]}, {"say": "Kafka may deliver an event twice. Each consumer records the event id it has processed, so a duplicate changes nothing and no email goes out twice.", "active": ["cart", "notif", "reco", "ana"], "ok": ["cart", "notif", "reco", "ana"]}, {"say": "An event that fails five times is parked in order.events.dlq for an operator, instead of blocking every event behind it.", "active": ["kafka"], "badges": [{"node": "kafka", "text": "dlq", "tone": "warn"}]}]}, {"id": "flash", "title": "Flash sale", "summary": "Admission control protects checkout", "steps": [{"say": "A limited shoe goes on sale. Thousands of shoppers press Add to cart in the same second.", "active": ["cust", "edge", "gw"], "packets": [{"from": "cust", "to": "edge", "label": "× 5,000", "kind": "req"}, {"from": "edge", "to": "gw", "label": "PUT cart/items/hot-sku", "kind": "req"}]}, {"say": "The gateway admits at most 200 requests a second for that SKU (bursts up to 400), counted in Redis across all gateway pods.", "active": ["gw", "redis"], "packets": [{"from": "gw", "to": "redis", "label": "token bucket per SKU", "kind": "req"}], "badges": [{"node": "gw", "text": "admission", "tone": "warn"}]}, {"say": "The rest get 429 Too Many Requests at once, with Retry-After. They fail fast instead of piling up behind the database.", "active": ["cust"], "packets": [{"from": "gw", "to": "cust", "label": "429 Retry-After", "kind": "error"}]}, {"say": "Admitted checkouts reserve stock with conditional updates, so the shoe can never be oversold. When stock reaches zero, the answer is OUT_OF_STOCK.", "active": ["ord", "inv", "pg"], "packets": [{"from": "ord", "to": "inv", "label": "reserve", "kind": "req"}, {"from": "inv", "to": "pg", "label": "UPDATE … WHERE available >= qty", "kind": "req"}]}, {"say": "Every other product keeps selling normally: the limit applies to one SKU, not to the shop.", "active": ["cat", "cart", "srch"], "ok": ["cat", "cart", "srch", "ord"]}]}, {"id": "failure", "title": "A dependency fails", "summary": "Degrade, do not fall over", "steps": [{"say": "OpenSearch goes down. search-service cannot answer, and its circuit breaker at the gateway opens.", "active": ["srch", "os"], "bad": ["os", "srch"]}, {"say": "Searches get a fast 503 from the gateway's fallback: Search is temporarily unavailable, product pages still work.", "active": ["gw", "cust"], "packets": [{"from": "gw", "to": "cust", "label": "503 SEARCH_UNAVAILABLE", "kind": "error"}]}, {"say": "Browsing, carts and checkout do not touch OpenSearch, so they carry on.", "active": ["cat", "cart", "ord"], "ok": ["cat", "cart", "ord", "inv", "pay"]}, {"say": "Products changed meanwhile are not lost: their events wait in Kafka. When OpenSearch returns, search-service catches up from where it stopped.", "active": ["kafka", "srch", "os"], "packets": [{"from": "kafka", "to": "srch", "label": "catalog.events", "kind": "event"}, {"from": "srch", "to": "os", "label": "upsert", "kind": "req"}], "ok": ["os", "srch"]}, {"say": "The same pattern holds elsewhere: if catalog is down, the cart shows prices pending; if Redis is down, catalog reads PostgreSQL; if Kafka is down, outboxes hold the events until it is back.", "active": ["cart", "cat", "redis", "kafka"], "ok": ["cart", "cat"]}]}]};
+</script>
+<script>
+/*
+ * Walkthrough engine: animates a system diagram step by step.
+ * Data (window.WALKTHROUGH) = { title, subtitle, nodes[], edges[], scenarios[] }
+ *   node:     { id, label, kind, tech, x, y }          kind: client | edge | service | db | cache | queue | search | external | job
+ *   edge:     { from, to, dashed }
+ *   scenario: { id, title, summary, steps[] }
+ *   step:     { say, active[], ok[], bad[], dim[], packets[{from, to, label, kind}], state{title, rows{}}, log, badges[{node, text, tone}] }
+ *             packet kind: req | res | event | error
+ * Narration uses the Web Speech API (a female voice, preferring "Amy"); it is optional and remembered per browser.
+ */
+(function () {
+  'use strict';
+  const W = window.WALKTHROUGH;
+  const $ = s => document.querySelector(s);
+  const NS = 'http://www.w3.org/2000/svg';
+  const ICONS = { client: '👤', edge: '🛡', service: '⚙', db: '🛢', cache: '⚡', queue: '📨', search: '🔎', external: '🌐', job: '⏱', analytics: '📊', storage: '🗂' };
+  const NODE_W = 228, NODE_H = 78;
+  const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
+
+  const state = { scenario: 0, step: -1, playing: false, speed: +(store('wt-speed') || 1), narrate: store('wt-narrate') === 'on', timer: null, anim: [], prevRows: {} };
+  const nodesById = Object.fromEntries(W.nodes.map(n => [n.id, n]));
+
+  // ---------- diagram ----------
+  const svg = document.createElementNS(NS, 'svg');
+  const maxX = Math.max(...W.nodes.map(n => n.x)) + NODE_W / 2 + 20, maxY = Math.max(...W.nodes.map(n => n.y)) + NODE_H / 2 + 30;
+  svg.setAttribute('viewBox', `0 0 ${maxX} ${maxY}`);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', W.title + ' architecture diagram');
+  const gEdges = el('g'), gNodes = el('g'), gPkts = el('g');
+  svg.append(gEdges, gNodes, gPkts);
+  $('#stage').append(svg);
+
+  function el(tag, attrs = {}, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  const edgeEls = {};
+  for (const e of W.edges || []) {
+    const a = nodesById[e.from], b = nodesById[e.to];
+    if (!a || !b) { console.error('edge with unknown node', e); continue; }
+    const line = el('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'edge' + (e.dashed ? ' dashed' : '') });
+    gEdges.append(line);
+    edgeEls[e.from + '>' + e.to] = edgeEls[e.to + '>' + e.from] = line;
+  }
+  const nodeEls = {};
+  for (const n of W.nodes) {
+    const g = el('g', { class: 'node', transform: `translate(${n.x - NODE_W / 2},${n.y - NODE_H / 2})` });
+    g.append(el('rect', { width: NODE_W, height: NODE_H, rx: n.kind === 'db' || n.kind === 'cache' ? 18 : 12 }));
+    g.append(el("text", { x: 16, y: 48, class: "icon" }, ICONS[n.kind] || "■"));
+    g.append(el("text", { x: 56, y: 34 }, n.label));
+    if (n.tech) g.append(el("text", { x: 56, y: 57, class: "tech" }, n.tech));
+    const title = el('title', {}, `${n.label}${n.tech ? ' — ' + n.tech : ''}`);
+    g.append(title);
+    gNodes.append(g);
+    nodeEls[n.id] = g;
+  }
+
+  // ---------- scenario list ----------
+  W.scenarios.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.className = 'scn';
+    b.innerHTML = `${i + 1}. ${esc(s.title)}<small>${esc(s.summary || '')}</small>`;
+    b.onclick = () => { pause(); select(i); };
+    $('#scenarios').append(b);
+  });
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+  // ---------- rendering a step ----------
+  function scenario() { return W.scenarios[state.scenario]; }
+
+  function select(i) {
+    state.scenario = i;
+    state.step = -1;
+    state.prevRows = {};
+    document.querySelectorAll('.scn').forEach((b, j) => b.classList.toggle('on', j === i));
+    $('#log').innerHTML = '';
+    show(0);
+  }
+
+  function show(i) {
+    const steps = scenario().steps;
+    i = Math.max(0, Math.min(steps.length - 1, i));
+    if (i < state.step) {           // going back: rebuild the log up to this step
+      $('#log').innerHTML = '';
+      state.prevRows = {};
+      for (let k = 0; k < i; k++) appendLog(steps[k]);
+    }
+    state.step = i;
+    const st = steps[i];
+    clearAnimations();
+    for (const [id, g] of Object.entries(nodeEls)) {
+      g.classList.toggle('active', (st.active || []).includes(id));
+      g.classList.toggle('ok', (st.ok || []).includes(id));
+      g.classList.toggle('bad', (st.bad || []).includes(id));
+      g.classList.toggle('dim', (st.dim || []).includes(id));
+      g.querySelectorAll('.badge').forEach(b => b.remove());
+    }
+    Object.values(edgeEls).forEach(l => l.classList.remove('hot'));
+    for (const b of st.badges || []) badge(b);
+    $('#say').textContent = st.say;
+    renderState(currentState(steps, i));
+    appendLog(st);
+    $('#count').textContent = `Step ${i + 1} / ${steps.length}`;
+    $('#bar').style.width = `${((i + 1) / steps.length) * 100}%`;
+    animatePackets(st.packets || []);
+    speak(st.say);
+    if (state.playing) schedule();
+  }
+
+  function badge({ node, text, tone }) {
+    const g = nodeEls[node];
+    if (!g) return;
+    const color = { ok: 'var(--res)', bad: 'var(--err)', warn: 'var(--evt)' }[tone] || 'var(--accent)';
+    const w = Math.max(34, text.length * 8.5 + 18);
+    const b = el('g', { class: 'badge', transform: `translate(${NODE_W - w + 8},-10)` });
+    b.append(el('rect', { width: w, height: 24, rx: 12, style: `fill:${color}` }), el('text', { x: w / 2, y: 17, 'text-anchor': 'middle' }, text));
+    g.append(b);
+  }
+
+  // the most recent state at or before step i, so the panel keeps showing the latest known values
+  function currentState(steps, i) {
+    for (let k = i; k >= 0; k--) if (steps[k].state) return steps[k].state;
+    return null;
+  }
+
+  function renderState(s) {
+    const box = $('#state'), card = box.closest('.card');
+    if (!s) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    $('#stateTitle').textContent = s.title || 'State';
+    box.innerHTML = Object.entries(s.rows || {}).map(([k, v]) => {
+      const changed = state.prevRows[k] !== undefined && state.prevRows[k] !== String(v);
+      return `<tr class="${changed ? 'changed' : ''}"><td>${esc(k)}</td><td>${esc(v)}</td></tr>`;
+    }).join('');
+    state.prevRows = Object.fromEntries(Object.entries(s.rows || {}).map(([k, v]) => [k, String(v)]));
+  }
+
+  function appendLog(st) {
+    const lines = [];
+    for (const p of st.packets || []) lines.push([p.kind || 'req', `${nodesById[p.from]?.label} → ${nodesById[p.to]?.label}: ${p.label}`]);
+    if (st.log) lines.push(['', st.log]);
+    for (const [cls, text] of lines) {
+      const li = document.createElement('li');
+      li.className = cls;
+      li.textContent = text;
+      $('#log').append(li);
+    }
+    $('#log').scrollTop = $('#log').scrollHeight;
+  }
+
+  // ---------- packets ----------
+  function clearAnimations() { state.anim.forEach(cancelAnimationFrame); state.anim = []; gPkts.innerHTML = ''; }
+
+  function animatePackets(packets) {
+    const dur = 900 / state.speed;
+    packets.forEach((p, k) => {
+      const a = nodesById[p.from], b = nodesById[p.to];
+      if (!a || !b) { console.error('packet with unknown node', p); return; }
+      const line = edgeEls[p.from + '>' + p.to];
+      if (line) line.classList.add('hot');
+      const color = { req: 'var(--req)', res: 'var(--res)', event: 'var(--evt)', error: 'var(--err)' }[p.kind || 'req'];
+      const g = el('g', { class: 'pkt', opacity: 0 });
+      g.append(el('circle', { r: 10, style: `fill:${color}` }), el('text', { x: 14, y: -12 }, p.label));
+      gPkts.append(g);
+      const start = performance.now() + k * dur * 0.6;
+      const frame = now => {
+        const t = Math.min(1, Math.max(0, (now - start) / dur));
+        const e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        g.setAttribute('transform', `translate(${a.x + (b.x - a.x) * e},${a.y + (b.y - a.y) * e})`);
+        g.setAttribute('opacity', now < start ? 0 : 1);
+        if (t < 1) state.anim.push(requestAnimationFrame(frame));
+      };
+      state.anim.push(requestAnimationFrame(frame));
+    });
+  }
+
+  // ---------- narration ----------
+  let voice = null;
+  function pickVoice() {
+    const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang));
+    const female = /(amy|samantha|karen|serena|victoria|moira|tessa|fiona|zira|aria|jenny|libby|sonia|natasha|hazel|susan|female)/i;
+    voice = vs.find(v => /amy/i.test(v.name)) || vs.find(v => female.test(v.name)) || vs[0] || null;
+  }
+  if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+  let speaking = false;
+  function speak(text) {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    speaking = false;
+    if (!state.narrate) return;
+    const u = new SpeechSynthesisUtterance(text);
+    if (voice) u.voice = voice;
+    u.rate = Math.min(1.6, 0.95 * state.speed);
+    u.onend = () => { speaking = false; if (state.playing) schedule(true); };
+    speaking = true;
+    speechSynthesis.speak(u);
+  }
+
+  function setNarration(on) {
+    state.narrate = on;
+    store('wt-narrate', on ? 'on' : 'off');
+    const b = $('#narrate');
+    b.classList.toggle('on', on);
+    b.textContent = on ? '🔊 Narration on' : '🔇 Narration off';
+    b.setAttribute('aria-pressed', on);
+    if (on) speak($('#say').textContent); else if ('speechSynthesis' in window) speechSynthesis.cancel();
+  }
+
+  // ---------- playback ----------
+  function schedule(afterSpeech) {
+    clearTimeout(state.timer);
+    if (state.narrate && speaking && !afterSpeech) return;     // wait for the sentence to finish
+    const delay = state.narrate ? 600 : Math.max(1800, 2600 / state.speed);
+    state.timer = setTimeout(next, delay);
+  }
+
+  function next() {
+    const steps = scenario().steps;
+    if (state.step < steps.length - 1) show(state.step + 1);
+    else if (state.scenario < W.scenarios.length - 1 && $('#autoNext').checked) select(state.scenario + 1);
+    else pause();
+  }
+
+  function play() { state.playing = true; $('#play').textContent = '⏸ Pause'; schedule(); }
+  function pause() { state.playing = false; clearTimeout(state.timer); $('#play').textContent = '▶ Play'; }
+
+  $('#play').onclick = () => (state.playing ? pause() : play());
+  $('#prev').onclick = () => { pause(); show(state.step - 1); };
+  $('#next').onclick = () => { pause(); show(state.step + 1); };
+  $('#restart').onclick = () => { pause(); select(state.scenario); };
+  $('#narrate').onclick = () => setNarration(!state.narrate);
+  $('#speed').value = String(state.speed);
+  $('#speed').onchange = e => { state.speed = +e.target.value; store('wt-speed', state.speed); };
+  $('#progress').onclick = e => {
+    const r = e.currentTarget.getBoundingClientRect();
+    pause();
+    show(Math.floor(((e.clientX - r.left) / r.width) * scenario().steps.length));
+  };
+
+  // ---------- themes ----------
+  function setTheme(t) {
+    document.documentElement.dataset.theme = t;
+    store('sd-theme', t);
+    document.querySelectorAll('[data-set-theme]').forEach(b => b.classList.toggle('on', b.dataset.setTheme === t));
+  }
+  document.querySelectorAll('[data-set-theme]').forEach(b => (b.onclick = () => setTheme(b.dataset.setTheme)));
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+    if (e.key === ' ') { e.preventDefault(); state.playing ? pause() : play(); }
+    else if (e.key === 'ArrowRight') { pause(); show(state.step + 1); }
+    else if (e.key === 'ArrowLeft') { pause(); show(state.step - 1); }
+    else if (e.key.toLowerCase() === 'n') setNarration(!state.narrate);
+    else if (e.key.toLowerCase() === 't') {
+      const order = ['light', 'medium', 'dark'];
+      setTheme(order[(order.indexOf(document.documentElement.dataset.theme) + 1) % 3]);
+    }
+  });
+
+  // ---------- start ----------
+  $('#title').textContent = W.title;
+  $('#subtitle').textContent = W.subtitle || '';
+  document.title = W.title + ' — walkthrough';
+  setTheme(store('sd-theme') || 'dark');
+  setNarration(state.narrate);
+  const hash = location.hash.replace('#', '');
+  const start = Math.max(0, W.scenarios.findIndex(s => s.id === hash));
+  select(start);
+
+  // test hook: lets automated checks walk every step
+  window.__walkthrough = { scenarios: W.scenarios.length, steps: i => W.scenarios[i].steps.length, select, show };
+})();
+
+</script>
+</body>
+</html>

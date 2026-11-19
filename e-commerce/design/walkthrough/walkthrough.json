@@ -1,0 +1,1710 @@
+{
+ "title": "E-commerce platform",
+ "subtitle": "The whole system in motion: architecture, browsing, carts, checkout and its failures, events, a flash sale",
+ "nodes": [
+  {
+   "id": "cust",
+   "label": "Customer",
+   "kind": "client",
+   "tech": "browser",
+   "x": 130,
+   "y": 80
+  },
+  {
+   "id": "edge",
+   "label": "NGINX edge",
+   "kind": "edge",
+   "tech": "TLS · limits · cache",
+   "x": 400,
+   "y": 80
+  },
+  {
+   "id": "sf",
+   "label": "storefront",
+   "kind": "service",
+   "tech": "SSR + BFF · Node",
+   "x": 670,
+   "y": 80
+  },
+  {
+   "id": "kc",
+   "label": "Keycloak",
+   "kind": "external",
+   "tech": "OIDC · realm shop",
+   "x": 940,
+   "y": 80
+  },
+  {
+   "id": "gw",
+   "label": "api-gateway",
+   "kind": "edge",
+   "tech": "JWT · rate limits · admission",
+   "x": 400,
+   "y": 240
+  },
+  {
+   "id": "cat",
+   "label": "catalog-service",
+   "kind": "service",
+   "tech": "products · prices",
+   "x": 670,
+   "y": 240
+  },
+  {
+   "id": "srch",
+   "label": "search-service",
+   "kind": "service",
+   "tech": "read model",
+   "x": 940,
+   "y": 240
+  },
+  {
+   "id": "cart",
+   "label": "cart-service",
+   "kind": "service",
+   "tech": "carts",
+   "x": 1210,
+   "y": 240
+  },
+  {
+   "id": "rev",
+   "label": "review-service",
+   "kind": "service",
+   "tech": "reviews · Cassandra",
+   "x": 1480,
+   "y": 240
+  },
+  {
+   "id": "kafka",
+   "label": "Kafka",
+   "kind": "queue",
+   "tech": "domain events",
+   "x": 130,
+   "y": 400
+  },
+  {
+   "id": "ord",
+   "label": "order-service",
+   "kind": "service",
+   "tech": "checkout saga",
+   "x": 670,
+   "y": 400
+  },
+  {
+   "id": "inv",
+   "label": "inventory-service",
+   "kind": "service",
+   "tech": "stock · reservations",
+   "x": 940,
+   "y": 400
+  },
+  {
+   "id": "pay",
+   "label": "payment-service",
+   "kind": "service",
+   "tech": "authorise · capture",
+   "x": 1210,
+   "y": 400
+  },
+  {
+   "id": "psp",
+   "label": "Payment provider",
+   "kind": "external",
+   "tech": "cards, tokenised",
+   "x": 1480,
+   "y": 400
+  },
+  {
+   "id": "notif",
+   "label": "notification-service",
+   "kind": "service",
+   "tech": "emails · Go",
+   "x": 130,
+   "y": 560
+  },
+  {
+   "id": "ana",
+   "label": "analytics",
+   "kind": "analytics",
+   "tech": "ClickHouse",
+   "x": 400,
+   "y": 560
+  },
+  {
+   "id": "pg",
+   "label": "PostgreSQL",
+   "kind": "db",
+   "tech": "one database per service",
+   "x": 670,
+   "y": 560
+  },
+  {
+   "id": "os",
+   "label": "OpenSearch",
+   "kind": "search",
+   "tech": "products index",
+   "x": 940,
+   "y": 560
+  },
+  {
+   "id": "redis",
+   "label": "Redis",
+   "kind": "cache",
+   "tech": "carts · cache · limits",
+   "x": 1210,
+   "y": 560
+  },
+  {
+   "id": "reco",
+   "label": "recommendations",
+   "kind": "service",
+   "tech": "bought together · Python",
+   "x": 1480,
+   "y": 560
+  }
+ ],
+ "edges": [
+  {
+   "from": "cust",
+   "to": "edge"
+  },
+  {
+   "from": "edge",
+   "to": "sf"
+  },
+  {
+   "from": "edge",
+   "to": "kc"
+  },
+  {
+   "from": "sf",
+   "to": "gw"
+  },
+  {
+   "from": "edge",
+   "to": "gw"
+  },
+  {
+   "from": "gw",
+   "to": "cat"
+  },
+  {
+   "from": "gw",
+   "to": "srch"
+  },
+  {
+   "from": "gw",
+   "to": "cart"
+  },
+  {
+   "from": "gw",
+   "to": "rev"
+  },
+  {
+   "from": "gw",
+   "to": "ord"
+  },
+  {
+   "from": "ord",
+   "to": "cart"
+  },
+  {
+   "from": "ord",
+   "to": "inv"
+  },
+  {
+   "from": "ord",
+   "to": "pay"
+  },
+  {
+   "from": "pay",
+   "to": "psp"
+  },
+  {
+   "from": "cart",
+   "to": "cat"
+  },
+  {
+   "from": "cat",
+   "to": "pg"
+  },
+  {
+   "from": "ord",
+   "to": "pg"
+  },
+  {
+   "from": "inv",
+   "to": "pg"
+  },
+  {
+   "from": "pay",
+   "to": "pg"
+  },
+  {
+   "from": "cart",
+   "to": "redis"
+  },
+  {
+   "from": "cat",
+   "to": "redis"
+  },
+  {
+   "from": "srch",
+   "to": "os"
+  },
+  {
+   "from": "ord",
+   "to": "kafka"
+  },
+  {
+   "from": "cat",
+   "to": "kafka"
+  },
+  {
+   "from": "inv",
+   "to": "kafka"
+  },
+  {
+   "from": "kafka",
+   "to": "srch"
+  },
+  {
+   "from": "kafka",
+   "to": "cart"
+  },
+  {
+   "from": "kafka",
+   "to": "notif"
+  },
+  {
+   "from": "kafka",
+   "to": "ana"
+  },
+  {
+   "from": "kafka",
+   "to": "reco"
+  },
+  {
+   "from": "kafka",
+   "to": "inv"
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "tour",
+   "title": "Architecture tour",
+   "summary": "Edge, web, API, services, events, stores",
+   "steps": [
+    {
+     "say": "Every request enters through the NGINX edge: TLS ends here, each address is rate-limited, and public assets are cached.",
+     "active": [
+      "cust",
+      "edge"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "edge",
+       "label": "HTTPS",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Pages come from the storefront, which renders on the server and keeps the user's tokens in its own session store. Sign-in goes to Keycloak.",
+     "active": [
+      "edge",
+      "sf",
+      "kc"
+     ],
+     "packets": [
+      {
+       "from": "edge",
+       "to": "sf",
+       "label": "pages",
+       "kind": "req"
+      },
+      {
+       "from": "edge",
+       "to": "kc",
+       "label": "sign-in",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "API calls go through api-gateway: it validates the JWT, applies rate limits per user and per address, and protects hot products with admission control.",
+     "active": [
+      "sf",
+      "gw"
+     ],
+     "packets": [
+      {
+       "from": "sf",
+       "to": "gw",
+       "label": "/api/v1/…",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Behind it, eleven services each own one part of the shop and their own data. None shares a database or a line of code with another.",
+     "active": [
+      "cat",
+      "srch",
+      "cart",
+      "rev",
+      "ord",
+      "inv",
+      "pay",
+      "notif",
+      "ana",
+      "reco"
+     ]
+    },
+    {
+     "say": "Only checkout calls other services synchronously: order-service runs the saga across cart, inventory and payment. Everything else learns about changes from events.",
+     "active": [
+      "ord",
+      "cart",
+      "inv",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "reserve",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "authorise",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Events go through Kafka, written first to an outbox table in the same transaction as the change, so an event is published if and only if the change committed.",
+     "active": [
+      "ord",
+      "cat",
+      "inv",
+      "kafka"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "kafka",
+       "label": "order.events",
+       "kind": "event"
+      },
+      {
+       "from": "cat",
+       "to": "kafka",
+       "label": "catalog.events",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "Each store fits its job: PostgreSQL for orders, stock, payments and the catalogue; Redis for carts and caches; OpenSearch for search; Cassandra for reviews; ClickHouse for analytics.",
+     "active": [
+      "pg",
+      "redis",
+      "os",
+      "rev",
+      "ana"
+     ],
+     "ok": [
+      "pg",
+      "redis",
+      "os"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "browse",
+   "title": "Browse and search",
+   "summary": "Cached product pages, search from a read model",
+   "steps": [
+    {
+     "say": "Ada opens a product page. The edge serves anonymous public pages from its cache when it can.",
+     "active": [
+      "cust",
+      "edge"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "edge",
+       "label": "GET /products/trail-shoe",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "On a miss the storefront asks the API for the product. catalog-service looks in Redis first: a cache hit never touches PostgreSQL.",
+     "active": [
+      "sf",
+      "gw",
+      "cat",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "sf",
+       "to": "gw",
+       "label": "GET /api/v1/products/id",
+       "kind": "req"
+      },
+      {
+       "from": "gw",
+       "to": "cat",
+       "label": "GET",
+       "kind": "req"
+      },
+      {
+       "from": "cat",
+       "to": "redis",
+       "label": "GET product:id",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "On a cache miss it reads PostgreSQL and stores the result in Redis for 10 minutes.",
+     "active": [
+      "cat",
+      "pg",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "cat",
+       "to": "pg",
+       "label": "SELECT product",
+       "kind": "req"
+      },
+      {
+       "from": "cat",
+       "to": "redis",
+       "label": "SET 10 min",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Ada searches for trail shoes. search-service answers from OpenSearch, a read model shaped for search: full text, filters by brand and price, facets and cursor pages.",
+     "active": [
+      "gw",
+      "srch",
+      "os"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "srch",
+       "label": "GET /api/v1/search?q=trail",
+       "kind": "req"
+      },
+      {
+       "from": "srch",
+       "to": "os",
+       "label": "query",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Both answers come back well inside their budgets: 150 ms for a product page, 300 ms for a search, at the 99th percentile.",
+     "active": [
+      "cust"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "sf",
+       "label": "200 OK",
+       "kind": "res"
+      },
+      {
+       "from": "sf",
+       "to": "cust",
+       "label": "page",
+       "kind": "res"
+      }
+     ],
+     "ok": [
+      "cat",
+      "srch"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cart",
+   "title": "Add to cart",
+   "summary": "Guest cart, prices from catalog, merge at sign-in",
+   "steps": [
+    {
+     "say": "Ada is not signed in yet. The storefront gives her a random guest cookie and sends it to the API as a guest id.",
+     "active": [
+      "cust",
+      "sf"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "sf",
+       "label": "Add to cart",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The gateway checks the per-SKU admission limit, then cart-service adds the line to her cart in Redis.",
+     "active": [
+      "gw",
+      "cart",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "sf",
+       "to": "gw",
+       "label": "PUT /api/v1/cart/items/sku",
+       "kind": "req"
+      },
+      {
+       "from": "gw",
+       "to": "cart",
+       "label": "PUT",
+       "kind": "req"
+      },
+      {
+       "from": "cart",
+       "to": "redis",
+       "label": "HSET cart:guest",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "To show the cart, cart-service fetches current prices from catalog-service for the SKUs it has not cached in the last 30 seconds.",
+     "active": [
+      "cart",
+      "cat"
+     ],
+     "packets": [
+      {
+       "from": "cart",
+       "to": "cat",
+       "label": "prices by SKU",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Ada signs in through Keycloak. The storefront starts a new session and merges the guest cart into her account's cart, then clears the guest cookie.",
+     "active": [
+      "sf",
+      "kc",
+      "cart"
+     ],
+     "packets": [
+      {
+       "from": "sf",
+       "to": "kc",
+       "label": "code + PKCE",
+       "kind": "req"
+      },
+      {
+       "from": "sf",
+       "to": "gw",
+       "label": "POST /api/v1/cart/merge",
+       "kind": "req"
+      }
+     ],
+     "ok": [
+      "cart"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "checkout",
+   "title": "Checkout that succeeds",
+   "summary": "Reserve, authorise, commit, capture, confirm",
+   "steps": [
+    {
+     "say": "Ada presses Place order. The storefront adds the idempotency key it created when the checkout page opened, and her access token from the server-side session. The browser never sees the token.",
+     "active": [
+      "cust",
+      "edge",
+      "sf"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "edge",
+       "label": "POST /checkout",
+       "kind": "req"
+      },
+      {
+       "from": "edge",
+       "to": "sf",
+       "label": "POST /checkout",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The gateway checks the token's signature, issuer and audience, applies her per-user checkout limit, and routes to order-service.",
+     "active": [
+      "sf",
+      "gw",
+      "ord"
+     ],
+     "packets": [
+      {
+       "from": "sf",
+       "to": "gw",
+       "label": "POST /api/v1/orders · key",
+       "kind": "req"
+      },
+      {
+       "from": "gw",
+       "to": "ord",
+       "label": "place order",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "order-service stores the key and a PENDING order in one transaction, then asks cart-service for a snapshot of the cart with prices. It never trusts prices sent by a client.",
+     "active": [
+      "ord",
+      "pg",
+      "cart"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pg",
+       "label": "INSERT order PENDING",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "cart",
+       "label": "GET checkout-snapshot",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "inventory-service reserves the stock with one conditional update per line, so two buyers can never take the last pair.",
+     "active": [
+      "ord",
+      "inv",
+      "pg"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "POST /internal/reservations",
+       "kind": "req"
+      },
+      {
+       "from": "inv",
+       "to": "pg",
+       "label": "UPDATE … WHERE available >= qty",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "inv",
+       "text": "reserved",
+       "tone": "ok"
+      }
+     ]
+    },
+    {
+     "say": "payment-service asks the provider to authorise the card token. The platform never sees a card number.",
+     "active": [
+      "ord",
+      "pay",
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "authorise",
+       "kind": "req"
+      },
+      {
+       "from": "pay",
+       "to": "psp",
+       "label": "authorise token",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "pay",
+       "text": "authorised",
+       "tone": "ok"
+      }
+     ]
+    },
+    {
+     "say": "order-service commits the reservation and captures the payment. Each step is saved before the next, so a crash resumes where it stopped.",
+     "active": [
+      "ord",
+      "inv",
+      "pay"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "commit",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "capture",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The order becomes CONFIRMED, and an OrderConfirmed event is written to the outbox in the same transaction.",
+     "active": [
+      "ord",
+      "pg"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pg",
+       "label": "UPDATE CONFIRMED + outbox",
+       "kind": "req"
+      }
+     ],
+     "ok": [
+      "ord"
+     ]
+    },
+    {
+     "say": "Ada gets 201 Created. A double-click or retry with the same key returns this same order and calls nothing again.",
+     "active": [
+      "cust"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "gw",
+       "label": "201 Created",
+       "kind": "res"
+      },
+      {
+       "from": "sf",
+       "to": "cust",
+       "label": "Order placed",
+       "kind": "res"
+      }
+     ],
+     "ok": [
+      "ord",
+      "inv",
+      "pay"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "oos",
+   "title": "Out of stock",
+   "summary": "The reservation fails; nothing is charged",
+   "steps": [
+    {
+     "say": "Ada presses Place order. The storefront adds the idempotency key it created when the checkout page opened, and her access token from the server-side session. The browser never sees the token.",
+     "active": [
+      "cust",
+      "edge",
+      "sf"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "edge",
+       "label": "POST /checkout",
+       "kind": "req"
+      },
+      {
+       "from": "edge",
+       "to": "sf",
+       "label": "POST /checkout",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The gateway checks the token's signature, issuer and audience, applies her per-user checkout limit, and routes to order-service.",
+     "active": [
+      "sf",
+      "gw",
+      "ord"
+     ],
+     "packets": [
+      {
+       "from": "sf",
+       "to": "gw",
+       "label": "POST /api/v1/orders · key",
+       "kind": "req"
+      },
+      {
+       "from": "gw",
+       "to": "ord",
+       "label": "place order",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "order-service stores the key and a PENDING order in one transaction, then asks cart-service for a snapshot of the cart with prices. It never trusts prices sent by a client.",
+     "active": [
+      "ord",
+      "pg",
+      "cart"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pg",
+       "label": "INSERT order PENDING",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "cart",
+       "label": "GET checkout-snapshot",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "inventory-service cannot reserve one of the lines: someone bought the last pair a moment ago.",
+     "active": [
+      "ord",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "reserve",
+       "kind": "req"
+      },
+      {
+       "from": "inv",
+       "to": "ord",
+       "label": "OUT_OF_STOCK",
+       "kind": "error"
+      }
+     ],
+     "bad": [
+      "inv"
+     ]
+    },
+    {
+     "say": "order-service cancels the order with reason OUT_OF_STOCK. Payment is never called, so nothing is authorised.",
+     "active": [
+      "ord",
+      "pg"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pg",
+       "label": "UPDATE CANCELLED",
+       "kind": "req"
+      }
+     ],
+     "dim": [
+      "pay",
+      "psp"
+     ],
+     "badges": [
+      {
+       "node": "ord",
+       "text": "cancelled",
+       "tone": "warn"
+      }
+     ]
+    },
+    {
+     "say": "Ada gets 409 Conflict naming the SKU, and the storefront shows which item to remove.",
+     "active": [
+      "cust"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "gw",
+       "label": "409 OUT_OF_STOCK",
+       "kind": "error"
+      },
+      {
+       "from": "sf",
+       "to": "cust",
+       "label": "Item sold out",
+       "kind": "res"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "declined",
+   "title": "Payment declined",
+   "summary": "Release the stock, cancel, tell the customer",
+   "steps": [
+    {
+     "say": "Ada presses Place order. The storefront adds the idempotency key it created when the checkout page opened, and her access token from the server-side session. The browser never sees the token.",
+     "active": [
+      "cust",
+      "edge",
+      "sf"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "edge",
+       "label": "POST /checkout",
+       "kind": "req"
+      },
+      {
+       "from": "edge",
+       "to": "sf",
+       "label": "POST /checkout",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The gateway checks the token's signature, issuer and audience, applies her per-user checkout limit, and routes to order-service.",
+     "active": [
+      "sf",
+      "gw",
+      "ord"
+     ],
+     "packets": [
+      {
+       "from": "sf",
+       "to": "gw",
+       "label": "POST /api/v1/orders · key",
+       "kind": "req"
+      },
+      {
+       "from": "gw",
+       "to": "ord",
+       "label": "place order",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "order-service stores the key and a PENDING order in one transaction, then asks cart-service for a snapshot of the cart with prices. It never trusts prices sent by a client.",
+     "active": [
+      "ord",
+      "pg",
+      "cart"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pg",
+       "label": "INSERT order PENDING",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "cart",
+       "label": "GET checkout-snapshot",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Stock is reserved.",
+     "active": [
+      "ord",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "reserve",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "inv",
+       "text": "reserved",
+       "tone": "ok"
+      }
+     ]
+    },
+    {
+     "say": "The provider declines the card.",
+     "active": [
+      "pay",
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "authorise",
+       "kind": "req"
+      },
+      {
+       "from": "psp",
+       "to": "pay",
+       "label": "declined",
+       "kind": "error"
+      }
+     ],
+     "bad": [
+      "pay"
+     ]
+    },
+    {
+     "say": "order-service compensates: it releases the reservation so the stock is available to others, and cancels the order with reason PAYMENT_DECLINED.",
+     "active": [
+      "ord",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "release",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "ord",
+       "text": "compensated",
+       "tone": "warn"
+      }
+     ]
+    },
+    {
+     "say": "Ada gets 402 Payment Required and can try another card. The new attempt is a new checkout with a new key.",
+     "active": [
+      "cust"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "gw",
+       "label": "402 PAYMENT_DECLINED",
+       "kind": "error"
+      },
+      {
+       "from": "sf",
+       "to": "cust",
+       "label": "Card declined",
+       "kind": "res"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "timeout",
+   "title": "Payment timeout",
+   "summary": "Outcome unknown: void, release, reconcile",
+   "steps": [
+    {
+     "say": "Ada presses Place order. The storefront adds the idempotency key it created when the checkout page opened, and her access token from the server-side session. The browser never sees the token.",
+     "active": [
+      "cust",
+      "edge",
+      "sf"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "edge",
+       "label": "POST /checkout",
+       "kind": "req"
+      },
+      {
+       "from": "edge",
+       "to": "sf",
+       "label": "POST /checkout",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The gateway checks the token's signature, issuer and audience, applies her per-user checkout limit, and routes to order-service.",
+     "active": [
+      "sf",
+      "gw",
+      "ord"
+     ],
+     "packets": [
+      {
+       "from": "sf",
+       "to": "gw",
+       "label": "POST /api/v1/orders · key",
+       "kind": "req"
+      },
+      {
+       "from": "gw",
+       "to": "ord",
+       "label": "place order",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "order-service stores the key and a PENDING order in one transaction, then asks cart-service for a snapshot of the cart with prices. It never trusts prices sent by a client.",
+     "active": [
+      "ord",
+      "pg",
+      "cart"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pg",
+       "label": "INSERT order PENDING",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "cart",
+       "label": "GET checkout-snapshot",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Stock is reserved and the authorisation is sent, but the provider does not answer in time.",
+     "active": [
+      "ord",
+      "pay",
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "authorise",
+       "kind": "req"
+      },
+      {
+       "from": "pay",
+       "to": "psp",
+       "label": "…",
+       "kind": "error"
+      }
+     ],
+     "bad": [
+      "psp"
+     ]
+    },
+    {
+     "say": "order-service cannot know whether the card was charged. It voids the authorisation to be safe and releases the stock.",
+     "active": [
+      "ord",
+      "pay",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "void",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "release",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "ord",
+       "text": "unknown",
+       "tone": "warn"
+      }
+     ]
+    },
+    {
+     "say": "The order is cancelled with reason PAYMENT_UNKNOWN. Ada gets 504 and is told she will not be charged.",
+     "active": [
+      "cust"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "gw",
+       "label": "504 PAYMENT_UNKNOWN",
+       "kind": "error"
+      },
+      {
+       "from": "sf",
+       "to": "cust",
+       "label": "You were not charged",
+       "kind": "res"
+      }
+     ]
+    },
+    {
+     "say": "payment-service's reconciler later asks the provider what really happened and refunds any charge that went through. An alert fires if timeouts keep happening.",
+     "active": [
+      "pay",
+      "psp"
+     ],
+     "packets": [
+      {
+       "from": "pay",
+       "to": "psp",
+       "label": "status?",
+       "kind": "req"
+      },
+      {
+       "from": "pay",
+       "to": "psp",
+       "label": "refund",
+       "kind": "req"
+      }
+     ],
+     "ok": [
+      "pay"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cancel",
+   "title": "Cancellation and refund",
+   "summary": "Refund, return stock, cancel, notify",
+   "steps": [
+    {
+     "say": "Ada cancels a confirmed order from her order page.",
+     "active": [
+      "cust",
+      "sf",
+      "gw"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "sf",
+       "label": "Cancel order",
+       "kind": "req"
+      },
+      {
+       "from": "sf",
+       "to": "gw",
+       "label": "POST /api/v1/orders/id/cancel",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "order-service checks that the order is hers. Someone else's order answers 404, so ids cannot be probed. The order moves to CANCELLING.",
+     "active": [
+      "ord",
+      "pg"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "ord",
+       "label": "cancel",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "pg",
+       "label": "UPDATE CANCELLING",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "It refunds the payment and returns the stock. If either fails, the order stays CANCELLING and saga recovery retries every 15 seconds.",
+     "active": [
+      "ord",
+      "pay",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "pay",
+       "label": "refund",
+       "kind": "req"
+      },
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "return stock",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The order becomes CANCELLED and OrderCancelled is published. notification-service emails Ada; inventory releases anything still held, as a safety net.",
+     "active": [
+      "ord",
+      "kafka",
+      "notif",
+      "inv"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "kafka",
+       "label": "OrderCancelled",
+       "kind": "event"
+      },
+      {
+       "from": "kafka",
+       "to": "notif",
+       "label": "email",
+       "kind": "event"
+      },
+      {
+       "from": "kafka",
+       "to": "inv",
+       "label": "release",
+       "kind": "event"
+      }
+     ],
+     "ok": [
+      "ord"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fanout",
+   "title": "Event fan-out",
+   "summary": "One order, many consumers, exactly-once effects",
+   "steps": [
+    {
+     "say": "A confirmed order leaves an OrderConfirmed row in order-service's outbox. The relay sends it to Kafka within about 100 ms and marks only what Kafka acknowledged.",
+     "active": [
+      "ord",
+      "pg",
+      "kafka"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "kafka",
+       "label": "order.events",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "The relay sends inside the request's trace, so the trace that began with Ada's click continues into every consumer.",
+     "active": [
+      "ord",
+      "kafka"
+     ],
+     "badges": [
+      {
+       "node": "kafka",
+       "text": "traceparent",
+       "tone": "ok"
+      }
+     ]
+    },
+    {
+     "say": "cart-service clears Ada's cart; notification-service sends her confirmation email through RabbitMQ.",
+     "active": [
+      "kafka",
+      "cart",
+      "notif"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "cart",
+       "label": "clear cart",
+       "kind": "event"
+      },
+      {
+       "from": "kafka",
+       "to": "notif",
+       "label": "send email",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "recommendation-service learns which products are bought together; analytics loads the order into ClickHouse.",
+     "active": [
+      "kafka",
+      "reco",
+      "ana"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "reco",
+       "label": "pairs",
+       "kind": "event"
+      },
+      {
+       "from": "kafka",
+       "to": "ana",
+       "label": "load",
+       "kind": "event"
+      }
+     ]
+    },
+    {
+     "say": "Kafka may deliver an event twice. Each consumer records the event id it has processed, so a duplicate changes nothing and no email goes out twice.",
+     "active": [
+      "cart",
+      "notif",
+      "reco",
+      "ana"
+     ],
+     "ok": [
+      "cart",
+      "notif",
+      "reco",
+      "ana"
+     ]
+    },
+    {
+     "say": "An event that fails five times is parked in order.events.dlq for an operator, instead of blocking every event behind it.",
+     "active": [
+      "kafka"
+     ],
+     "badges": [
+      {
+       "node": "kafka",
+       "text": "dlq",
+       "tone": "warn"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "flash",
+   "title": "Flash sale",
+   "summary": "Admission control protects checkout",
+   "steps": [
+    {
+     "say": "A limited shoe goes on sale. Thousands of shoppers press Add to cart in the same second.",
+     "active": [
+      "cust",
+      "edge",
+      "gw"
+     ],
+     "packets": [
+      {
+       "from": "cust",
+       "to": "edge",
+       "label": "× 5,000",
+       "kind": "req"
+      },
+      {
+       "from": "edge",
+       "to": "gw",
+       "label": "PUT cart/items/hot-sku",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "The gateway admits at most 200 requests a second for that SKU (bursts up to 400), counted in Redis across all gateway pods.",
+     "active": [
+      "gw",
+      "redis"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "redis",
+       "label": "token bucket per SKU",
+       "kind": "req"
+      }
+     ],
+     "badges": [
+      {
+       "node": "gw",
+       "text": "admission",
+       "tone": "warn"
+      }
+     ]
+    },
+    {
+     "say": "The rest get 429 Too Many Requests at once, with Retry-After. They fail fast instead of piling up behind the database.",
+     "active": [
+      "cust"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "cust",
+       "label": "429 Retry-After",
+       "kind": "error"
+      }
+     ]
+    },
+    {
+     "say": "Admitted checkouts reserve stock with conditional updates, so the shoe can never be oversold. When stock reaches zero, the answer is OUT_OF_STOCK.",
+     "active": [
+      "ord",
+      "inv",
+      "pg"
+     ],
+     "packets": [
+      {
+       "from": "ord",
+       "to": "inv",
+       "label": "reserve",
+       "kind": "req"
+      },
+      {
+       "from": "inv",
+       "to": "pg",
+       "label": "UPDATE … WHERE available >= qty",
+       "kind": "req"
+      }
+     ]
+    },
+    {
+     "say": "Every other product keeps selling normally: the limit applies to one SKU, not to the shop.",
+     "active": [
+      "cat",
+      "cart",
+      "srch"
+     ],
+     "ok": [
+      "cat",
+      "cart",
+      "srch",
+      "ord"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "failure",
+   "title": "A dependency fails",
+   "summary": "Degrade, do not fall over",
+   "steps": [
+    {
+     "say": "OpenSearch goes down. search-service cannot answer, and its circuit breaker at the gateway opens.",
+     "active": [
+      "srch",
+      "os"
+     ],
+     "bad": [
+      "os",
+      "srch"
+     ]
+    },
+    {
+     "say": "Searches get a fast 503 from the gateway's fallback: Search is temporarily unavailable, product pages still work.",
+     "active": [
+      "gw",
+      "cust"
+     ],
+     "packets": [
+      {
+       "from": "gw",
+       "to": "cust",
+       "label": "503 SEARCH_UNAVAILABLE",
+       "kind": "error"
+      }
+     ]
+    },
+    {
+     "say": "Browsing, carts and checkout do not touch OpenSearch, so they carry on.",
+     "active": [
+      "cat",
+      "cart",
+      "ord"
+     ],
+     "ok": [
+      "cat",
+      "cart",
+      "ord",
+      "inv",
+      "pay"
+     ]
+    },
+    {
+     "say": "Products changed meanwhile are not lost: their events wait in Kafka. When OpenSearch returns, search-service catches up from where it stopped.",
+     "active": [
+      "kafka",
+      "srch",
+      "os"
+     ],
+     "packets": [
+      {
+       "from": "kafka",
+       "to": "srch",
+       "label": "catalog.events",
+       "kind": "event"
+      },
+      {
+       "from": "srch",
+       "to": "os",
+       "label": "upsert",
+       "kind": "req"
+      }
+     ],
+     "ok": [
+      "os",
+      "srch"
+     ]
+    },
+    {
+     "say": "The same pattern holds elsewhere: if catalog is down, the cart shows prices pending; if Redis is down, catalog reads PostgreSQL; if Kafka is down, outboxes hold the events until it is back.",
+     "active": [
+      "cart",
+      "cat",
+      "redis",
+      "kafka"
+     ],
+     "ok": [
+      "cart",
+      "cat"
+     ]
+    }
+   ]
+  }
+ ]
+}

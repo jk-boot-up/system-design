@@ -10,10 +10,10 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Area | Progress | Done | Next |
 |---|---|---|---|
 | Specification and plans | ██████████ 100% | SPEC, PLAN, design plan, implementation plan, prerequisites | Keep in step with changes |
-| System design documents | █████████░ 95% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, system/module/service diagrams, security, observability, capacity, runbooks, storefront, 13 ADRs | System walkthrough |
+| System design documents | ██████████ 100% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, system/module/service diagrams, security, observability, capacity, runbooks, storefront, 13 ADRs | Keep in step with changes |
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
 | Services (11) | ██████████ 100% | all eleven complete | — |
-| Walkthroughs | █████████░ 92% | every service | System walkthrough |
+| Walkthroughs | ██████████ 100% | every service and the whole system | — |
 | Local stack and Kubernetes overlays | ██████████ 100% | Compose stack with profiles and smoke test; dev, staging and prod overlays with operator-managed stores, checked against the operators' CRDs | — |
 | Storefront (web UI) | ██████████ 100% | React Router 8 server rendering + backend-for-frontend (`web/storefront`): every page, sign-in, checkout, staff; compose, edge and k8s wiring; CI | Component tests when pages gain client logic |
 | End-to-end and performance tests | █████████░ 90% | End-to-end journeys (`tests/e2e`): 22 across core, the storefront in a browser and every profile; ZAP and Lighthouse; Gatling for browse, cart, checkout and search; nightly CI | Reviews journey and search simulation need > 4 GB of Docker memory |
@@ -37,6 +37,9 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## Recently completed
 
+* System walkthrough (`design/walkthrough`): 11 animated scenarios, 64 narrated steps: architecture tour, browse and
+  search, cart with guest merge, checkout, out of stock, payment declined, payment timeout, cancellation and refund,
+  event fan-out, flash sale, a dependency failing. Every step plays without errors in Chromium.
 * Design documents 11–15: the system and service-interaction map as wired in the code, modules inside a service and
   communication diagrams of checkout, indexing and cancellation; security (trust boundaries, STRIDE, sign-in, secrets,
   data protection and the gaps: no mTLS on internal calls, no database backups, no SBOMs or automated updates for the
@@ -147,7 +150,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* System walkthrough (S19).
+* Video pipeline: narrated walkthrough videos and upload sheets (prepared only, never uploaded).
 
 ## Risks and notes
 
