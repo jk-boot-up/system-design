@@ -1,4 +1,5 @@
-# Only the gateway may call order-service. order-service may call cart, inventory and payment, its database, Kafka and Keycloak.
+# Only the gateway may call order-service. order-service may call cart, inventory and payment, and its database pooler, Kafka
+# and Keycloak in the platform namespace.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -16,6 +17,5 @@ spec:
         - podSelector: { matchLabels: { app.kubernetes.io/name: cart-service } }
         - podSelector: { matchLabels: { app.kubernetes.io/name: inventory-service } }
         - podSelector: { matchLabels: { app.kubernetes.io/name: payment-service } }
-        - podSelector: { matchLabels: { app.kubernetes.io/name: pgbouncer-orders } }
     - to: [ { namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-platform } } } ]
     - ports: [ { port: 53, protocol: UDP }, { port: 53, protocol: TCP } ]

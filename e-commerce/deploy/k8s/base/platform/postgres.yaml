@@ -1,0 +1,167 @@
+# PostgreSQL 17 through CloudNativePG: one cluster per owning service (database per service), three instances spread over
+# zones with one synchronous standby, so a failover loses no committed order or payment. Each cluster's owner credentials
+# come from the secret of the same name, which the service in e-commerce-shop also reads.
+# order, inventory and payment connect through PgBouncer in transaction mode (SPEC: thousands of client connections onto
+# about 50 server connections); Flyway's transaction-scoped advisory lock and PgBouncer's prepared-statement support make
+# both safe in that mode. catalog and Keycloak connect to their primary directly (catalog-db-rw, keycloak-db-rw).
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: orders-db
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.12
+  primaryUpdateStrategy: unsupervised
+  postgresql:
+    synchronous: { method: any, number: 1 }
+    parameters: { max_connections: "200", shared_buffers: 1GB, log_min_duration_statement: "250" }
+  bootstrap:
+    initdb: { database: orders, owner: orders, secret: { name: orders-db } }
+  storage: { size: 100Gi }
+  resources:
+    requests: { cpu: "2", memory: 4Gi }
+    limits: { memory: 4Gi }
+  affinity: { topologyKey: topology.kubernetes.io/zone }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: inventory-db
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.12
+  primaryUpdateStrategy: unsupervised
+  postgresql:
+    synchronous: { method: any, number: 1 }
+    parameters: { max_connections: "200", shared_buffers: 512MB, log_min_duration_statement: "250" }
+  bootstrap:
+    initdb: { database: inventory, owner: inventory, secret: { name: inventory-db } }
+  storage: { size: 20Gi }
+  resources:
+    requests: { cpu: "1", memory: 2Gi }
+    limits: { memory: 2Gi }
+  affinity: { topologyKey: topology.kubernetes.io/zone }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: payments-db
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.12
+  primaryUpdateStrategy: unsupervised
+  postgresql:
+    synchronous: { method: any, number: 1 }
+    parameters: { max_connections: "200", shared_buffers: 512MB, log_min_duration_statement: "250" }
+  bootstrap:
+    initdb: { database: payments, owner: payments, secret: { name: payments-db } }
+  storage: { size: 50Gi }
+  resources:
+    requests: { cpu: "1", memory: 2Gi }
+    limits: { memory: 2Gi }
+  affinity: { topologyKey: topology.kubernetes.io/zone }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: catalog-db
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.12
+  primaryUpdateStrategy: unsupervised
+  postgresql:
+    synchronous: { method: any, number: 1 }
+    parameters: { max_connections: "200", shared_buffers: 512MB, log_min_duration_statement: "250" }
+  bootstrap:
+    initdb: { database: catalog, owner: catalog, secret: { name: catalog-db } }
+  storage: { size: 20Gi }
+  resources:
+    requests: { cpu: "1", memory: 2Gi }
+    limits: { memory: 2Gi }
+  affinity: { topologyKey: topology.kubernetes.io/zone }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: keycloak-db
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.12
+  primaryUpdateStrategy: unsupervised
+  postgresql:
+    synchronous: { method: any, number: 1 }
+    parameters: { max_connections: "100", shared_buffers: 256MB, log_min_duration_statement: "250" }
+  bootstrap:
+    initdb: { database: keycloak, owner: keycloak, secret: { name: keycloak-db } }
+  storage: { size: 10Gi }
+  resources:
+    requests: { cpu: "500m", memory: 1Gi }
+    limits: { memory: 1Gi }
+  affinity: { topologyKey: topology.kubernetes.io/zone }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pgbouncer-orders
+spec:
+  cluster: { name: orders-db }
+  type: rw
+  instances: 3
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: pgbouncer-orders }
+    spec:
+      containers: []
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: pgbouncer-orders } }
+  pgbouncer:
+    poolMode: transaction
+    parameters: { default_pool_size: "50", max_client_conn: "2000", max_prepared_statements: "200" }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pgbouncer-inventory
+spec:
+  cluster: { name: inventory-db }
+  type: rw
+  instances: 3
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: pgbouncer-inventory }
+    spec:
+      containers: []
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: pgbouncer-inventory } }
+  pgbouncer:
+    poolMode: transaction
+    parameters: { default_pool_size: "50", max_client_conn: "2000", max_prepared_statements: "200" }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pgbouncer-payments
+spec:
+  cluster: { name: payments-db }
+  type: rw
+  instances: 3
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: pgbouncer-payments }
+    spec:
+      containers: []
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: pgbouncer-payments } }
+  pgbouncer:
+    poolMode: transaction
+    parameters: { default_pool_size: "50", max_client_conn: "2000", max_prepared_statements: "200" }

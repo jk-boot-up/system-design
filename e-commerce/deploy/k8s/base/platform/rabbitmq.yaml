@@ -1,0 +1,35 @@
+# RabbitMQ 4.2 through the RabbitMQ cluster operator: three nodes, so the email quorum queues survive the loss of one.
+# notification-service connects as its own user, declared with the messaging topology operator from the
+# notification-rabbitmq secret (username, password); its RABBITMQ_URL in e-commerce-shop carries the same credentials.
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: rabbitmq
+spec:
+  replicas: 3
+  image: rabbitmq:4.2-management
+  resources:
+    requests: { cpu: "1", memory: 2Gi }
+    limits: { memory: 2Gi }
+  persistence: { storage: 20Gi }
+  rabbitmq:
+    additionalConfig: |
+      default_queue_type = quorum
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: notification
+spec:
+  rabbitmqClusterReference: { name: rabbitmq }
+  importCredentialsSecret: { name: notification-rabbitmq }
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: notification
+spec:
+  rabbitmqClusterReference: { name: rabbitmq }
+  vhost: /
+  userReference: { name: notification }
+  permissions: { configure: ".*", read: ".*", write: ".*" }

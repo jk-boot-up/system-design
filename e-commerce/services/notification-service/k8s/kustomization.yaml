@@ -10,7 +10,7 @@ configMapGenerator:
   - name: notification-service
     literals:
       - KAFKA_BROKERS=kafka-bootstrap:9092
-      - REDIS_URL=redis://redis-cache:6379
+      - REDIS_URL=redis://redis-notify:6379
       - SMTP_ADDR=mailpit:1025
       - MAIL_FROM=Shop <orders@shop.example>
       - RETRY_DELAYS=30s,2m,10m

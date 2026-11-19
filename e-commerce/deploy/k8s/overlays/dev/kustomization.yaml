@@ -1,0 +1,13 @@
+# dev: integration of merged changes on a small cluster. Single-replica data stores, synthetic data, fixed passwords,
+# Mailpit, RustFS, self-signed certificates and the local stack's test users.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: [ ../../base, environment.yaml ]
+components:
+  - ../../components/hosts
+  - ../../components/single-replica
+  - ../../components/dev-secrets
+  - ../../components/local-mail
+  - ../../components/local-object-storage
+  - ../../components/self-signed-tls
+  - ../../components/test-users

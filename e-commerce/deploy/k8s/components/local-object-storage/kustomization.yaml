@@ -1,0 +1,8 @@
+# S3-compatible object storage for product images in dev and staging: RustFS, as in the local stack (MinIO no longer
+# publishes community images). Production uses the cloud provider's object storage (see its overlay). Browsers upload
+# straight to storage with presigned URLs; in dev, port-forward svc/minio 9000 and they use http://localhost:9000.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: [ storage.yaml ]
+configMapGenerator:
+  - { name: catalog-service, namespace: e-commerce-shop, behavior: merge, literals: [ "S3_PUBLIC_ENDPOINT=http://localhost:9000" ] }

@@ -1,0 +1,20 @@
+# e-commerce-shop: the services, the NGINX edge and the analytics ClickHouse. e-commerce-platform: data stores, Kafka,
+# Keycloak and monitoring. Both enforce Pod Security "baseline"; the shop namespace also warns and audits against
+# "restricted", which every Java, Go and Python service meets (non-root, read-only root, no capabilities, RuntimeDefault seccomp).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: e-commerce-shop
+  labels:
+    app.kubernetes.io/part-of: e-commerce
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: e-commerce-platform
+  labels:
+    app.kubernetes.io/part-of: e-commerce
+    pod-security.kubernetes.io/enforce: baseline

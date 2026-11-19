@@ -1,0 +1,84 @@
+# Keycloak 26.8 through the Keycloak operator (installed in this namespace; it watches only its own). Two instances on
+# keycloak-db. Browsers reach it at the public host name through the operator's Ingress; services fetch signing keys over
+# plain HTTP inside the cluster (the keycloak alias in e-commerce-shop), and tokens always carry the public issuer.
+apiVersion: k8s.keycloak.org/v2beta1
+kind: Keycloak
+metadata:
+  name: keycloak
+spec:
+  instances: 2
+  image: keycloak/keycloak:26.8.2
+  db:
+    vendor: postgres
+    host: keycloak-db-rw
+    database: keycloak
+    usernameSecret: { name: keycloak-db, key: username }
+    passwordSecret: { name: keycloak-db, key: password }
+  http:
+    httpEnabled: true
+    tlsSecret: keycloak-tls
+  hostname:
+    hostname: https://id.shop.example
+    backchannelDynamic: true
+  proxy: { headers: xforwarded }
+  ingress:
+    enabled: true
+    tlsSecret: keycloak-tls
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits: { memory: 1500Mi }
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: keycloak-tls
+spec:
+  secretName: keycloak-tls
+  dnsNames: [ id.shop.example ]
+  issuerRef: { kind: ClusterIssuer, name: letsencrypt }
+  privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }
+---
+# The shop realm: roles, the public web client with PKCE, the shop-api audience and a "roles" claim, as in
+# deploy/compose/keycloak/shop-realm.json, without its test users (the dev overlay adds them).
+apiVersion: k8s.keycloak.org/v2beta1
+kind: KeycloakRealmImport
+metadata:
+  name: shop
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: shop
+    enabled: true
+    sslRequired: external
+    accessTokenLifespan: 900
+    registrationAllowed: true
+    loginWithEmailAllowed: true
+    roles:
+      realm:
+        - { name: customer, description: Shopper }
+        - { name: staff, description: "Merchandiser: catalogue and stock" }
+    defaultRoles: [customer]
+    clients:
+      - clientId: shop-web
+        name: Shop web app
+        publicClient: true
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        redirectUris: [ "https://shop.example/*" ]
+        webOrigins: [ "https://shop.example" ]
+        attributes: { pkce.code.challenge.method: S256 }
+        protocolMappers:
+          - name: audience shop-api
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            config: { included.custom.audience: shop-api, access.token.claim: "true", id.token.claim: "false" }
+          - name: roles
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-realm-role-mapper
+            config:
+              claim.name: roles
+              multivalued: "true"
+              jsonType.label: String
+              access.token.claim: "true"
+              id.token.claim: "false"
+              userinfo.token.claim: "false"

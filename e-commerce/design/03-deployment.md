@@ -7,15 +7,20 @@
   <img alt="Production topology (one region, three availability zones) diagram" src="diagrams/deployment--production-topology-one-region-three-availabilit.light.svg">
 </picture>
 
-Stateful systems run either as managed services or through Kubernetes operators:
-* PostgreSQL: CloudNativePG or Patroni.
-* Kafka: Strimzi.
-* Redis: Redis operator.
+Stateful systems run either as managed services or through Kubernetes operators (manifests and versions in
+[deploy/k8s](../deploy/k8s/README.md)):
+* PostgreSQL: CloudNativePG, one cluster per owning service, PgBouncer poolers in transaction mode.
+* Kafka: Strimzi, KRaft mode.
+* Redis: OpsTree Redis operator, one instance per use (cache, rate limits, carts, recommendations, notification sent log).
 * OpenSearch: OpenSearch operator.
 * Cassandra: K8ssandra.
-* MinIO: MinIO operator.
-* RabbitMQ: RabbitMQ Cluster Operator.
-* ClickHouse: Altinity ClickHouse operator.
+* Object storage: the cloud provider's S3 in production; RustFS in dev and staging (MinIO no longer publishes community images).
+* RabbitMQ: RabbitMQ cluster and messaging topology operators.
+* ClickHouse: a single-replica StatefulSet (rebuildable from Kafka and the order database); Altinity ClickHouse operator with
+  ClickHouse Keeper once dashboards become business-critical.
+* Keycloak: Keycloak operator, on its own CloudNativePG cluster.
+
+Services run in namespace `e-commerce-shop`; data stores, Kafka, Keycloak and monitoring in `e-commerce-platform`.
 
 ## 3.2 Node pools and placement
 

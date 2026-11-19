@@ -1,0 +1,9 @@
+# The provisioned dashboards as a ConfigMap, labelled for Grafana's dashboard sidecar. A kustomization of its own so the
+# JSON files stay next to the local Grafana provisioning and are not copied.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+configMapGenerator:
+  - name: grafana-dashboards-e-commerce
+    files: [orders.json]
+    options:
+      labels: { grafana_dashboard: "1" }

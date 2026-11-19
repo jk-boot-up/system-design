@@ -1,0 +1,25 @@
+# Cassandra 5 through K8ssandra: data centre dc1 with three nodes, one per zone (review-service writes with
+# NetworkTopologyStrategy {dc1: 3} and reads and writes at LOCAL_QUORUM). review-service connects without credentials, so
+# authentication is off and the cluster is reachable only through networkpolicy.yaml. The data centre's Service is
+# cassandra-dc1-service, the contact point in the service's settings.
+apiVersion: k8ssandra.io/v1alpha1
+kind: K8ssandraCluster
+metadata:
+  name: cassandra
+spec:
+  auth: false
+  cassandra:
+    serverVersion: 5.0.6
+    datacenters:
+      - metadata: { name: dc1 }
+        size: 3
+        racks: [ { name: r1 }, { name: r2 }, { name: r3 } ]
+        storageConfig:
+          cassandraDataVolumeClaimSpec:
+            accessModes: [ReadWriteOnce]
+            resources: { requests: { storage: 100Gi } }
+        config:
+          jvmOptions: { heapSize: 4Gi }
+        resources:
+          requests: { cpu: "2", memory: 8Gi }
+          limits: { memory: 8Gi }

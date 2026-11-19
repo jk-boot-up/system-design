@@ -47,15 +47,19 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <h1 id="3-deployment-design">3. Deployment design<a class="headerlink" href="#3-deployment-design" title="Permanent link">#</a></h1>
 <h2 id="31-production-topology-one-region-three-availability-zones">3.1 Production topology (one region, three availability zones)<a class="headerlink" href="#31-production-topology-one-region-three-availability-zones" title="Permanent link">#</a></h2>
 <p><figure class="diagram"><img alt="Production topology (one region, three availability zones) diagram" src="diagrams/deployment--production-topology-one-region-three-availabilit.light.svg" data-light="diagrams/deployment--production-topology-one-region-three-availabilit.light.svg" data-dark="diagrams/deployment--production-topology-one-region-three-availabilit.dark.svg" loading="lazy"></figure></p>
-<p>Stateful systems run either as managed services or through Kubernetes operators:
-* PostgreSQL: CloudNativePG or Patroni.
-* Kafka: Strimzi.
-* Redis: Redis operator.
+<p>Stateful systems run either as managed services or through Kubernetes operators (manifests and versions in
+<a href="../deploy/k8s/README.html">deploy/k8s</a>):
+* PostgreSQL: CloudNativePG, one cluster per owning service, PgBouncer poolers in transaction mode.
+* Kafka: Strimzi, KRaft mode.
+* Redis: OpsTree Redis operator, one instance per use (cache, rate limits, carts, recommendations, notification sent log).
 * OpenSearch: OpenSearch operator.
 * Cassandra: K8ssandra.
-* MinIO: MinIO operator.
-* RabbitMQ: RabbitMQ Cluster Operator.
-* ClickHouse: Altinity ClickHouse operator.</p>
+* Object storage: the cloud provider's S3 in production; RustFS in dev and staging (MinIO no longer publishes community images).
+* RabbitMQ: RabbitMQ cluster and messaging topology operators.
+* ClickHouse: a single-replica StatefulSet (rebuildable from Kafka and the order database); Altinity ClickHouse operator with
+  ClickHouse Keeper once dashboards become business-critical.
+* Keycloak: Keycloak operator, on its own CloudNativePG cluster.</p>
+<p>Services run in namespace <code>e-commerce-shop</code>; data stores, Kafka, Keycloak and monitoring in <code>e-commerce-platform</code>.</p>
 <h2 id="32-node-pools-and-placement">3.2 Node pools and placement<a class="headerlink" href="#32-node-pools-and-placement" title="Permanent link">#</a></h2>
 <p><figure class="diagram"><img alt="Node pools and placement diagram" src="diagrams/deployment--node-pools-and-placement.light.svg" data-light="diagrams/deployment--node-pools-and-placement.light.svg" data-dark="diagrams/deployment--node-pools-and-placement.dark.svg" loading="lazy"></figure></p>
 <ul>

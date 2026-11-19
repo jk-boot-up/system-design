@@ -1,0 +1,41 @@
+# staging: release candidates and load tests. Production's shape (three replicas of every data store across zones, so
+# failover drills mean something) at about half its size; secrets from the staging vault; Mailpit catches email so no
+# customer is ever written to; ACME staging certificates.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: [ ../../base, environment.yaml ]
+components:
+  - ../../components/hosts
+  - ../../components/external-secrets
+  - ../../components/local-mail
+  - ../../components/local-object-storage
+patches:
+  - target: { kind: Certificate }
+    patch: |-
+      - { op: replace, path: /spec/issuerRef/name, value: letsencrypt-staging }
+  - target: { kind: HorizontalPodAutoscaler }
+    patch: |-
+      - { op: replace, path: /spec/minReplicas, value: 2 }
+  - target: { kind: Cluster }
+    patch: |-
+      - { op: replace, path: /spec/resources, value: { requests: { cpu: 500m, memory: 2Gi }, limits: { memory: 2Gi } } }
+      - { op: replace, path: /spec/postgresql/parameters/shared_buffers, value: 512MB }
+      - { op: replace, path: /spec/storage/size, value: 20Gi }
+  - target: { kind: KafkaNodePool }
+    patch: |-
+      - { op: replace, path: /spec/resources, value: { requests: { cpu: "1", memory: 4Gi }, limits: { memory: 4Gi } } }
+      - { op: replace, path: /spec/storage/volumes/0/size, value: 50Gi }
+  - target: { kind: OpenSearchCluster }
+    patch: |-
+      - { op: replace, path: /spec/nodePools/0/jvm, value: -Xms2g -Xmx2g }
+      - { op: replace, path: /spec/nodePools/0/resources, value: { requests: { cpu: "1", memory: 4Gi }, limits: { memory: 4Gi } } }
+      - { op: replace, path: /spec/nodePools/0/diskSize, value: 30Gi }
+  - target: { kind: K8ssandraCluster }
+    patch: |-
+      - { op: replace, path: /spec/cassandra/datacenters/0/config/jvmOptions/heapSize, value: 2Gi }
+      - { op: replace, path: /spec/cassandra/datacenters/0/resources, value: { requests: { cpu: "1", memory: 4Gi }, limits: { memory: 4Gi } } }
+      - { op: replace, path: /spec/cassandra/datacenters/0/storageConfig/cassandraDataVolumeClaimSpec/resources/requests/storage, value: 30Gi }
+  - target: { kind: StatefulSet, name: analytics }
+    patch: |-
+      - { op: replace, path: /spec/template/spec/containers/0/resources, value: { requests: { cpu: 500m, memory: 2Gi }, limits: { memory: 2Gi } } }
+      - { op: replace, path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage, value: 30Gi }

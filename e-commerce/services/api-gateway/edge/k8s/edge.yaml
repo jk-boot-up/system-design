@@ -40,3 +40,18 @@ spec:
   ports:
     - { name: http, port: 80, targetPort: http }
     - { name: https, port: 443, targetPort: https }
+---
+# The edge accepts traffic from anywhere and may only reach the gateway (and DNS, for re-resolving its address).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: edge
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: edge } }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports: [ { port: 8080 }, { port: 8443 } ]
+  egress:
+    - to: [ { podSelector: { matchLabels: { app.kubernetes.io/name: api-gateway } } } ]
+      ports: [ { port: 8080 } ]
+    - ports: [ { port: 53, protocol: UDP }, { port: 53, protocol: TCP } ]

@@ -1,0 +1,72 @@
+# The service bases use short names (kafka-bootstrap, pgbouncer-orders, redis-cart, ...) so they read the same locally and
+# here. The stores live in e-commerce-platform; these aliases point each short name at the Service its operator creates.
+# Network policies match the pods behind them, so the aliases grant no access of their own.
+apiVersion: v1
+kind: Service
+metadata: { name: kafka-bootstrap }
+spec: { type: ExternalName, externalName: kafka-kafka-bootstrap.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: pgbouncer-inventory }
+spec: { type: ExternalName, externalName: pgbouncer-inventory.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: pgbouncer-orders }
+spec: { type: ExternalName, externalName: pgbouncer-orders.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: pgbouncer-payments }
+spec: { type: ExternalName, externalName: pgbouncer-payments.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: catalog-db-rw }
+spec: { type: ExternalName, externalName: catalog-db-rw.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis-cache }
+spec: { type: ExternalName, externalName: redis-cache.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis-cart }
+spec: { type: ExternalName, externalName: redis-cart.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis-ratelimit }
+spec: { type: ExternalName, externalName: redis-ratelimit.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis-reco }
+spec: { type: ExternalName, externalName: redis-reco.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis-notify }
+spec: { type: ExternalName, externalName: redis-notify.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: opensearch }
+spec: { type: ExternalName, externalName: opensearch.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: cassandra-dc1-service }
+spec: { type: ExternalName, externalName: cassandra-dc1-service.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: rabbitmq }
+spec: { type: ExternalName, externalName: rabbitmq.e-commerce-platform.svc.cluster.local }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: keycloak }
+spec: { type: ExternalName, externalName: keycloak-service.e-commerce-platform.svc.cluster.local }

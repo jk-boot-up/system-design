@@ -1,0 +1,10 @@
+# Public host names of this environment (never applied; components/hosts copies them where they are used).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: environment
+  annotations: { config.kubernetes.io/local-config: "true" }
+data:
+  SHOP_HOST: dev.shop.example
+  ID_HOST: id.dev.shop.example
+  CDN_HOST: cdn.dev.shop.example

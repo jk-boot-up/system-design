@@ -1,0 +1,88 @@
+# Dev sizing: one replica of every service and data store, small requests and disks, replication factor 1 everywhere.
+# Not for anything that should survive the loss of a node.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  # services: one pod each, a tenth of the CPU request, and budgets that still let a node drain
+  - target: { kind: Deployment, namespace: e-commerce-shop }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 1 }
+      - { op: replace, path: /spec/template/spec/containers/0/resources/requests/cpu, value: 50m }
+  - target: { kind: HorizontalPodAutoscaler }
+    patch: |-
+      - { op: replace, path: /spec/minReplicas, value: 1 }
+      - { op: replace, path: /spec/maxReplicas, value: 2 }
+  - target: { kind: ScaledObject }
+    patch: |-
+      - { op: replace, path: /spec/minReplicaCount, value: 1 }
+      - { op: replace, path: /spec/maxReplicaCount, value: 2 }
+  - target: { kind: PodDisruptionBudget }
+    patch: |-
+      - { op: remove, path: /spec/minAvailable }
+      - { op: add, path: /spec/maxUnavailable, value: 1 }
+  - target: { kind: StatefulSet, name: analytics }
+    patch: |-
+      - { op: replace, path: /spec/template/spec/containers/0/resources, value: { requests: { cpu: 100m, memory: 1Gi }, limits: { memory: 2Gi } } }
+      - { op: replace, path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage, value: 10Gi }
+  # PostgreSQL: one instance (so no synchronous standby), one pooler
+  - target: { kind: Cluster }
+    patch: |-
+      - { op: replace, path: /spec/instances, value: 1 }
+      - { op: remove, path: /spec/postgresql/synchronous }
+      - { op: replace, path: /spec/postgresql/parameters/shared_buffers, value: 64MB }
+      - { op: replace, path: /spec/storage/size, value: 5Gi }
+      - { op: replace, path: /spec/resources, value: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 512Mi } } }
+  - target: { kind: Pooler }
+    patch: |-
+      - { op: replace, path: /spec/instances, value: 1 }
+  # Kafka: one combined node, replication factor 1
+  - target: { kind: KafkaNodePool }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 1 }
+      - { op: replace, path: /spec/storage/volumes/0/size, value: 20Gi }
+      - { op: replace, path: /spec/resources, value: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1Gi } } }
+  - target: { kind: Kafka }
+    patch: |-
+      - op: replace
+        path: /spec/kafka/config
+        value:
+          auto.create.topics.enable: false
+          default.replication.factor: 1
+          min.insync.replicas: 1
+          offsets.topic.replication.factor: 1
+          transaction.state.log.replication.factor: 1
+          transaction.state.log.min.isr: 1
+  - target: { kind: KafkaTopic }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 1 }
+  # Redis, OpenSearch, Cassandra, RabbitMQ, Keycloak
+  - target: { kind: Redis }
+    patch: |-
+      - { op: replace, path: /spec/kubernetesConfig/resources, value: { requests: { cpu: 20m, memory: 128Mi }, limits: { memory: 256Mi } } }
+  - target: { kind: OpenSearchCluster }
+    patch: |-
+      - { op: replace, path: /spec/nodePools/0/replicas, value: 1 }
+      - { op: replace, path: /spec/nodePools/0/diskSize, value: 10Gi }
+      - { op: replace, path: /spec/nodePools/0/jvm, value: -Xms512m -Xmx512m }
+      - { op: replace, path: /spec/nodePools/0/resources, value: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1Gi } } }
+      - { op: add, path: /spec/general/additionalConfig/discovery.type, value: single-node }
+  - target: { kind: K8ssandraCluster }
+    patch: |-
+      - { op: replace, path: /spec/cassandra/datacenters/0/size, value: 1 }
+      - { op: replace, path: /spec/cassandra/datacenters/0/racks, value: [ { name: r1 } ] }
+      - { op: replace, path: /spec/cassandra/datacenters/0/config/jvmOptions/heapSize, value: 768Mi }
+      - { op: replace, path: /spec/cassandra/datacenters/0/resources, value: { requests: { cpu: 200m, memory: 2Gi }, limits: { memory: 2Gi } } }
+      - { op: replace, path: /spec/cassandra/datacenters/0/storageConfig/cassandraDataVolumeClaimSpec/resources/requests/storage, value: 10Gi }
+  - target: { kind: RabbitmqCluster }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 1 }
+      - { op: replace, path: /spec/resources, value: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 512Mi } } }
+  - target: { kind: Keycloak }
+    patch: |-
+      - { op: replace, path: /spec/instances, value: 1 }
+# Keyspaces with one replica, to match the single Cassandra node.
+configMapGenerator:
+  - name: review-service
+    namespace: e-commerce-shop
+    behavior: merge
+    literals: [ "CASSANDRA_REPLICATION={'class': 'NetworkTopologyStrategy', 'dc1': 1}" ]

@@ -1,0 +1,123 @@
+# Topics from design/10-event-catalogue.md (the same list deploy/compose/kafka/create-topics.sh creates locally), managed by
+# Strimzi's topic operator. Replication factor 3 everywhere; min.insync.replicas 2 comes from the broker defaults.
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: catalog-events
+  labels: { strimzi.io/cluster: kafka }
+spec:
+  topicName: catalog.events
+  partitions: 12
+  replicas: 3
+  config: { retention.ms: 604800000 }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: catalog-events-dlq
+  labels: { strimzi.io/cluster: kafka }
+spec:
+  topicName: catalog.events.dlq
+  partitions: 3
+  replicas: 3
+  config: { retention.ms: 2592000000 }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: inventory-events
+  labels: { strimzi.io/cluster: kafka }
+spec:
+  topicName: inventory.events
+  partitions: 12
+  replicas: 3
+  config: { retention.ms: 604800000 }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: inventory-events-dlq
+  labels: { strimzi.io/cluster: kafka }
+spec:
+  topicName: inventory.events.dlq
+  partitions: 3
+  replicas: 3
+  config: { retention.ms: 2592000000 }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: order-events
+  labels: { strimzi.io/cluster: kafka }
+spec:
+  topicName: order.events
+  partitions: 12
+  replicas: 3
+  config: { retention.ms: 604800000 }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: order-events-dlq
+  labels: { strimzi.io/cluster: kafka }
+spec:
+  topicName: order.events.dlq
+  partitions: 3
+  replicas: 3
+  config: { retention.ms: 2592000000 }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: payment-events
+  labels: { strimzi.io/cluster: kafka }
+spec:
+  topicName: payment.events
+  partitions: 12
+  replicas: 3
+  config: { retention.ms: 604800000 }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: payment-events-dlq
+  labels: { strimzi.io/cluster: kafka }
+spec:
+  topicName: payment.events.dlq
+  partitions: 3
+  replicas: 3
+  config: { retention.ms: 2592000000 }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: review-events
+  labels: { strimzi.io/cluster: kafka }
+spec:
+  topicName: review.events
+  partitions: 6
+  replicas: 3
+  config: { retention.ms: 604800000 }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: review-events-dlq
+  labels: { strimzi.io/cluster: kafka }
+spec:
+  topicName: review.events.dlq
+  partitions: 3
+  replicas: 3
+  config: { retention.ms: 2592000000 }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: catalog-products
+  labels: { strimzi.io/cluster: kafka }
+spec:
+  topicName: catalog.products
+  partitions: 12
+  replicas: 3
+  config: { cleanup.policy: compact }

@@ -1,0 +1,11 @@
+# The edge's certificate. Each overlay names the issuer (self-signed in dev, ACME staging and production elsewhere);
+# the host name comes from the environment ConfigMap.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: edge-tls
+spec:
+  secretName: edge-tls
+  dnsNames: [ shop.example ]
+  issuerRef: { kind: ClusterIssuer, name: letsencrypt }
+  privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }

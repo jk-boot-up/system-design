@@ -1,0 +1,8 @@
+# Default deny: a pod not selected by its own policy talks to nothing. Every workload here ships an allow policy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]

@@ -1,0 +1,23 @@
+# production: the base as designed (design/03-deployment.md §3.1), secrets from the production vault, ACME certificates,
+# the cloud provider's S3-compatible object storage and the company SMTP relay instead of RustFS and Mailpit.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: [ ../../base, environment.yaml ]
+components:
+  - ../../components/hosts
+  - ../../components/external-secrets
+configMapGenerator:
+  # The relay accepts mail from the cluster's egress addresses without authentication (notification-service sends plain
+  # SMTP); its egress policy already allows port 587.
+  - { name: notification-service, namespace: e-commerce-shop, behavior: merge, literals: [ SMTP_ADDR=smtp-relay.shop.example:587 ] }
+  # Browsers upload to the same public endpoint, so no separate S3_PUBLIC_ENDPOINT.
+  - { name: catalog-service, namespace: e-commerce-shop, behavior: merge, literals: [ S3_ENDPOINT=https://storage.shop.example ] }
+patches:
+  # catalog reaches object storage outside the cluster through the egress gateway, as payment reaches its provider.
+  - target: { kind: NetworkPolicy, name: catalog-service }
+    patch: |-
+      - op: add
+        path: /spec/egress/-
+        value:
+          to: [ { namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: egress-gateway } } } ]
+          ports: [ { port: 443 } ]

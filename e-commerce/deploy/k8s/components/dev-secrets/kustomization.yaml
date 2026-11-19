@@ -1,0 +1,29 @@
+# Fixed, well-known passwords for the dev cluster only (synthetic data, no outside access). Each pair of secrets that must
+# agree (a database's owner in both namespaces, catalog's DB user, notification's AMQP URL) is written out side by side.
+# Staging and production use components/external-secrets instead.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+generatorOptions:
+  disableNameSuffixHash: true   # operators and the service bases reference these by name
+secretGenerator:
+  # e-commerce-platform: database owners (CloudNativePG reads username/password), the RabbitMQ user, object storage keys
+  - { name: orders-db,    namespace: e-commerce-platform, type: kubernetes.io/basic-auth, literals: [ username=orders,    password=dev-orders ] }
+  - { name: inventory-db, namespace: e-commerce-platform, type: kubernetes.io/basic-auth, literals: [ username=inventory, password=dev-inventory ] }
+  - { name: payments-db,  namespace: e-commerce-platform, type: kubernetes.io/basic-auth, literals: [ username=payments,  password=dev-payments ] }
+  - { name: catalog-db,   namespace: e-commerce-platform, type: kubernetes.io/basic-auth, literals: [ username=catalog,   password=dev-catalog ] }
+  - { name: keycloak-db,  namespace: e-commerce-platform, type: kubernetes.io/basic-auth, literals: [ username=keycloak,  password=dev-keycloak ] }
+  - { name: notification-rabbitmq, namespace: e-commerce-platform, literals: [ username=notification, password=dev-notification ] }
+  - { name: object-storage, namespace: e-commerce-platform, literals: [ RUSTFS_ACCESS_KEY=dev-catalog, RUSTFS_SECRET_KEY=dev-catalog-secret ] }
+  # e-commerce-shop: what the services read
+  - { name: orders-db,    namespace: e-commerce-shop, type: kubernetes.io/basic-auth, literals: [ username=orders,    password=dev-orders ] }
+  - { name: inventory-db, namespace: e-commerce-shop, type: kubernetes.io/basic-auth, literals: [ username=inventory, password=dev-inventory ] }
+  - { name: payments-db,  namespace: e-commerce-shop, type: kubernetes.io/basic-auth, literals: [ username=payments,  password=dev-payments ] }
+  - name: catalog-service
+    namespace: e-commerce-shop
+    literals: [ DB_USER=catalog, DB_PASSWORD=dev-catalog, S3_ACCESS_KEY=dev-catalog, S3_SECRET_KEY=dev-catalog-secret ]
+  - name: notification-service
+    namespace: e-commerce-shop
+    literals: [ "RABBITMQ_URL=amqp://notification:dev-notification@rabbitmq:5672/" ]
+  - name: analytics
+    namespace: e-commerce-shop
+    literals: [ CLICKHOUSE_PASSWORD=dev-clickhouse, CLICKHOUSE_GRAFANA_PASSWORD=dev-grafana ]

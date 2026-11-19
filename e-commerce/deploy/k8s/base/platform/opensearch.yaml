@@ -1,0 +1,33 @@
+# OpenSearch 3 through the OpenSearch operator: three nodes, each cluster-manager eligible and holding data, one per zone.
+# search-service speaks plain HTTP without credentials (services/search-service), so the security plugin is off and the
+# cluster is reachable only through networkpolicy.yaml. Nodes need vm.max_map_count=262144 from the node image or a
+# node-tuning DaemonSet: the operator's privileged init container is not allowed under Pod Security "baseline".
+apiVersion: opensearch.org/v1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch
+spec:
+  general:
+    serviceName: opensearch
+    version: 3.3.2
+    httpPort: 9200
+    setVMMaxMapCount: false
+    additionalConfig: { plugins.security.disabled: "true" }
+  security:
+    tls:
+      http: { enabled: false }
+      transport: { enabled: false }
+  nodePools:
+    - component: nodes
+      replicas: 3
+      roles: [cluster_manager, data, ingest]
+      diskSize: 100Gi
+      jvm: -Xms4g -Xmx4g
+      resources:
+        requests: { cpu: "2", memory: 8Gi }
+        limits: { memory: 8Gi }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector: { matchLabels: { opster.io/opensearch-nodepool: nodes } }

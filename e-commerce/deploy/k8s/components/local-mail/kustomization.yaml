@@ -1,0 +1,5 @@
+# Mailpit catches every email in dev and staging (web UI on port 8025: kubectl -n e-commerce-platform port-forward
+# svc/mailpit 8025). Production sends through the SMTP relay named in its overlay instead.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: [ mailpit.yaml ]

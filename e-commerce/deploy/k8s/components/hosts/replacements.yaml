@@ -1,0 +1,40 @@
+# Copies the host names of the overlay's environment ConfigMap into every setting that names one. Each overlay
+# brings its own environment ConfigMap as a resource and lists this component. URL targets replace only the host
+# part (the third "/"-separated field of https://host/...).
+- source: { kind: ConfigMap, name: environment, fieldPath: data.SHOP_HOST }
+  targets:
+    - select: { kind: Certificate, name: edge-tls }
+      fieldPaths: [ spec.dnsNames.0 ]
+    - select: { kind: ConfigMap, name: api-gateway }
+      fieldPaths: [ data.SHOP_ORIGINS ]
+      options: { delimiter: /, index: 2 }
+    - select: { kind: KeycloakRealmImport, name: shop }
+      fieldPaths: [ "spec.realm.clients.[clientId=shop-web].redirectUris.0", "spec.realm.clients.[clientId=shop-web].webOrigins.0" ]
+      options: { delimiter: /, index: 2 }
+- source: { kind: ConfigMap, name: environment, fieldPath: data.ID_HOST }
+  targets:
+    - select: { kind: Certificate, name: keycloak-tls }
+      fieldPaths: [ spec.dnsNames.0 ]
+    - select: { kind: Keycloak, name: keycloak }
+      fieldPaths: [ spec.hostname.hostname ]
+      options: { delimiter: /, index: 2 }
+    - select: { kind: ConfigMap, name: api-gateway }
+      fieldPaths: [ data.JWT_ISSUER ]
+      options: { delimiter: /, index: 2 }
+    - select: { kind: ConfigMap, name: catalog-service }
+      fieldPaths: [ data.JWT_ISSUER ]
+      options: { delimiter: /, index: 2 }
+    - select: { kind: ConfigMap, name: cart-service }
+      fieldPaths: [ data.JWT_ISSUER ]
+      options: { delimiter: /, index: 2 }
+    - select: { kind: ConfigMap, name: order-service }
+      fieldPaths: [ data.JWT_ISSUER ]
+      options: { delimiter: /, index: 2 }
+    - select: { kind: ConfigMap, name: review-service }
+      fieldPaths: [ data.JWT_ISSUER ]
+      options: { delimiter: /, index: 2 }
+- source: { kind: ConfigMap, name: environment, fieldPath: data.CDN_HOST }
+  targets:
+    - select: { kind: ConfigMap, name: catalog-service }
+      fieldPaths: [ data.IMAGE_BASE_URL ]
+      options: { delimiter: /, index: 2 }

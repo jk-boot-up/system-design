@@ -1,0 +1,11 @@
+# The users of deploy/compose/keycloak/shop-realm.json.
+- { op: replace, path: /spec/realm/clients/0/directAccessGrantsEnabled, value: true }
+- op: add
+  path: /spec/realm/users
+  value:
+    - { username: ada, email: ada@example.com, emailVerified: true, enabled: true, firstName: Ada, lastName: Lovelace,
+        credentials: [ { type: password, value: ada, temporary: false } ], realmRoles: [ customer ] }
+    - { username: bob, email: bob@example.com, emailVerified: true, enabled: true, firstName: Bob, lastName: Builder,
+        credentials: [ { type: password, value: bob, temporary: false } ], realmRoles: [ customer ] }
+    - { username: sam, email: sam@example.com, emailVerified: true, enabled: true, firstName: Sam, lastName: Staff,
+        credentials: [ { type: password, value: sam, temporary: false } ], realmRoles: [ customer, staff ] }

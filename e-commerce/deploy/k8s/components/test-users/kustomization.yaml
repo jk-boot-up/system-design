@@ -1,0 +1,7 @@
+# Dev only: the local stack's test users (ada and bob, customers; sam, staff) and the password grant the end-to-end tests
+# and smoke test use to get tokens.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - target: { kind: KeycloakRealmImport, name: shop }
+    path: users.yaml

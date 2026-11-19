@@ -3,7 +3,7 @@
 Current progress of the e-commerce platform. Updated with every change of state; the detailed work lists are in
 [design/DESIGN-PLAN.md](design/DESIGN-PLAN.md) and [design/IMPLEMENTATION-PLAN.md](design/IMPLEMENTATION-PLAN.md).
 
-**Last updated:** 2026-11-18 · **Branch:** `system-design-e-commerce-draft-1` (fast-forwarded to `main`)
+**Last updated:** 2026-11-19 · **Branch:** `system-design-e-commerce-draft-1` (fast-forwarded to `main`)
 
 ## At a glance
 
@@ -14,7 +14,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
 | Services (11) | ██████████ 100% | all eleven complete | — |
 | Walkthroughs | █████████░ 92% | every service | System walkthrough |
-| Local stack and Kubernetes overlays | ░░░░░░░░░░ 0% | inventory-service `k8s/` base | Compose stack, overlays |
+| Local stack and Kubernetes overlays | ██████████ 100% | Compose stack with profiles and smoke test; dev, staging and prod overlays with operator-managed stores, checked against the operators' CRDs | — |
 | End-to-end and performance tests | ░░░░░░░░░░ 0% | — | After checkout works end to end |
 
 ## Services
@@ -34,6 +34,14 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | analytics (ClickHouse) | ✅ | ✅ 1 end-to-end (ClickHouse image + Kafka) + Grafana check | ✅ (consumed) | ✅ | ✅ | ✅ | ✅ |
 
 ## Recently completed
+
+* Kubernetes overlays (`deploy/k8s`): dev, staging and prod built from every service's own base; services in `e-commerce-shop`,
+  operator-managed stores in `e-commerce-platform` (CloudNativePG + PgBouncer, Strimzi KRaft + the catalogue's topics, Redis per
+  use, OpenSearch, K8ssandra, RabbitMQ with notification's own user, Keycloak with the shop realm); host names set once per
+  environment; dev secrets in Git, External Secrets elsewhere. `verify.sh --server` sends all 446 objects to a kind API server
+  with strict validation against the pinned CRDs. Found and fixed on the way: the analytics base could not build (dashboard
+  outside its root), the KEDA scaler had no TriggerAuthentication, the edge had no network policy under default deny, and the
+  notification sent log shared an LRU cache (an eviction could send an email twice; it now has `redis-notify`).
 
 * Local stack (`deploy/compose`): every service and store, a Keycloak realm with test users, topics from the event catalogue, profiles
   so it runs in 4 GB, and `smoke.sh` buying through the NGINX edge (verified, plus async, search, reviews and analytics profiles).
@@ -90,7 +98,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* Platform: k8s overlays (P2), end-to-end tests (P3), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
+* Platform: end-to-end tests (P3), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

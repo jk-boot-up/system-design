@@ -1,0 +1,23 @@
+# Everything every environment shares: the two namespaces, the services (each project's own k8s/ base) and the data stores
+# as operator custom resources. Overlays add host names, secrets, sizes and certificates.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces.yaml
+  - shop
+  - platform
+# Images come from the shop registry. The release pipeline pins each overlay to the tested version with
+# `kustomize edit set image e-commerce/<name>=registry.shop.example/e-commerce/<name>:<version>` in that overlay.
+images:
+  - { name: e-commerce/analytics, newName: registry.shop.example/e-commerce/analytics }
+  - { name: e-commerce/api-gateway, newName: registry.shop.example/e-commerce/api-gateway }
+  - { name: e-commerce/cart-service, newName: registry.shop.example/e-commerce/cart-service }
+  - { name: e-commerce/catalog-service, newName: registry.shop.example/e-commerce/catalog-service }
+  - { name: e-commerce/edge, newName: registry.shop.example/e-commerce/edge }
+  - { name: e-commerce/inventory-service, newName: registry.shop.example/e-commerce/inventory-service }
+  - { name: e-commerce/notification-service, newName: registry.shop.example/e-commerce/notification-service }
+  - { name: e-commerce/order-service, newName: registry.shop.example/e-commerce/order-service }
+  - { name: e-commerce/payment-service, newName: registry.shop.example/e-commerce/payment-service }
+  - { name: e-commerce/recommendation-service, newName: registry.shop.example/e-commerce/recommendation-service }
+  - { name: e-commerce/review-service, newName: registry.shop.example/e-commerce/review-service }
+  - { name: e-commerce/search-service, newName: registry.shop.example/e-commerce/search-service }

@@ -47,7 +47,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <h1 id="status">Status<a class="headerlink" href="#status" title="Permanent link">#</a></h1>
 <p>Current progress of the e-commerce platform. Updated with every change of state; the detailed work lists are in
 <a href="design/DESIGN-PLAN.html">design/DESIGN-PLAN.md</a> and <a href="design/IMPLEMENTATION-PLAN.html">design/IMPLEMENTATION-PLAN.md</a>.</p>
-<p><strong>Last updated:</strong> 2026-11-18 · <strong>Branch:</strong> <code>system-design-e-commerce-draft-1</code> (fast-forwarded to <code>main</code>)</p>
+<p><strong>Last updated:</strong> 2026-11-19 · <strong>Branch:</strong> <code>system-design-e-commerce-draft-1</code> (fast-forwarded to <code>main</code>)</p>
 <h2 id="at-a-glance">At a glance<a class="headerlink" href="#at-a-glance" title="Permanent link">#</a></h2>
 <table>
 <thead>
@@ -91,9 +91,9 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>Local stack and Kubernetes overlays</td>
-<td>░░░░░░░░░░ 0%</td>
-<td>inventory-service <code>k8s/</code> base</td>
-<td>Compose stack, overlays</td>
+<td>██████████ 100%</td>
+<td>Compose stack with profiles and smoke test; dev, staging and prod overlays with operator-managed stores, checked against the operators' CRDs</td>
+<td>—</td>
 </tr>
 <tr>
 <td>End-to-end and performance tests</td>
@@ -233,6 +233,15 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <h2 id="recently-completed">Recently completed<a class="headerlink" href="#recently-completed" title="Permanent link">#</a></h2>
 <ul>
 <li>
+<p>Kubernetes overlays (<code>deploy/k8s</code>): dev, staging and prod built from every service's own base; services in <code>e-commerce-shop</code>,
+  operator-managed stores in <code>e-commerce-platform</code> (CloudNativePG + PgBouncer, Strimzi KRaft + the catalogue's topics, Redis per
+  use, OpenSearch, K8ssandra, RabbitMQ with notification's own user, Keycloak with the shop realm); host names set once per
+  environment; dev secrets in Git, External Secrets elsewhere. <code>verify.sh --server</code> sends all 446 objects to a kind API server
+  with strict validation against the pinned CRDs. Found and fixed on the way: the analytics base could not build (dashboard
+  outside its root), the KEDA scaler had no TriggerAuthentication, the edge had no network policy under default deny, and the
+  notification sent log shared an LRU cache (an eviction could send an email twice; it now has <code>redis-notify</code>).</p>
+</li>
+<li>
 <p>Local stack (<code>deploy/compose</code>): every service and store, a Keycloak realm with test users, topics from the event catalogue, profiles
   so it runs in 4 GB, and <code>smoke.sh</code> buying through the NGINX edge (verified, plus async, search, reviews and analytics profiles).
   Bringing it up found and fixed: stale upstream addresses in the gateway after a container is replaced, browser-reachable upload
@@ -300,7 +309,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>Platform: k8s overlays (P2), end-to-end tests (P3), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).</li>
+<li>Platform: end-to-end tests (P3), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).</li>
 <li>System, module and service diagrams (design document 11).</li>
 </ul>
 <h2 id="risks-and-notes">Risks and notes<a class="headerlink" href="#risks-and-notes" title="Permanent link">#</a></h2>

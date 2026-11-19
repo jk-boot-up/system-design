@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes overlays</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">E-commerce platform</a>
+  <span class="src">README.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="kubernetes-overlays">Kubernetes overlays<a class="headerlink" href="#kubernetes-overlays" title="Permanent link">#</a></h1>
+<p>The whole e-commerce system on Kubernetes, for three environments, built with Kustomize from each service's own <code>k8s/</code>
+base. Data stores are custom resources of their operators. Design: <a href="../../design/03-deployment.html">design/03-deployment.md</a>.</p>
+<pre class="highlight"><code class="language-bash">cd e-commerce/deploy/k8s
+./verify.sh                                   # build dev, staging and prod
+./verify.sh --server                          # and dry-run every object on a kind cluster against the operators' CRDs
+kubectl apply --server-side -k overlays/dev   # deploy (operators installed first, below)</code></pre>
+<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-text">base/
+  namespaces.yaml        e-commerce-shop (services, edge, analytics) and e-commerce-platform (data stores, Kafka, Keycloak)
+  shop/                  the 11 service bases + NGINX edge, unchanged; default deny; aliases to the platform stores;
+                         in-cluster JWK set URIs; RuntimeDefault seccomp; the edge certificate; KEDA credentials
+  platform/              PostgreSQL + PgBouncer, Kafka + topics, Redis, OpenSearch, Cassandra, RabbitMQ, Keycloak + realm
+components/
+  hosts/                 copies an overlay's host names (its environment.yaml) into issuers, CORS, realm, certificates
+  single-replica/        dev sizing: one of everything, replication factor 1
+  dev-secrets/           fixed dev passwords
+  external-secrets/      secrets from the environment's vault (staging, prod)
+  local-mail/            Mailpit (dev, staging)
+  local-object-storage/  RustFS as the S3 store (dev, staging)
+  self-signed-tls/       self-signed ClusterIssuer (dev)
+  test-users/            ada, bob (customers) and sam (staff), and the password grant (dev)
+overlays/
+  dev/  staging/  prod/</code></pre>
+<h2 id="environments">Environments<a class="headerlink" href="#environments" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>dev</th>
+<th>staging</th>
+<th>prod</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hosts</td>
+<td>dev.shop.example, id.dev.…</td>
+<td>staging.shop.example, id.staging.…</td>
+<td>shop.example, id.shop.example</td>
+</tr>
+<tr>
+<td>Service replicas</td>
+<td>1 (HPA up to 2)</td>
+<td>HPA from 2</td>
+<td>as in each base (HPA from 2, or 3 for gateway, order and inventory)</td>
+</tr>
+<tr>
+<td>Data stores</td>
+<td>1 replica each, RF 1</td>
+<td>3 replicas across zones, about half the size</td>
+<td>3 replicas across zones (design §3.1)</td>
+</tr>
+<tr>
+<td>Secrets</td>
+<td><code>dev-secrets</code> (in Git, dev only)</td>
+<td>External Secrets, staging vault</td>
+<td>External Secrets, production vault</td>
+</tr>
+<tr>
+<td>Email</td>
+<td>Mailpit</td>
+<td>Mailpit</td>
+<td>SMTP relay <code>smtp-relay.shop.example:587</code></td>
+</tr>
+<tr>
+<td>Object storage</td>
+<td>RustFS</td>
+<td>RustFS</td>
+<td>provider S3 at <code>storage.shop.example</code> (egress gateway)</td>
+</tr>
+<tr>
+<td>Certificates</td>
+<td>self-signed</td>
+<td>Let's Encrypt staging</td>
+<td>Let's Encrypt</td>
+</tr>
+<tr>
+<td>Keycloak users</td>
+<td>test users, password grant</td>
+<td>sign-up only</td>
+<td>sign-up only</td>
+</tr>
+</tbody>
+</table>
+<h2 id="where-things-run">Where things run<a class="headerlink" href="#where-things-run" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>e-commerce-shop</strong>: every service, the NGINX edge (the only <code>LoadBalancer</code>) and the analytics ClickHouse. Default deny;
+  each workload's own policy (in its service base) opens what it needs. Short store names in the service settings
+  (<code>kafka-bootstrap</code>, <code>pgbouncer-orders</code>, <code>redis-cart</code>, …) are <code>ExternalName</code> aliases to the platform namespace, so the bases
+  stay the same as in the local stack.</li>
+<li><strong>e-commerce-platform</strong>: one CloudNativePG cluster per owning service (orders, inventory, payments, catalog) and one for
+  Keycloak; PgBouncer poolers in transaction mode for orders, inventory and payments; Kafka in KRaft mode with the topics of
+  the event catalogue; Redis per use (<code>redis-cache</code>, <code>redis-ratelimit</code>, <code>redis-cart</code>, <code>redis-reco</code>, <code>redis-notify</code>);
+  OpenSearch; Cassandra (data centre <code>dc1</code>); RabbitMQ with notification's own user; Keycloak with the <code>shop</code> realm. Ingress
+  is allowed from this namespace, the shop namespace, the operators, <code>monitoring</code> and <code>ingress-nginx</code>.</li>
+</ul>
+<p><code>redis-notify</code> is separate from the cache on purpose: an LRU eviction of a sent-log entry would let an email go out twice.</p>
+<h2 id="operators-once-per-cluster">Operators (once per cluster)<a class="headerlink" href="#operators-once-per-cluster" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Version</th>
+<th>Namespace</th>
+<th>Install</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cert-manager</td>
+<td>1.21.3</td>
+<td><code>cert-manager</code></td>
+<td>Helm chart <code>jetstack/cert-manager</code>, <code>crds.enabled=true</code></td>
+</tr>
+<tr>
+<td>CloudNativePG</td>
+<td>1.30.2</td>
+<td><code>cnpg-system</code></td>
+<td><code>kubectl apply --server-side -f https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.2/cnpg-1.30.2.yaml</code></td>
+</tr>
+<tr>
+<td>Strimzi</td>
+<td>1.3.1</td>
+<td><code>strimzi</code></td>
+<td>Helm chart <code>strimzi/strimzi-kafka-operator</code>, <code>watchNamespaces={e-commerce-platform}</code></td>
+</tr>
+<tr>
+<td>OpsTree Redis operator</td>
+<td>0.27.0</td>
+<td><code>redis-operator</code></td>
+<td>Helm chart <code>ot-helm/redis-operator</code></td>
+</tr>
+<tr>
+<td>OpenSearch operator</td>
+<td>3.0.0</td>
+<td><code>opensearch-operator</code></td>
+<td>Helm chart <code>opensearch-operator/opensearch-operator</code></td>
+</tr>
+<tr>
+<td>K8ssandra operator</td>
+<td>1.34.0</td>
+<td><code>k8ssandra-operator</code></td>
+<td>Helm chart <code>k8ssandra/k8ssandra-operator</code>, cluster-scoped</td>
+</tr>
+<tr>
+<td>RabbitMQ cluster + messaging topology operators</td>
+<td>2.23.3, 1.20.6</td>
+<td><code>rabbitmq-system</code></td>
+<td>their release manifests</td>
+</tr>
+<tr>
+<td>Keycloak operator</td>
+<td>26.8.2</td>
+<td><strong><code>e-commerce-platform</code></strong> (it watches only its own namespace)</td>
+<td>the <code>keycloak-k8s-resources</code> manifests</td>
+</tr>
+<tr>
+<td>External Secrets Operator</td>
+<td>2.15.0</td>
+<td><code>external-secrets</code></td>
+<td>Helm chart <code>external-secrets/external-secrets</code> (staging, prod)</td>
+</tr>
+<tr>
+<td>KEDA</td>
+<td>2.21.1</td>
+<td><code>keda</code></td>
+<td>Helm chart <code>kedacore/keda</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>verify.sh --server</code> checks every manifest against exactly these CRD versions.</p>
+<p>Cluster-level objects the staging and prod overlays expect:</p>
+<ul>
+<li><code>ClusterIssuer</code> <code>letsencrypt-staging</code> (staging) and <code>letsencrypt</code> (prod), with the DNS-01 solver of the zone's DNS provider.</li>
+<li><code>ClusterSecretStore</code> <code>e-commerce</code>, pointing at that environment's vault, holding these keys:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Properties</th>
+<th>Becomes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>e-commerce/orders-db</code>, <code>inventory-db</code>, <code>payments-db</code>, <code>catalog-db</code>, <code>keycloak-db</code></td>
+<td><code>username</code>, <code>password</code></td>
+<td>database owner secrets in both namespaces</td>
+</tr>
+<tr>
+<td><code>e-commerce/notification-rabbitmq</code></td>
+<td><code>username</code>, <code>password</code></td>
+<td>the RabbitMQ user and notification's <code>RABBITMQ_URL</code></td>
+</tr>
+<tr>
+<td><code>e-commerce/object-storage</code></td>
+<td><code>access_key</code>, <code>secret_key</code></td>
+<td>catalog's <code>S3_ACCESS_KEY</code>, <code>S3_SECRET_KEY</code></td>
+</tr>
+<tr>
+<td><code>e-commerce/analytics</code></td>
+<td><code>default_password</code>, <code>grafana_password</code></td>
+<td>ClickHouse passwords</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>An <code>egress-gateway</code> namespace (payment provider, object storage) and an ingress controller in <code>ingress-nginx</code> in front of
+  Keycloak.</li>
+<li>Nodes with <code>vm.max_map_count=262144</code> for OpenSearch (the operator's privileged init container is off).</li>
+</ul>
+<h2 id="using-dev">Using dev<a class="headerlink" href="#using-dev" title="Permanent link">#</a></h2>
+<pre class="highlight"><code class="language-bash">kubectl -n e-commerce-shop port-forward svc/edge 8443:443           # the shop API through the edge
+kubectl -n e-commerce-platform port-forward svc/mailpit 8025        # emails
+kubectl -n e-commerce-platform port-forward svc/minio 9000          # browser uploads (presigned URLs point here)</code></pre>
+<p>Tokens come from <code>https://id.dev.shop.example/realms/shop</code> with the test users (<code>ada</code> / <code>ada</code>, <code>sam</code> / <code>sam</code>), as in the
+local stack's <a href="../compose/smoke.sh">smoke test</a>.</p>
+<h2 id="known-gaps">Known gaps<a class="headerlink" href="#known-gaps" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>Why it is acceptable now</th>
+<th>Next step</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OpenSearch, Cassandra and Redis run without authentication</td>
+<td>Only reachable inside the platform namespace's network policy; the services do not send credentials yet</td>
+<td>Add credentials to search, review and the Redis clients, then enable security</td>
+</tr>
+<tr>
+<td>Edge NGINX and ClickHouse run as root (warned against <code>restricted</code>, allowed by <code>baseline</code>)</td>
+<td>Both drop to an unprivileged worker or user inside the image</td>
+<td>Unprivileged NGINX image; ClickHouse with <code>runAsUser: 101</code></td>
+</tr>
+<tr>
+<td>Traces and logs are not collected</td>
+<td>Metrics are scraped by Prometheus annotations</td>
+<td>P5: OTel collector, Tempo, Loki</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

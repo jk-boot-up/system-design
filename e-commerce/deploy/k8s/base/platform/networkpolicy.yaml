@@ -1,0 +1,21 @@
+# Default deny for ingress into the platform namespace, then allow: pods of this namespace (replication, the Keycloak
+# database), the shop namespace (services; each service's own egress policy narrows this further), the operators that
+# manage these pods, Prometheus, and the ingress controller in front of Keycloak. Operators run in the namespaces the
+# README installs them into.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: platform-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-shop } }
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: [cnpg-system, strimzi, redis-operator, opensearch-operator, k8ssandra-operator, rabbitmq-system,
+                         monitoring, ingress-nginx]

@@ -1,0 +1,24 @@
+# The platform namespace: data stores, Kafka and Keycloak, each as a custom resource of its operator (installed once per
+# cluster, see deploy/k8s/README.md). Sizes here are production's; the dev and staging overlays shrink them.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: e-commerce-platform
+labels:
+  - pairs: { app.kubernetes.io/part-of: e-commerce }
+resources:
+  - postgres.yaml
+  - kafka.yaml
+  - topics.yaml
+  - redis.yaml
+  - opensearch.yaml
+  - cassandra.yaml
+  - rabbitmq.yaml
+  - keycloak.yaml
+  - networkpolicy.yaml
+configMapGenerator:
+  - name: redis-cache-config       # caches: evict least recently used keys, keep nothing on disk
+    literals: [ "redis-additional.conf=maxmemory-policy allkeys-lru\nsave \"\"\nappendonly no\n" ]
+  - name: redis-durable-config     # carts and co-purchase counts: append-only file, fsync every second
+    literals: [ "redis-additional.conf=maxmemory-policy noeviction\nappendonly yes\nappendfsync everysec\n" ]
+generatorOptions:
+  disableNameSuffixHash: true      # operators reference these by name

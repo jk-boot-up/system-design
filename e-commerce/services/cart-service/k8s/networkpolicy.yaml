@@ -1,4 +1,5 @@
-# Callers: the gateway (public cart API) and order-service (checkout snapshot). Egress: catalog-service, Redis, Kafka, Keycloak.
+# Callers: the gateway (public cart API) and order-service (checkout snapshot). Egress: catalog-service, and Redis, Kafka and
+# Keycloak in the platform namespace.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -15,6 +16,5 @@ spec:
   egress:
     - to:
         - podSelector: { matchLabels: { app.kubernetes.io/name: catalog-service } }
-        - podSelector: { matchLabels: { app.kubernetes.io/name: redis-cart } }
     - to: [ { namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-platform } } } ]
     - ports: [ { port: 53, protocol: UDP }, { port: 53, protocol: TCP } ]

@@ -1,0 +1,8 @@
+# Dev only: certificates from a self-signed ClusterIssuer instead of ACME.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: [ issuer.yaml ]
+patches:
+  - target: { kind: Certificate }
+    patch: |-
+      - { op: replace, path: /spec/issuerRef/name, value: e-commerce-self-signed }

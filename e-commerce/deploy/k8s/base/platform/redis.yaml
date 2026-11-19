@@ -1,0 +1,71 @@
+# Redis 8 through the OpsTree Redis operator, one instance per use so a cache flush or eviction never touches a cart:
+#   redis-cache      catalog cache-aside                                  LRU, no persistence
+#   redis-ratelimit  gateway token buckets (the gateway falls back to a stricter local bucket if it is down)   no persistence
+#   redis-cart       carts (30-day expiry)                                append-only file, never evicts
+#   redis-reco       co-purchase counts (rebuildable from order.events)  append-only file, never evicts
+#   redis-notify     notification sent log and claims                    append-only file, never evicts (an evicted
+#                    entry would let an email go out twice)
+# Reachable only from e-commerce-shop and this namespace (networkpolicy.yaml); no password, as in every service's settings.
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: redis-cache
+spec:
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v8.4.6
+    resources: { requests: { cpu: 500m, memory: 2Gi }, limits: { memory: 2Gi } }
+  redisConfig: { additionalRedisConfig: redis-cache-config, maxMemoryPercentOfLimit: 80 }
+  podSecurityContext: { runAsUser: 1000, fsGroup: 1000 }
+---
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: redis-ratelimit
+spec:
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v8.4.6
+    resources: { requests: { cpu: 500m, memory: 512Mi }, limits: { memory: 512Mi } }
+  redisConfig: { additionalRedisConfig: redis-cache-config, maxMemoryPercentOfLimit: 80 }
+  podSecurityContext: { runAsUser: 1000, fsGroup: 1000 }
+---
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: redis-cart
+spec:
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v8.4.6
+    resources: { requests: { cpu: "1", memory: 4Gi }, limits: { memory: 4Gi } }
+  redisConfig: { additionalRedisConfig: redis-durable-config, maxMemoryPercentOfLimit: 80 }
+  podSecurityContext: { runAsUser: 1000, fsGroup: 1000 }
+  storage:
+    volumeClaimTemplate:
+      spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 20Gi } } }
+---
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: redis-reco
+spec:
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v8.4.6
+    resources: { requests: { cpu: 500m, memory: 2Gi }, limits: { memory: 2Gi } }
+  redisConfig: { additionalRedisConfig: redis-durable-config, maxMemoryPercentOfLimit: 80 }
+  podSecurityContext: { runAsUser: 1000, fsGroup: 1000 }
+  storage:
+    volumeClaimTemplate:
+      spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 10Gi } } }
+---
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: redis-notify
+spec:
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v8.4.6
+    resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { memory: 512Mi } }
+  redisConfig: { additionalRedisConfig: redis-durable-config, maxMemoryPercentOfLimit: 80 }
+  podSecurityContext: { runAsUser: 1000, fsGroup: 1000 }
+  storage:
+    volumeClaimTemplate:
+      spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 5Gi } } }

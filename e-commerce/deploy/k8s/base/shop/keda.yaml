@@ -1,0 +1,9 @@
+# Credentials for the KEDA scaler that sizes notification workers by the email.send queue (services/notification-service/
+# k8s/hpa.yaml). It reads the same AMQP URL the workers use; QueueLength over AMQP needs no management API access.
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: notification-rabbitmq
+spec:
+  secretTargetRef:
+    - { parameter: host, name: notification-service, key: RABBITMQ_URL }

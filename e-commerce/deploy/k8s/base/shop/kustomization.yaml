@@ -1,0 +1,36 @@
+# The shop namespace: every service's own k8s/ base, unchanged, plus what only makes sense once they run together.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: e-commerce-shop
+resources:
+  - ../../../../services/api-gateway/k8s
+  - ../../../../services/api-gateway/edge/k8s
+  - ../../../../services/catalog-service/k8s
+  - ../../../../services/search-service/k8s
+  - ../../../../services/cart-service/k8s
+  - ../../../../services/inventory-service/k8s
+  - ../../../../services/order-service/k8s
+  - ../../../../services/payment-service/k8s
+  - ../../../../services/review-service/k8s
+  - ../../../../services/notification-service/k8s
+  - ../../../../services/recommendation-service/k8s
+  - ../../../../services/analytics/k8s
+  - default-deny.yaml
+  - aliases.yaml
+  - certificate.yaml
+  - keda.yaml
+# Signing keys are fetched inside the cluster (network policies allow no route to the public Keycloak address); the issuer
+# claim is still checked against the public URL in JWT_ISSUER.
+configMapGenerator:
+  - { name: api-gateway, behavior: merge, literals: [ "JWT_JWK_SET_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/certs" ] }
+  - { name: catalog-service, behavior: merge, literals: [ "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/certs" ] }
+  - { name: cart-service, behavior: merge, literals: [ "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/certs" ] }
+  - { name: order-service, behavior: merge, literals: [ "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/certs" ] }
+  - { name: review-service, behavior: merge, literals: [ "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/certs" ] }
+# RuntimeDefault seccomp for every pod, the one "restricted" requirement the service bases leave to the platform.
+patches:
+  - target: { kind: Deployment|StatefulSet }
+    patch: |-
+      kind: any
+      metadata: { name: any }
+      spec: { template: { spec: { securityContext: { seccompProfile: { type: RuntimeDefault } } } } }

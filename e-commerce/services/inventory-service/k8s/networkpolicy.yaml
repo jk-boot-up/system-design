@@ -1,4 +1,4 @@
-# Only order-service may call inventory; inventory may reach only its database, Kafka and the OTel collector.
+# Only order-service may call inventory; inventory may reach only the platform namespace (its database pooler, Kafka, OTel).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -12,7 +12,5 @@ spec:
         - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-platform } }
       ports: [ { port: 8084 } ]
   egress:
-    - to: [ { podSelector: { matchLabels: { app.kubernetes.io/name: pgbouncer-inventory } } } ]
-      ports: [ { port: 5432 } ]
     - to: [ { namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-platform } } } ]
     - ports: [ { port: 53, protocol: UDP }, { port: 53, protocol: TCP } ]
