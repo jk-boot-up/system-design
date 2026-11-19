@@ -1,0 +1,21 @@
+flowchart LR
+    B["Browser<br/>(session cookie only)"]
+    subgraph Edge["NGINX edge"]
+      E1["TLS, HTTP/2, security headers<br/>rate limits, micro-cache"]
+    end
+    subgraph SF["storefront (Node 26, 3+ pods)"]
+      R["React server rendering<br/>loaders and actions"]
+      BFF["BFF: OIDC client, sessions,<br/>CSRF checks, API proxy"]
+    end
+    RS[("redis-session<br/>encrypted sessions")]
+    G["api-gateway<br/>JWT, rate limits, routing"]
+    K["Keycloak<br/>(confidential client)"]
+    SV["catalog · search · cart · order<br/>review · recommendation · inventory"]
+    CDN["CDN<br/>/assets, product images"]
+    B -- "HTML, form posts, JSON" --> E1 --> R
+    B -- "hashed assets, images" --> CDN
+    R --- BFF
+    BFF -- "Bearer access token" --> G --> SV
+    BFF -- "code exchange, refresh (back channel)" --> K
+    B -- "sign-in pages only" --> K
+    BFF --- RS

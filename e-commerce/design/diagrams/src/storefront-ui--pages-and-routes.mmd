@@ -1,0 +1,11 @@
+flowchart TB
+    Home["/ home"] --> Cat["/c/:slug category"]
+    Home --> Search["/search?q=&brand=&minPrice=… results + facets"]
+    Cat --> PDP["/p/:sku product, reviews, recommendations"]
+    Search --> PDP
+    PDP --> Cart["/cart"]
+    Cart --> Checkout["/checkout 🔒"]
+    Checkout --> Result["/orders/:id 🔒 confirmation"]
+    Orders["/orders 🔒 history"] --> Result
+    PDP --> Review["/p/:sku/review 🔒"]
+    Staff["/staff/* 🔒 staff + 2FA<br/>products, images, categories, stock"]

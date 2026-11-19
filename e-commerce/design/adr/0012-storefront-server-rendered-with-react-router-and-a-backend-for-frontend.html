@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0012. Storefront server-rendered with React Router and a backend-for-frontend</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../../README.html">E-commerce platform</a>
+  <span class="src">0012-storefront-server-rendered-with-react-router-and-a-backend-for-frontend.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="0012-storefront-server-rendered-with-react-router-and-a-backend-for-frontend">0012. Storefront server-rendered with React Router and a backend-for-frontend<a class="headerlink" href="#0012-storefront-server-rendered-with-react-router-and-a-backend-for-frontend" title="Permanent link">#</a></h1>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Status</td>
+<td>Accepted</td>
+</tr>
+<tr>
+<td>Date</td>
+<td>2026-11-19</td>
+</tr>
+</tbody>
+</table>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">#</a></h2>
+<p>The platform needs a web storefront for shoppers and staff that is production grade and secure: public pages fast on phones
+and indexable, no tokens in the browser, every checkout outcome handled. Details and the full ranking:
+<a href="../16-storefront-ui.html">16 Storefront UI</a>.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">#</a></h2>
+<p>Build the storefront with React Router 8 in framework mode (React 19, TypeScript, Vite), rendered on the server by a Node 26
+LTS process that is also the backend-for-frontend: it signs users in with Keycloak as a confidential OIDC client, keeps tokens
+in encrypted server-side sessions (<code>redis-session</code>) and calls the gateway on the browser's behalf. The browser holds only an
+<code>HttpOnly</code> <code>__Host-</code> session cookie. Only server rendering, loaders and actions are used (no React Server Components).</p>
+<h2 id="alternatives-considered">Alternatives considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>React + Vite single-page app, tokens in the browser</td>
+<td>Any XSS bug could use the tokens; public pages render only after JavaScript runs</td>
+</tr>
+<tr>
+<td>Same app with a separate BFF service</td>
+<td>Two processes to build and run, and public pages still not server-rendered</td>
+</tr>
+<tr>
+<td>Next.js 16</td>
+<td>Second in the ranking and the most used React framework; more concepts (server components, caches, middleware) and more critical advisories in 2026 in exactly those features</td>
+</tr>
+<tr>
+<td>SvelteKit, Nuxt</td>
+<td>As capable; smaller ecosystems and hiring pools</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">#</a></h2>
+<ul>
+<li>A new Node workload (<code>storefront</code>) and a <code>redis-session</code> store in every environment.</li>
+<li>Framework and runtime advisories must be patched within days (critical within 72 hours).</li>
+<li>Public pages can be cached at the edge for signed-out visitors; signed-in pages are never cached.</li>
+<li>The components are plain React, so moving to another React framework later reuses them.</li>
+</ul>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

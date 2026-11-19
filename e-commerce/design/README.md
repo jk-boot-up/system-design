@@ -17,6 +17,7 @@ the design, then read these documents in order.
 | 8 | [Class and UML diagrams](08-class-diagrams.md) | Domain models, ports and adapters, component and package diagrams |
 | 9 | [API catalogue](09-api-catalogue.md) | Every public and internal endpoint with request and response shapes |
 | 10 | [Event catalogue](10-event-catalogue.md) | Every event, topic, key, producer, consumer and payload |
+| 16 | [Storefront UI](16-storefront-ui.md) | What the industry uses, ranked stack choice with reasons, BFF security, pages, checkout, deployment, testing |
 | 11 | Low-level design per service | Each service keeps its own design in `services/<service>/design/README.md` (links below) |
 | 12 | [Architecture decision records](adr/) | One record per significant decision |
 

@@ -224,8 +224,8 @@ consumers come after it.</p>
 </tr>
 <tr>
 <td>UI</td>
-<td>Demo storefront <code>web/storefront</code> (after P3)</td>
-<td>React + TypeScript + Vite single-page app served as static files by the NGINX edge (no Node server): browse and faceted search, product page with reviews and recommendations, cart, sign-in with Keycloak (<code>shop-web</code>, PKCE), checkout, order history and cancellation, a staff page for products, images and stock; problem details shown to the user; Dockerfile, compose and k8s route, Playwright journeys, walkthrough. Server rendering stays a SPEC extension (a demo behind sign-in needs no search-engine indexing)</td>
+<td>Storefront <code>web/storefront</code> (after P3)</td>
+<td>Production-grade and secure web shop designed in <a href="16-storefront-ui.html">16 Storefront UI</a>: React Router 8 framework mode (React 19, TypeScript, Vite) rendered on the server by Node 26 LTS, acting as backend-for-frontend (Keycloak confidential client, encrypted sessions in <code>redis-session</code>, no tokens in the browser, CSRF and strict CSP); browse, search, product, cart, checkout with every outcome, orders, reviews, staff pages with second factor; Playwright + axe + ZAP + Lighthouse; k8s and compose wiring; walkthrough. Steps U1–U6</td>
 <td>⏳</td>
 </tr>
 <tr>

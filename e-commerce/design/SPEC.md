@@ -434,7 +434,7 @@ Detailed reasoning for each choice is recorded in `design/adr/`.
 * Fulfilment and shipping integration; returns.
 * Promotions and coupon engine (rules evaluated at cart pricing).
 * Marketplace: seller onboarding and split payments.
-* Storefront web app (server-rendered, CDN cached).
+* Storefront web app (server-rendered, CDN cached): designed in [16 Storefront UI](16-storefront-ui.md), planned after the end-to-end tests.
 
 ## 13. Scalability, modularity and performance
 

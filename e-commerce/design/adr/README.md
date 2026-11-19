@@ -13,3 +13,4 @@
 | 0009 | [UUIDv7 identifiers](0009-uuidv7-identifiers.md) | Accepted |
 | 0010 | [Plain JDBC (JdbcClient) instead of JPA](0010-plain-jdbc-jdbcclient-instead-of-jpa.md) | Accepted |
 | 0011 | [Diagrams as rendered SVG from editable sources](0011-diagrams-as-rendered-svg-from-editable-sources.md) | Accepted |
+| 0012 | [Storefront server-rendered with React Router and a backend-for-frontend](0012-storefront-server-rendered-with-react-router-and-a-backend-for-frontend.md) | Accepted |

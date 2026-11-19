@@ -39,6 +39,7 @@ Status: ✅ done · 🔄 in progress · ⏳ planned
 | S18 | [ADRs](adr/README.md) | 11 decision records (microservices, no shared code, saga, outbox, brokers, languages, polyglot persistence, ids, JDBC, diagrams) | ✅ (new ADRs as decisions arise) |
 | S19 | System walkthrough (`walkthrough/`) | Animated: architecture tour (system → services → modules), browse and search, cart, checkout happy path, out of stock, payment declined, payment timeout, cancellation and refund, event fan-out, flash sale, failure of a dependency | ⏳ |
 | S20 | [PREREQUISITES.md](../PREREQUISITES.md) | Tools, versions, resources, ports, verification | ✅ |
+| S21 | [16 Storefront UI](16-storefront-ui.md) | Industry survey, ranked stack choice with reasons, BFF security design, pages, checkout, errors, accessibility, performance, deployment, testing | ✅ |
 
 ## 3. Per-service design (`services/<service>/design/`)
 

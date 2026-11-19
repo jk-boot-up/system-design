@@ -1,0 +1,18 @@
+sequenceDiagram
+    autonumber
+    actor U as Shopper
+    participant SF as storefront (BFF)
+    participant RS as redis-session
+    participant KC as Keycloak
+    participant GW as api-gateway
+    U->>SF: GET /login?returnTo=/checkout
+    SF->>RS: store state, nonce, PKCE verifier (5 min)
+    SF-->>U: 302 to Keycloak (code, PKCE S256, state, nonce)
+    U->>KC: sign in (password or passkey)
+    KC-->>U: 302 /auth/callback?code&state
+    U->>SF: GET /auth/callback
+    SF->>KC: code + verifier + client secret (back channel)
+    KC-->>SF: ID, access, refresh tokens
+    SF->>RS: new session id → encrypted tokens, user, roles
+    SF->>GW: POST /cart/merge {guestId} with Bearer token
+    SF-->>U: 302 returnTo, Set-Cookie __Host-sid (HttpOnly, Secure, SameSite=Lax)

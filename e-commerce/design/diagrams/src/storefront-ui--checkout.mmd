@@ -1,0 +1,15 @@
+stateDiagram-v2
+    [*] --> Review: open /checkout
+    Review --> Submitting: Place order (server creates Idempotency-Key)
+    Submitting --> Confirmed: 201, status CONFIRMED
+    Submitting --> Pending: 201, status PENDING
+    Submitting --> OutOfStock: 409 OUT_OF_STOCK
+    Submitting --> Declined: 402 PAYMENT_DECLINED
+    Submitting --> Retry: timeout or 5xx
+    Retry --> Submitting: same Idempotency-Key
+    Pending --> Confirmed: poll GET /orders/{id}
+    Pending --> Cancelled: poll shows CANCELLED
+    OutOfStock --> Review: cart refreshed, lines marked
+    Declined --> Review: choose another card
+    Confirmed --> [*]
+    Cancelled --> [*]

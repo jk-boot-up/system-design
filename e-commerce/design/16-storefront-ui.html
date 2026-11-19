@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>16. Storefront UI</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../README.html">E-commerce platform</a>
+  <span class="src">16-storefront-ui.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="16-storefront-ui">16. Storefront UI<a class="headerlink" href="#16-storefront-ui" title="Permanent link">#</a></h1>
+<p>The storefront: the web app shoppers and staff use. It is designed to production grade and secure, not as a throwaway
+demo. This document shows what the industry uses, ranks the options against this project's needs, gives the reason for
+every decision, and designs the app. Milestone <strong>UI</strong> in the <a href="IMPLEMENTATION-PLAN.html">implementation plan</a>; decision record
+<a href="adr/0012-storefront-server-rendered-with-react-router-and-a-backend-for-frontend.html">ADR 0012</a>.</p>
+<h2 id="161-requirements">16.1 Requirements<a class="headerlink" href="#161-requirements" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>What it means for the UI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Production grade</strong></td>
+<td>Public product and search pages are fast on a mid-range phone (LCP &lt; 2.5 s, INP &lt; 200 ms, CLS &lt; 0.1) and indexable by search engines; zero-downtime releases; observable (logs, metrics, traces); runs in every environment of <a href="03-deployment.html">03 Deployment</a></td>
+</tr>
+<tr>
+<td><strong>Secure</strong></td>
+<td>No access or refresh token ever reaches the browser; protection against XSS, CSRF, clickjacking, session theft and supply-chain attacks; least privilege on the network; follows the OWASP ASVS 5.0 level 2 controls for web front ends</td>
+</tr>
+<tr>
+<td><strong>Correct</strong></td>
+<td>Every API outcome has a screen, including every checkout outcome of the saga; no double orders</td>
+</tr>
+<tr>
+<td><strong>Accessible</strong></td>
+<td>WCAG 2.2 AA, checked automatically on every page</td>
+</tr>
+<tr>
+<td><strong>Maintainable</strong></td>
+<td>Mainstream technology, typed against the services' OpenAPI contracts, tested at every level</td>
+</tr>
+</tbody>
+</table>
+<p>In scope: browse, search with facets, product page with reviews and recommendations, guest cart, sign-in and registration
+(Keycloak), cart merge, checkout, orders, cancellation, reviews, and staff pages for products, images, categories and stock.
+Out of scope: real payments (payment-service simulates the provider), multiple languages and currencies, native apps, a CMS.</p>
+<h2 id="162-what-the-industry-uses">16.2 What the industry uses<a class="headerlink" href="#162-what-the-industry-uses" title="Permanent link">#</a></h2>
+<p>Measured on 2026-11-19 from the public npm registry (downloads in the last week), GitHub, and the frameworks' published
+security advisories. Downloads overstate packages that other tools pull in and include CI installs, so they show relative
+use, not head counts. Developer surveys of recent years (Stack Overflow, State of JS) give the same order for the big
+three: React well ahead, then Angular and Vue, then Svelte.</p>
+<h3 id="ui-libraries">UI libraries<a class="headerlink" href="#ui-libraries" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Library</th>
+<th>npm downloads / week</th>
+<th>GitHub stars</th>
+<th>Where it is used in practice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>React</td>
+<td>268.6 M</td>
+<td>252.7 k</td>
+<td>The default for new web apps; most jobs, libraries and examples; most commerce front ends (Shopify Hydrogen, many headless shops)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Vue</td>
+<td>25.9 M</td>
+<td>55.0 k</td>
+<td>Strong in Asia and with PHP/Laravel teams; Nuxt for server rendering</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Angular</td>
+<td>8.3 M</td>
+<td>101.4 k</td>
+<td>Large enterprises and internal apps; everything built in</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Svelte</td>
+<td>10.2 M</td>
+<td>89.7 k</td>
+<td>Loved by developers, small bundles, smaller job market</td>
+</tr>
+<tr>
+<td>—</td>
+<td>Solid, Preact, Qwik</td>
+<td>—</td>
+<td>—</td>
+<td>Niche, or pulled in by other tools</td>
+</tr>
+</tbody>
+</table>
+<h3 id="application-frameworks-routing-server-rendering-server-code">Application frameworks (routing, server rendering, server code)<a class="headerlink" href="#application-frameworks-routing-server-rendering-server-code" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Framework</th>
+<th>Built on</th>
+<th>npm downloads / week</th>
+<th>Advisories in 2026 (critical / high)</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Next.js 16</td>
+<td>React</td>
+<td>97.7 M</td>
+<td>5 / 7</td>
+<td>Public React sites; the most common React framework</td>
+</tr>
+<tr>
+<td>2</td>
+<td>React Router 8 framework mode (formerly Remix)</td>
+<td>React, Vite</td>
+<td>78.9 M (library + framework)</td>
+<td>1 / 12</td>
+<td>Apps that grew from React Router; Shopify Hydrogen</td>
+</tr>
+<tr>
+<td>3</td>
+<td>TanStack Start</td>
+<td>React, Vite</td>
+<td>13.7 M</td>
+<td>— (young)</td>
+<td>Newer full-stack React with typed routing</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Astro 7</td>
+<td>any (islands)</td>
+<td>12.3 M</td>
+<td>—</td>
+<td>Content sites with little interactivity</td>
+</tr>
+<tr>
+<td>5</td>
+<td>SvelteKit 3</td>
+<td>Svelte, Vite</td>
+<td>5.5 M</td>
+<td>—</td>
+<td>Svelte apps with server rendering</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Nuxt 4</td>
+<td>Vue, Vite</td>
+<td>3.5 M</td>
+<td>—</td>
+<td>Vue apps with server rendering</td>
+</tr>
+</tbody>
+</table>
+<p>Advisory counts are from each project's GitHub security advisories. Both leading frameworks ship fixes often; React
+Router's latest batch (2026-11-18) is fixed in 8.5.1, and the storefront starts on 8.5.2. The lesson for a secure design is
+not "pick the one with no advisories" but "use few framework features, and patch within days" (§16.11).</p>
+<h3 id="the-rest-of-the-stack">The rest of the stack<a class="headerlink" href="#the-rest-of-the-stack" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Most used today</th>
+<th>Runner-up</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Build tool</td>
+<td><strong>Vite</strong> (284 M)</td>
+<td>webpack (75 M, mostly legacy)</td>
+<td>Every framework above except Next.js builds with Vite</td>
+</tr>
+<tr>
+<td>Server-side OIDC</td>
+<td><strong>openid-client</strong> (Node)</td>
+<td>Auth.js (Next.js-centred)</td>
+<td>openid-client is a certified OpenID relying party library</td>
+</tr>
+<tr>
+<td>Server data in the browser</td>
+<td><strong>TanStack Query</strong> (89.6 M)</td>
+<td>Redux Toolkit (51.3 M)</td>
+<td>Mostly replaced by framework loaders when the server renders</td>
+</tr>
+<tr>
+<td>Styling</td>
+<td><strong>Tailwind CSS</strong> (187.5 M)</td>
+<td>styled-components, MUI (14 M each)</td>
+<td>CSS-in-JS declined with server rendering</td>
+</tr>
+<tr>
+<td>Accessible primitives</td>
+<td>Radix (99.5 M)</td>
+<td>React Aria Components (9.8 M)</td>
+<td>Unstyled, accessible building blocks</td>
+</tr>
+<tr>
+<td>Unit tests</td>
+<td><strong>Vitest</strong> (190 M)</td>
+<td>Jest (61 M)</td>
+<td></td>
+</tr>
+<tr>
+<td>Browser tests</td>
+<td><strong>Playwright</strong> (136.4 M)</td>
+<td>Cypress (7.3 M)</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Practical reading:</strong> in 2026 a team building a public, production web shop most often picks React + TypeScript with a
+server-rendering framework, Next.js first and React Router second. Plain single-page apps built with Vite remain the
+common choice for internal tools and apps behind a login.</p>
+<h2 id="163-choosing-the-stack">16.3 Choosing the stack<a class="headerlink" href="#163-choosing-the-stack" title="Permanent link">#</a></h2>
+<h3 id="why-the-requirements-rule-out-a-plain-single-page-app">Why the requirements rule out a plain single-page app<a class="headerlink" href="#why-the-requirements-rule-out-a-plain-single-page-app" title="Permanent link">#</a></h3>
+<p>An earlier plan for this milestone was a React + Vite single-page app with tokens in the browser, because it needed no
+server. The production-grade and secure requirements change that:</p>
+<ol>
+<li><strong>Tokens must stay off the browser.</strong> The IETF guidance <em>OAuth 2.0 for Browser-Based Applications</em> ranks a
+   backend-for-frontend (BFF) as the most secure pattern: a server keeps the tokens and the browser holds only an
+   <code>HttpOnly</code> session cookie. With tokens in the browser, any XSS bug can use them; with a BFF, it cannot steal them.</li>
+<li><strong>Public pages must render on the server.</strong> Search engines and first-load speed on phones need HTML with the product
+   in it, not an empty page that fills in after JavaScript runs.</li>
+</ol>
+<p>Both need a server. Once there is a server, the best choice is a framework that renders React on the server and is the
+BFF, in one process.</p>
+<h3 id="criteria">Criteria<a class="headerlink" href="#criteria" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Criterion</th>
+<th>What it asks</th>
+<th>Weight</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Production storefront fit</td>
+<td>Server rendering, streaming, caching of public pages, SEO, Core Web Vitals</td>
+<td>25 %</td>
+</tr>
+<tr>
+<td>Security model</td>
+<td>Server-side sessions and tokens (BFF) without custom glue; CSRF protection; size of the attack surface; patch record</td>
+<td>20 %</td>
+</tr>
+<tr>
+<td>Ecosystem and hiring</td>
+<td>Libraries, examples, people who know it (§16.2)</td>
+<td>20 %</td>
+</tr>
+<tr>
+<td>Simplicity</td>
+<td>Concepts to learn and get right: rendering modes, caches, server/client boundaries</td>
+<td>15 %</td>
+</tr>
+<tr>
+<td>OIDC fit</td>
+<td>Standard Keycloak sign-in with a confidential client</td>
+<td>10 %</td>
+</tr>
+<tr>
+<td>Testing and tooling</td>
+<td>Unit, component, browser tests; type safety; dev speed</td>
+<td>10 %</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ranking">Ranking<a class="headerlink" href="#ranking" title="Permanent link">#</a></h3>
+<p>Scores 1–5 per criterion; total out of 100.</p>
+<table>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Option</th>
+<th>Storefront</th>
+<th>Security</th>
+<th>Ecosystem</th>
+<th>Simple</th>
+<th>OIDC</th>
+<th>Tooling</th>
+<th><strong>Total</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1</strong></td>
+<td><strong>React Router 8 framework mode (React 19, Vite, server rendering + BFF)</strong></td>
+<td>5</td>
+<td>5</td>
+<td>4</td>
+<td>4</td>
+<td>5</td>
+<td>4</td>
+<td><strong>91</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Next.js 16 (App Router)</td>
+<td>5</td>
+<td>4</td>
+<td>5</td>
+<td>2</td>
+<td>4</td>
+<td>4</td>
+<td>83</td>
+</tr>
+<tr>
+<td>3</td>
+<td>SvelteKit 3</td>
+<td>5</td>
+<td>5</td>
+<td>2</td>
+<td>4</td>
+<td>4</td>
+<td>4</td>
+<td>81</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Nuxt 4</td>
+<td>5</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>4</td>
+<td>4</td>
+<td>78</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Angular 22 with SSR</td>
+<td>4</td>
+<td>4</td>
+<td>4</td>
+<td>2</td>
+<td>4</td>
+<td>5</td>
+<td>76</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Astro 7 with React islands</td>
+<td>4</td>
+<td>4</td>
+<td>3</td>
+<td>4</td>
+<td>3</td>
+<td>4</td>
+<td>74</td>
+</tr>
+<tr>
+<td>7</td>
+<td>React + Vite single-page app + separate BFF</td>
+<td>2</td>
+<td>4</td>
+<td>5</td>
+<td>2</td>
+<td>4</td>
+<td>5</td>
+<td>69</td>
+</tr>
+<tr>
+<td>8</td>
+<td>TanStack Start</td>
+<td>4</td>
+<td>3</td>
+<td>2</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>61</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Vue + Vite single-page app</td>
+<td>2</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>4</td>
+<td>4</td>
+<td>59</td>
+</tr>
+</tbody>
+</table>
+<p>How the security scores were set: 5 = server sessions are the framework's normal way of working, the request model is plain
+HTTP (forms, loaders, actions) that is easy to reason about, and the features we would use have a short advisory list;
+4 = a BFF works but needs more care (more server features with their own advisories, or a separate process); 3 = tokens
+would sit in the browser, or the project is too young to judge.</p>
+<h3 id="the-decision">The decision<a class="headerlink" href="#the-decision" title="Permanent link">#</a></h3>
+<p><strong>React Router 8 in framework mode: React 19 + TypeScript, rendered on the server by a Node 26 LTS process that is also the
+backend-for-frontend.</strong></p>
+<p>Why, point by point:</p>
+<ol>
+<li><strong>Secure by construction.</strong> The server holds the Keycloak tokens in a server-side session; the browser gets one
+   <code>__Host-</code> session cookie (<code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code>). Every API call goes browser → storefront server →
+   gateway, and the server adds the access token. An XSS bug can no longer read or exfiltrate a token.</li>
+<li><strong>Plain web model.</strong> Data loads in route <code>loader</code>s and changes go through route <code>action</code>s, which are ordinary HTTP GET and
+   POST handlers. Auth checks are explicit code at the top of each loader and action, so they are easy to review and test.
+   No hidden layers decide what runs where.</li>
+<li><strong>Small attack surface by choice.</strong> We use server rendering, loaders, actions and nothing more: no React Server
+   Components, no framework image optimisation, no edge middleware. Most 2026 advisories in both leading frameworks are in
+   exactly those features.</li>
+<li><strong>Production storefront fit.</strong> Product, category and search pages render on the server with streaming, so a phone gets
+   readable HTML at once; they are cacheable at the edge for signed-out visitors. Shopify's own React storefront framework
+   (Hydrogen) is built on this same framework, which is evidence that it suits commerce.</li>
+<li><strong>Mainstream React.</strong> The components, hooks and libraries are ordinary React; the build is Vite. Anyone who knows React
+   can work on it, and nothing locks the project to a hosting vendor.</li>
+</ol>
+<p><strong>Why not Next.js, the most used option?</strong> It is a sound choice and scores second. It loses here on simplicity and attack
+surface: server components, server actions, several caching layers and middleware are more concepts to get right, and
+those features carried five critical advisories this year. Its strengths (image optimisation, edge runtime, a hosting
+platform) are not needed with our NGINX edge and CDN. A team already fluent in Next.js could pick it and follow the
+same design (§16.5–16.11 apply unchanged).</p>
+<p><strong>Why not SvelteKit?</strong> Technically as strong and as secure, but a much smaller ecosystem and hiring pool.</p>
+<p><strong>Why not keep the single-page app?</strong> It would need a separate BFF anyway, and still could not serve indexable public pages.</p>
+<h2 id="164-architecture">16.4 Architecture<a class="headerlink" href="#164-architecture" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Architecture diagram" src="diagrams/storefront-ui--architecture.light.svg" data-light="diagrams/storefront-ui--architecture.light.svg" data-dark="diagrams/storefront-ui--architecture.dark.svg" loading="lazy"></figure></p>
+<ul>
+<li><strong>One public origin</strong> (<code>shop.example</code>). The edge sends <code>/</code> and every page route to the storefront, and <code>/assets/*</code> comes
+  from the CDN (origin: the storefront). The pages never call <code>/api/*</code> from the browser: they call the storefront, which
+  calls the gateway with the token. <code>/api/*</code> stays public for clients that hold their own bearer tokens (the end-to-end
+  tests, the smoke test, future mobile apps); the gateway accepts only <code>Authorization: Bearer</code>, never the session cookie,
+  so a stolen cookie is useless against the API.</li>
+<li><strong>Same image everywhere.</strong> Settings that differ per environment (issuer URL, client id, CDN host) come from environment
+  variables and the <code>deploy/k8s</code> hosts component, never from the build.</li>
+<li><strong>Stateless pods.</strong> Sessions live in <code>redis-session</code>, so any pod serves any request and pods can roll or scale freely.</li>
+</ul>
+<p><strong>Why a separate <code>redis-session</code>?</strong> Sessions must never be evicted by cache pressure or flushed with a cache: the same
+reason notification's sent log has its own instance. It uses an append-only file and <code>noeviction</code>.</p>
+<h2 id="165-sign-in-sessions-and-tokens-bff">16.5 Sign-in, sessions and tokens (BFF)<a class="headerlink" href="#165-sign-in-sessions-and-tokens-bff" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Sign-in, sessions and tokens (BFF) diagram" src="diagrams/storefront-ui--sign-in-sessions-and-tokens-bff.light.svg" data-light="diagrams/storefront-ui--sign-in-sessions-and-tokens-bff.light.svg" data-dark="diagrams/storefront-ui--sign-in-sessions-and-tokens-bff.dark.svg" loading="lazy"></figure></p>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Confidential client <code>shop-storefront</code> (client secret from the vault) with PKCE and <code>nonce</code></td>
+<td>A server can keep a secret, so Keycloak authenticates the client too; PKCE and nonce still protect the code and the ID token</td>
+</tr>
+<tr>
+<td>Tokens only in <code>redis-session</code>, encrypted with AES-256-GCM (key from the vault, rotated with a key id)</td>
+<td>A Redis dump or backup does not expose usable tokens</td>
+</tr>
+<tr>
+<td>Cookie <code>__Host-sid</code>: random 256-bit id, <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code>, <code>Path=/</code>, no <code>Domain</code></td>
+<td>The <code>__Host-</code> prefix forbids sub-domain cookies; scripts cannot read it; it is not sent on cross-site POSTs</td>
+</tr>
+<tr>
+<td>New session id at sign-in and on role change</td>
+<td>Prevents session fixation</td>
+</tr>
+<tr>
+<td>Idle timeout 30 min, absolute 12 h; access token refreshed by the server 60 s before expiry; refresh tokens rotate</td>
+<td>Short-lived credentials without bothering the shopper</td>
+</tr>
+<tr>
+<td>Sign-out ends the Keycloak session (RP-initiated logout) and deletes the Redis session; Keycloak back-channel logout also deletes it</td>
+<td>Signing out anywhere signs out everywhere</td>
+</tr>
+<tr>
+<td><code>returnTo</code> must be a relative path on our origin</td>
+<td>Prevents open redirects</td>
+</tr>
+<tr>
+<td>Staff accounts need a second factor (Keycloak OTP or passkey)</td>
+<td>Staff can change prices and stock</td>
+</tr>
+<tr>
+<td>Guest cart: random <code>__Host-guest</code> cookie (<code>HttpOnly</code>), sent by the BFF as <code>X-Guest-Id</code>; merged and cleared at sign-in</td>
+<td>Guests shop without an account; the id never appears in scripts or URLs</td>
+</tr>
+</tbody>
+</table>
+<p>Realm changes this needs: client <code>shop-storefront</code> (confidential, standard flow only, redirect URI
+<code>https://&lt;shop host&gt;/auth/callback</code>, back-channel logout URL); <code>shop-web</code> (public) is kept only for local API exploration in
+dev; brute-force detection on; password policy (length ≥ 12, breached-password check).</p>
+<h2 id="166-security-design">16.6 Security design<a class="headerlink" href="#166-security-design" title="Permanent link">#</a></h2>
+<h3 id="threats-and-controls">Threats and controls<a class="headerlink" href="#threats-and-controls" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Control</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>XSS steals tokens</td>
+<td>No tokens in the browser (§16.5).</td>
+</tr>
+<tr>
+<td>XSS runs actions as the user</td>
+<td>Strict CSP with a per-request nonce, no inline scripts or <code>eval</code>, no third-party scripts; React escapes output; <code>dangerouslySetInnerHTML</code> banned by lint; review bodies are plain text; Trusted Types first in report-only mode, enforced once reports are clean</td>
+</tr>
+<tr>
+<td>CSRF</td>
+<td><code>SameSite=Lax</code> cookie, every state-changing request is POST/PUT/DELETE, plus a check of <code>Origin</code> (must equal the shop origin) and a per-session CSRF token on every form and fetch; actions reject anything else</td>
+</tr>
+<tr>
+<td>Clickjacking</td>
+<td><code>frame-ancestors 'none'</code> and <code>X-Frame-Options: DENY</code></td>
+</tr>
+<tr>
+<td>Session theft or fixation</td>
+<td><code>__Host-</code> cookie, rotation at sign-in, idle and absolute timeouts, sessions revocable server-side</td>
+</tr>
+<tr>
+<td>Open redirect</td>
+<td><code>returnTo</code> limited to relative paths</td>
+</tr>
+<tr>
+<td>Broken access control</td>
+<td>Every loader and action checks the session and roles before calling the API; the gateway and services enforce the same rules again (the UI is never the only check)</td>
+</tr>
+<tr>
+<td>Injection into API calls</td>
+<td>Inputs validated with Zod schemas generated from the OpenAPI contracts; path parameters encoded; the BFF forwards only a fixed list of API routes, never a caller-supplied URL (no server-side request forgery)</td>
+</tr>
+<tr>
+<td>Abuse (credential stuffing, scraping, cart spam)</td>
+<td>Edge rate limits per IP on <code>/login</code>, <code>/auth/*</code> and search; Keycloak brute-force lockout; gateway token buckets per user</td>
+</tr>
+<tr>
+<td>Sensitive data exposure</td>
+<td>HTTPS only with HSTS preload; no personal data in URLs or logs (emails and names masked); <code>Cache-Control: private, no-store</code> on every signed-in page; the edge caches only anonymous public pages</td>
+</tr>
+<tr>
+<td>Supply chain</td>
+<td>Lockfile with integrity hashes, <code>npm ci --ignore-scripts</code>, dependency review and <code>npm audit</code> in CI, Renovate for updates, SBOM (CycloneDX) and signed image with provenance; framework advisories patched within 72 h (critical) or 7 days (high)</td>
+</tr>
+<tr>
+<td>Compromised pod</td>
+<td>Distroless Node image, non-root, read-only root filesystem, all capabilities dropped, seccomp <code>RuntimeDefault</code>; egress only to the gateway, Keycloak and <code>redis-session</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response-headers-set-by-the-storefront-enforced-by-the-edge">Response headers (set by the storefront, enforced by the edge)<a class="headerlink" href="#response-headers-set-by-the-storefront-enforced-by-the-edge" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Header</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Content-Security-Policy</code></td>
+<td><code>default-src 'self'; script-src 'nonce-…' 'strict-dynamic'; style-src 'self' 'nonce-…'; style-src-attr 'unsafe-inline'; img-src 'self' &lt;cdn&gt; data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; form-action 'self' &lt;id host&gt;; base-uri 'none'; object-src 'none'; upgrade-insecure-requests</code> (inline <code>style</code> attributes are allowed because accessible components position popovers with them; they cannot run script)</td>
+</tr>
+<tr>
+<td><code>Strict-Transport-Security</code></td>
+<td><code>max-age=63072000; includeSubDomains; preload</code></td>
+</tr>
+<tr>
+<td><code>Cross-Origin-Opener-Policy</code> / <code>Cross-Origin-Resource-Policy</code></td>
+<td><code>same-origin</code> / <code>same-site</code></td>
+</tr>
+<tr>
+<td><code>Referrer-Policy</code></td>
+<td><code>strict-origin-when-cross-origin</code></td>
+</tr>
+<tr>
+<td><code>Permissions-Policy</code></td>
+<td>camera, microphone, geolocation, payment and USB disabled</td>
+</tr>
+<tr>
+<td><code>X-Content-Type-Options</code></td>
+<td><code>nosniff</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="167-pages-and-routes">16.7 Pages and routes<a class="headerlink" href="#167-pages-and-routes" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Pages and routes diagram" src="diagrams/storefront-ui--pages-and-routes.light.svg" data-light="diagrams/storefront-ui--pages-and-routes.light.svg" data-dark="diagrams/storefront-ui--pages-and-routes.dark.svg" loading="lazy"></figure></p>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Rendering and caching</th>
+<th>Data (API catalogue)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/</code>, <code>/c/:slug</code>, <code>/p/:sku</code>, <code>/search</code></td>
+<td>Server-rendered and streamed; for signed-out visitors <code>Cache-Control: public, s-maxage=30, stale-while-revalidate=60</code> at the edge; personalised parts (cart count) load after</td>
+<td><code>GET /categories</code>, <code>/search</code>, <code>/products/{id}</code>, <code>/products/{sku}/reviews</code>, <code>/recommendations</code>; reviews and recommendations stream in and fail independently</td>
+</tr>
+<tr>
+<td><code>/cart</code></td>
+<td>Server-rendered, <code>private, no-store</code>; quantity changes are form actions with optimistic UI</td>
+<td><code>GET /cart</code>, <code>PUT /cart/items/{sku}</code>, <code>DELETE /cart</code>; "pricing pending" banner in degraded mode</td>
+</tr>
+<tr>
+<td><code>/checkout</code>, <code>/orders*</code>, <code>/p/:sku/review</code></td>
+<td>Sign-in required; <code>private, no-store</code></td>
+<td><code>POST /orders</code> (+ <code>Idempotency-Key</code>), <code>GET /orders</code>, <code>POST /orders/{id}/cancel</code>, <code>POST /reviews</code></td>
+</tr>
+<tr>
+<td><code>/staff/*</code></td>
+<td><code>staff</code> role and recent second factor required; never cached; code split so shoppers never download it</td>
+<td><code>/admin/products</code>, <code>/admin/categories</code>, image upload and confirm, inventory admin; edits send <code>If-Match</code>, a <code>412</code> shows "changed by someone else"</td>
+</tr>
+<tr>
+<td><code>/login</code>, <code>/logout</code>, <code>/auth/callback</code></td>
+<td>BFF endpoints; rate limited</td>
+<td>Keycloak</td>
+</tr>
+<tr>
+<td><code>/healthz</code>, <code>/readyz</code>, <code>/metrics</code></td>
+<td>Not routed by the edge</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>All pages work without JavaScript for the core path (browse, search, add to cart, check out) because loaders and actions are
+plain GET and POST; JavaScript improves them (instant navigation, optimistic updates). This is progressive enhancement, and it
+also makes the app more robust on poor networks.</p>
+<h2 id="168-checkout">16.8 Checkout<a class="headerlink" href="#168-checkout" title="Permanent link">#</a></h2>
+<p><figure class="diagram"><img alt="Checkout diagram" src="diagrams/storefront-ui--checkout.light.svg" data-light="diagrams/storefront-ui--checkout.light.svg" data-dark="diagrams/storefront-ui--checkout.dark.svg" loading="lazy"></figure></p>
+<ul>
+<li><strong>The server owns the idempotency key.</strong> When the checkout page renders, the BFF creates a key and stores it in the
+  session next to a hash of the cart. "Place order" posts to the action, which sends that key. A double click, reload or
+  retry after a timeout reuses it, and order-service returns the first result: never two orders. A changed cart gets a new
+  key.</li>
+<li><strong>Every outcome has a screen</strong>, matching the saga in <a href="05-sequence-diagrams.html">05 Sequence diagrams</a>: out of stock marks the
+  lines; declined keeps the cart; an unknown payment result shows "confirming your payment" and polls.</li>
+<li><strong>Card data never touches our servers.</strong> In production the payment provider's hosted fields (in an isolated iframe on the
+  provider's origin, allowed by <code>frame-src</code> for that origin only) produce the <code>paymentToken</code>; the demo provider issues test
+  tokens. This keeps the storefront out of PCI DSS card-data scope.</li>
+</ul>
+<h2 id="169-errors-loading-and-empty-states">16.9 Errors, loading and empty states<a class="headerlink" href="#169-errors-loading-and-empty-states" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>What the user sees</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>problem+json</code> with a known <code>code</code></td>
+<td>A specific message from one mapping table, tested against the API catalogue's error list</td>
+</tr>
+<tr>
+<td><code>400 VALIDATION_FAILED</code></td>
+<td>Messages next to the fields in <code>errors[]</code></td>
+</tr>
+<tr>
+<td>Session expired</td>
+<td>Silent refresh by the server; if that fails, sign in and return to the same page (form input kept)</td>
+</tr>
+<tr>
+<td><code>403</code></td>
+<td>"You do not have access"</td>
+</tr>
+<tr>
+<td><code>429</code></td>
+<td>"Too many requests, try again in N seconds" (<code>Retry-After</code>)</td>
+</tr>
+<tr>
+<td><code>503 SEARCH_UNAVAILABLE</code> / <code>DEPENDENCY_UNAVAILABLE</code></td>
+<td>That section shows "temporarily unavailable"; the rest of the page works</td>
+</tr>
+<tr>
+<td>Anything else</td>
+<td>"Something went wrong" with a reference (<code>traceId</code>); details only in server logs</td>
+</tr>
+</tbody>
+</table>
+<p>Error pages never show stack traces or upstream messages. Loading states are skeletons shaped like the content.</p>
+<h2 id="1610-accessibility-and-performance">16.10 Accessibility and performance<a class="headerlink" href="#1610-accessibility-and-performance" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>WCAG 2.2 AA:</strong> semantic HTML first; React Aria Components for combobox, dialog, menu and toast; full keyboard use; visible
+  focus; contrast checked in light and dark themes; focus moves to the page heading on navigation; axe runs in every browser
+  test and fails the build on any violation.</li>
+<li><strong>Budgets (checked in CI on every change):</strong> LCP &lt; 2.5 s and INP &lt; 200 ms on a throttled mid-range phone for home, search
+  and product pages; JavaScript per route ≤ 150 kB compressed; no layout shift from images (width and height always set).</li>
+<li><strong>Images:</strong> responsive sizes from the CDN (<code>srcset</code>), modern formats, lazy below the fold.</li>
+</ul>
+<h2 id="1611-technology-inside-the-app">16.11 Technology inside the app<a class="headerlink" href="#1611-technology-inside-the-app" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Choice</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Framework</td>
+<td>React Router 8.5 (framework mode), React 19, Vite 8</td>
+<td>§16.3</td>
+</tr>
+<tr>
+<td>Language</td>
+<td>TypeScript, strict</td>
+<td>Contract mismatches fail the build</td>
+</tr>
+<tr>
+<td>Runtime</td>
+<td>Node 26 LTS (supported to April 2029) on a distroless image</td>
+<td>Current LTS line, small image without a shell</td>
+</tr>
+<tr>
+<td>OIDC</td>
+<td><code>openid-client</code> 6</td>
+<td>Certified OpenID relying-party library; standards only, not tied to Keycloak</td>
+</tr>
+<tr>
+<td>Sessions</td>
+<td>Own small session store over <code>redis</code> 6 with AES-256-GCM</td>
+<td>A few dozen lines we fully understand, instead of a generic session framework</td>
+</tr>
+<tr>
+<td>API client and types</td>
+<td><code>openapi-typescript</code> + <code>openapi-fetch</code> from each service's <code>contracts/openapi.yaml</code>; Zod for runtime checks</td>
+<td>The services are contract-first; a breaking API change fails the UI build</td>
+</tr>
+<tr>
+<td>Browser data</td>
+<td>Route loaders and actions; TanStack Query only for live parts (order status polling)</td>
+<td>The server already loads data; no client store needed</td>
+</tr>
+<tr>
+<td>Styling</td>
+<td>Tailwind CSS 4 with design tokens as CSS variables (light and dark)</td>
+<td>Most used approach, no runtime cost, works with a strict CSP (styles from files, no CSS-in-JS)</td>
+</tr>
+<tr>
+<td>Logging and tracing</td>
+<td><code>pino</code> (JSON, PII masked), OpenTelemetry Node SDK, <code>traceparent</code> forwarded to the gateway</td>
+<td>One trace from click to database</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>Vitest 5 + Testing Library + MSW 3; Playwright 1.65 + axe-core; OWASP ZAP baseline scan</td>
+<td>§16.13</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Patch policy:</strong> Renovate opens updates daily; framework and runtime security fixes ship within 72 hours (critical) or 7
+days (high); CI blocks a release that has a known critical or high advisory.</p>
+<h2 id="1612-deployment">16.12 Deployment<a class="headerlink" href="#1612-deployment" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Project</td>
+<td><code>web/storefront</code> (not under <code>services/</code>: it owns no business data and publishes no API, but it is an independent project with its own build, tests, CI and README)</td>
+</tr>
+<tr>
+<td>Image</td>
+<td>Multi-stage: <code>npm ci --ignore-scripts</code> → build → distroless Node 26, non-root, read-only root, port 8090</td>
+</tr>
+<tr>
+<td>Kubernetes</td>
+<td>Deployment (3 replicas, spread across zones), HPA on CPU, PDB <code>minAvailable: 50%</code>, probes on <code>/readyz</code> and <code>/healthz</code>, graceful shutdown that drains in-flight requests; network policy: ingress from the edge only, egress to api-gateway, Keycloak and <code>redis-session</code></td>
+</tr>
+<tr>
+<td>Edge</td>
+<td><code>/</code> and page routes → storefront; <code>/assets/*</code> → storefront with <code>immutable</code> caching (CDN in front); <code>/api/*</code> → gateway as today (bearer-token clients); <code>/docs/*</code> unchanged; per-IP rate limits on <code>/login</code> and <code>/auth/*</code></td>
+</tr>
+<tr>
+<td>Secrets</td>
+<td><code>STOREFRONT_CLIENT_SECRET</code>, <code>SESSION_ENCRYPTION_KEYS</code> from the vault through External Secrets (generated values in dev)</td>
+</tr>
+<tr>
+<td>Local</td>
+<td><code>npm run dev</code> with the compose stack; compose service <code>storefront</code> behind the edge at <code>https://localhost:8443/</code></td>
+</tr>
+<tr>
+<td>Releases</td>
+<td>Rolling update with <code>maxUnavailable: 0</code>; old and new pods share sessions (session format versioned); assets kept for one release so open pages keep working</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1613-testing">16.13 Testing<a class="headerlink" href="#1613-testing" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Tool</th>
+<th>Covers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Types</td>
+<td><code>tsc</code> strict, generated API types</td>
+<td>Every API call matches its contract</td>
+</tr>
+<tr>
+<td>Unit</td>
+<td>Vitest</td>
+<td>Session encryption and rotation, CSRF and <code>Origin</code> checks, <code>returnTo</code> validation, problem-code mapping, money formatting (string amounts, never floats), idempotency-key lifecycle</td>
+</tr>
+<tr>
+<td>Component</td>
+<td>Vitest + Testing Library + MSW</td>
+<td>Each page with success, empty, error and slow responses</td>
+</tr>
+<tr>
+<td>BFF integration</td>
+<td>Vitest + Testcontainers (Redis, Keycloak)</td>
+<td>Sign-in, refresh, sign-out, back-channel logout, expired and tampered cookies, role changes</td>
+</tr>
+<tr>
+<td>End to end</td>
+<td>Playwright + axe against the compose stack</td>
+<td>Browse → search → cart → sign in (merge) → checkout → email in Mailpit; out of stock; declined; cancel; review; staff product with image and stock; every page accessible</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>OWASP ZAP baseline in CI; header and cookie assertions in Playwright; dependency audit</td>
+<td>No missing headers, no token in any response body or storage, CSRF rejected without a token</td>
+</tr>
+<tr>
+<td>Performance</td>
+<td>Lighthouse CI on home, search and product pages</td>
+<td>Budgets of §16.10</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1614-delivery-steps">16.14 Delivery steps<a class="headerlink" href="#1614-delivery-steps" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>U1</td>
+<td>Project scaffold, server rendering, design tokens and layout, generated API client, CI with audits, image and k8s base</td>
+</tr>
+<tr>
+<td>U2</td>
+<td>BFF: OIDC sign-in and sign-out, encrypted sessions in <code>redis-session</code>, CSRF, security headers, guest cookie; realm client</td>
+</tr>
+<tr>
+<td>U3</td>
+<td>Catalogue, search with facets, product page with reviews and recommendations; edge caching for anonymous pages</td>
+</tr>
+<tr>
+<td>U4</td>
+<td>Cart, merge, checkout with every outcome, orders, cancellation, reviews</td>
+</tr>
+<tr>
+<td>U5</td>
+<td>Staff pages with second factor: products, images, categories, stock</td>
+</tr>
+<tr>
+<td>U6</td>
+<td>Edge routing, compose and k8s wiring, Playwright + axe + ZAP + Lighthouse in CI, README and walkthrough</td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>
