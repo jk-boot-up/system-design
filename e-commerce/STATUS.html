@@ -103,9 +103,9 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td>End-to-end and performance tests</td>
-<td>██████░░░░ 60%</td>
+<td>████████░░ 80%</td>
 <td>End-to-end journeys (<code>tests/e2e</code>): 22 across core, the storefront in a browser and every profile; ZAP and Lighthouse; nightly CI</td>
-<td>Reviews journey locally (needs &gt; 4 GB); Gatling (P4)</td>
+<td>Reviews journey locally (needs &gt; 4 GB); verify the search simulation</td>
 </tr>
 </tbody>
 </table>
@@ -239,6 +239,14 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <h2 id="recently-completed">Recently completed<a class="headerlink" href="#recently-completed" title="Permanent link">#</a></h2>
 <ul>
 <li>
+<p>Performance tests (<code>tests/performance</code>, Gatling 3.16, Java DSL): browse, search, add to cart and checkout, seeded through
+  the public API, each with a warm-up excluded from the budgets, then held to SPEC §2.2 p99 budgets and compared with a
+  per-environment baseline (&gt; 10 % fails); <code>run-compose.sh</code> with an overlay that lifts per-address limits for a single
+  load generator; nightly CI with the baseline kept in the Actions cache. Locally: product page 9 ms, add to cart 54 ms,
+  place order 320 ms (p99). Search is not yet verified: this run's products were not searchable within 90 s. Without a
+  warm-up the cold JVMs missed two budgets (add to cart 147 ms, place order 1.7 s), which is why every run warms up first.</p>
+</li>
+<li>
 <p>Storefront (<code>web/storefront</code>, design/16, ADR 0012): React Router 8.5 framework mode on Node 26, rendered on the server and
   acting as backend-for-frontend. Keycloak confidential client with PKCE; tokens only on the server in sessions sealed with
   AES-256-GCM in <code>redis-session</code> (rotation at sign-in, refresh under a lock, back-channel logout); CSRF by origin plus a
@@ -338,7 +346,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>Platform: Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).</li>
+<li>Platform: search simulation (P4), observability (P5); design documents S13–S17; system walkthrough (S19).</li>
 <li>System, module and service diagrams (design document 11).</li>
 </ul>
 <h2 id="risks-and-notes">Risks and notes<a class="headerlink" href="#risks-and-notes" title="Permanent link">#</a></h2>

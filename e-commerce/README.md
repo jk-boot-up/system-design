@@ -49,7 +49,7 @@ e-commerce/
 │  └─ k8s/overlays/              dev / staging / prod overlays composing every service's k8s base
 ├─ tests/                        WHOLE-SYSTEM TESTS
 │  ├─ e2e/                       end-to-end journeys against the running stack
-│  └─ performance/               Gatling simulations with p99 budgets
+│  └─ performance/               Gatling simulations held to the p99 budgets, with a regression check
 └─ tools/                        documentation pipeline (diagrams → SVG, Markdown → HTML), scoped to this folder
 ```
 

@@ -16,7 +16,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Walkthroughs | █████████░ 92% | every service | System walkthrough |
 | Local stack and Kubernetes overlays | ██████████ 100% | Compose stack with profiles and smoke test; dev, staging and prod overlays with operator-managed stores, checked against the operators' CRDs | — |
 | Storefront (web UI) | ██████████ 100% | React Router 8 server rendering + backend-for-frontend (`web/storefront`): every page, sign-in, checkout, staff; compose, edge and k8s wiring; CI | Component tests when pages gain client logic |
-| End-to-end and performance tests | ██████░░░░ 60% | End-to-end journeys (`tests/e2e`): 22 across core, the storefront in a browser and every profile; ZAP and Lighthouse; nightly CI | Reviews journey locally (needs > 4 GB); Gatling (P4) |
+| End-to-end and performance tests | ████████░░ 80% | End-to-end journeys (`tests/e2e`): 22 across core, the storefront in a browser and every profile; ZAP and Lighthouse; nightly CI | Reviews journey locally (needs > 4 GB); verify the search simulation |
 
 ## Services
 
@@ -35,6 +35,13 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | analytics (ClickHouse) | ✅ | ✅ 1 end-to-end (ClickHouse image + Kafka) + Grafana check | ✅ (consumed) | ✅ | ✅ | ✅ | ✅ |
 
 ## Recently completed
+
+* Performance tests (`tests/performance`, Gatling 3.16, Java DSL): browse, search, add to cart and checkout, seeded through
+  the public API, each with a warm-up excluded from the budgets, then held to SPEC §2.2 p99 budgets and compared with a
+  per-environment baseline (> 10 % fails); `run-compose.sh` with an overlay that lifts per-address limits for a single
+  load generator; nightly CI with the baseline kept in the Actions cache. Locally: product page 9 ms, add to cart 54 ms,
+  place order 320 ms (p99). Search is not yet verified: this run's products were not searchable within 90 s. Without a
+  warm-up the cold JVMs missed two budgets (add to cart 147 ms, place order 1.7 s), which is why every run warms up first.
 
 * Storefront (`web/storefront`, design/16, ADR 0012): React Router 8.5 framework mode on Node 26, rendered on the server and
   acting as backend-for-frontend. Keycloak confidential client with PKCE; tokens only on the server in sessions sealed with
@@ -120,7 +127,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* Platform: Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
+* Platform: search simulation (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

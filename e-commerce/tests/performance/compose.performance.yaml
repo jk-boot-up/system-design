@@ -1,0 +1,13 @@
+# Overlay for deploy/compose/compose.yaml while the simulations run:
+#   docker compose -f compose.yaml -f ../../tests/performance/compose.performance.yaml up -d --wait
+# Gatling sends all its traffic from one address. Real visitors come from many, so the per-address limits (edge 50 r/s,
+# gateway 20 r/s per anonymous address) would measure the limiter, not the system. They are lifted here; the per-user
+# checkout limit and the per-SKU admission control stay as they are.
+services:
+  edge:
+    environment:
+      ADDRESS_RATE: "100000r/s"
+  api-gateway:
+    environment:
+      GATEWAY_RATELIMITS_BROWSE_RATE: "100000"
+      GATEWAY_RATELIMITS_BROWSE_BURST: "100000"

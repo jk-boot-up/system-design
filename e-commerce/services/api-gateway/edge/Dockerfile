@@ -8,5 +8,6 @@ COPY templates/ /etc/nginx/templates/
 COPY 05-dev-certificate.sh /docker-entrypoint.d/
 ENV GATEWAY_UPSTREAM=api-gateway:8080 \
     STOREFRONT_UPSTREAM=storefront:8090 \
-    SIGN_IN_RATE=10r/m
+    SIGN_IN_RATE=10r/m \
+    ADDRESS_RATE=50r/s
 EXPOSE 8080 8443

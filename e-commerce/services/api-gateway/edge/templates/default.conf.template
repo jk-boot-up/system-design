@@ -3,6 +3,10 @@ upstream gateway {
     keepalive 64;
 }
 
+# A coarse first line per address (ADDRESS_RATE: 50r/s by default); fine-grained limits (per user, per SKU) are the
+# gateway's job.
+limit_req_zone $binary_remote_addr zone=per_address:20m rate=${ADDRESS_RATE};
+
 # Sign-in, callback and sign-out per address (SIGN_IN_RATE: 10r/m by default; the local stack allows more for the tests).
 limit_req_zone $binary_remote_addr zone=sign_in:10m rate=${SIGN_IN_RATE};
 

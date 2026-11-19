@@ -1,0 +1,52 @@
+name: e-commerce / performance
+
+# Gatling simulations (browse, cart, checkout, search) against the compose stack, each held to its p99 budget from
+# SPEC §2.2, then compared with the last accepted run on the same runner type: a p99 more than 10 % worse fails.
+# Nightly after the end-to-end run, and on demand.
+on:
+  schedule: [ { cron: '30 4 * * *' } ]
+  workflow_dispatch:
+    inputs:
+      accept_baseline:
+        description: Make this run the new baseline even if it is slower (after a change you accept)
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    working-directory: e-commerce/tests/performance
+
+jobs:
+  simulations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PERF_BASELINE: ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '25', cache: gradle }
+      - name: Last accepted baseline for this runner type
+        uses: actions/cache/restore@v4
+        with:
+          path: e-commerce/tests/performance/baseline/ci
+          key: perf-baseline-ci-${{ github.run_id }}
+          restore-keys: perf-baseline-ci-
+      - name: Build the stack
+        working-directory: e-commerce/deploy/compose
+        run: COMPOSE_PARALLEL_LIMIT=2 docker compose -f compose.yaml -f ../../tests/performance/compose.performance.yaml build
+      - name: Simulations and regression check
+        run: ./run-compose.sh
+        env:
+          UPDATE_BASELINE: ${{ inputs.accept_baseline && '1' || '' }}
+      - name: Accept this run as the baseline
+        run: python3 scripts/regression.py --update
+      - uses: actions/cache/save@v4
+        with:
+          path: e-commerce/tests/performance/baseline/ci
+          key: perf-baseline-ci-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gatling-reports
+          path: e-commerce/tests/performance/build/reports/gatling

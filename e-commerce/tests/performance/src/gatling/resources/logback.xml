@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Quiet console: Gatling's own summary and assertions are the output. Set the "io.gatling.http.engine.response" logger
+     to DEBUG to see failed requests, or TRACE for every request. -->
+<configuration>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder><pattern>%d{HH:mm:ss.SSS} %-5level %logger{30} - %msg%n%rEx</pattern></encoder>
+  </appender>
+  <logger name="io.gatling.http.engine.response" level="${GATLING_RESPONSE_LOG:-WARN}"/>
+  <root level="WARN"><appender-ref ref="CONSOLE"/></root>
+</configuration>
