@@ -223,6 +223,12 @@ consumers come after it.</p>
 <td>⏳</td>
 </tr>
 <tr>
+<td>UI</td>
+<td>Demo storefront <code>web/storefront</code> (after P3)</td>
+<td>React + TypeScript + Vite single-page app served as static files by the NGINX edge (no Node server): browse and faceted search, product page with reviews and recommendations, cart, sign-in with Keycloak (<code>shop-web</code>, PKCE), checkout, order history and cancellation, a staff page for products, images and stock; problem details shown to the user; Dockerfile, compose and k8s route, Playwright journeys, walkthrough. Server rendering stays a SPEC extension (a demo behind sign-in needs no search-engine indexing)</td>
+<td>⏳</td>
+</tr>
+<tr>
 <td>P4</td>
 <td>Performance tests <code>tests/performance</code></td>
 <td>Gatling simulations for browse, search, add to cart and checkout, with p99 budgets from the spec</td>

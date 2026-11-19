@@ -98,7 +98,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* Platform: end-to-end tests (P3), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
+* Platform: end-to-end tests (P3), then the demo storefront (UI, React + Vite), Gatling (P4), observability (P5); design documents S13–S17; system walkthrough (S19).
 * System, module and service diagrams (design document 11).
 
 ## Risks and notes

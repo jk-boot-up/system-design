@@ -21,7 +21,7 @@ This plan covers how the e-commerce system described in [SPEC.md](SPEC.md) is bu
 ## 2. Non-goals (first release)
 
 * **Real payment processors.** Payment uses a pluggable provider port with a simulated provider. A real provider (for example Stripe or Adyen) is an adapter added later.
-* **A full storefront UI.** A small demo storefront is planned as a later milestone; the first release exposes the platform through APIs.
+* **A full storefront UI.** The first release exposes the platform through APIs; a small demo storefront (React + Vite single-page app, milestone UI in the implementation plan, after the end-to-end tests) shows it working. A production, server-rendered storefront is an extension.
 * **Recommendations, marketplace sellers, multi-currency tax engines.** These are listed as extensions in the spec.
 
 ## 3. Technology choices (summary)
