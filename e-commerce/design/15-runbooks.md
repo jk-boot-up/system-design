@@ -112,13 +112,14 @@ Common first steps for every incident:
 
 ## 15.7 Cache stampede
 
-* **Signals:** catalog-service and its database CPU spike together, often right after Redis restarts or at the same
-  moment every few minutes; product-latency SLO burns.
+* **Signals:** catalog-service and its database CPU spike together, usually right after Redis restarts or is flushed;
+  product-latency SLO burns.
 * **Confirm:** Redis hit rate drops sharply; many identical `select … from product` queries at once.
-* **Why it can happen here:** product entries expire after exactly 10 minutes and a miss reads PostgreSQL directly, with
-  no jitter and no single-flight. Entries written together (after a restart, or by an import) expire together.
+* **Why it can still happen here:** expiry is spread (10 minutes ± 10 %) and concurrent misses for one product share one
+  query per pod, so expiry alone no longer causes a stampede. Losing Redis does: every product misses at once, and each
+  pod reads each hot product once.
 * **Act now:** scale catalog-service out; the edge and gateway caches absorb anonymous product pages meanwhile. If Redis
   itself is down, catalog keeps working from PostgreSQL (Redis errors count as misses), so restore Redis.
-* **Fix for good:** add jitter to the expiry (for example 10 minutes ± 10 %) and collapse concurrent misses for the same
-  product into one query; then this runbook only covers Redis loss.
+* **Already in place:** jittered expiry and per-pod single-flight (`RedisProductCache`, `SingleFlight` in catalog-service);
+  a read that overlaps a committed edit does not write the old version back into the cache.
 * **Over when:** the hit rate is back above 90 % and database CPU is normal.

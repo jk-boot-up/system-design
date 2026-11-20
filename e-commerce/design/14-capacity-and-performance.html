@@ -247,15 +247,15 @@ connections the database must hold.</p>
 <td>catalog</td>
 <td>20</td>
 <td>10</td>
-<td>— (direct, no pooler)</td>
-<td>200 of <code>max_connections</code> 200</td>
-<td>mostly cache misses</td>
+<td>200 of 2,000</td>
+<td>30</td>
+<td>mostly cache misses, at most one per product per pod at a time</td>
 </tr>
 </tbody>
 </table>
-<p>Catalog connects directly: at its maximum of 10 pods it would use every one of the database's 200 connections, leaving
-none for migrations or operators. Add <code>pgbouncer-catalog</code> (as for the others) or lower its pool before raising its
-<code>maxReplicas</code>.</p>
+<p>Catalog used to connect directly, and at its maximum of 10 pods it would have used every one of the database's 200
+connections. It now goes through <code>pgbouncer-catalog</code> like the others, with a smaller server pool because almost every read
+is a cache hit.</p>
 <p>At 1× one primary per database is comfortable. At 10× the orders primary would need ~25 k writes and reads a second;
 order history moves to read replicas first, then orders are sharded by <code>customer_id</code> (Citus), which keeps a customer's
 orders on one shard.</p>

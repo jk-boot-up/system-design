@@ -58,6 +58,17 @@ class CatalogServiceTest {
     }
 
     @Test
+    void aReadThatOverlapsACommittedWriteDoesNotCacheTheOldVersion() {
+        Product p = service.createProduct("SKU-1001", details("89.90", ProductStatus.ACTIVE));
+        // The reader misses the cache and reads version 1; before it can cache it, an editor commits version 2.
+        db.afterFind = () -> service.updateProduct(p.id(), 1, details("79.90", ProductStatus.ACTIVE));
+        assertThat(service.activeProduct(p.id()).version()).isEqualTo(1L);
+        assertThat(db.cached).doesNotContainKey(p.id());
+        assertThat(service.activeProduct(p.id()).version()).isEqualTo(2L);
+        assertThat(db.cached.get(p.id()).version()).isEqualTo(2L);
+    }
+
+    @Test
     void shoppersCannotSeeDrafts() {
         Product draft = service.createProduct("SKU-1002", details("10", ProductStatus.DRAFT));
         assertThatThrownBy(() -> service.activeProduct(draft.id())).extracting(e -> ((DomainException) e).code()).isEqualTo("NOT_FOUND");

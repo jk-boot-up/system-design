@@ -32,6 +32,8 @@ class InMemoryCatalog implements ProductRepository, ProductEvents, ProductCache,
     final List<Product> published = new ArrayList<>();
     boolean inTx;
     int dbReads;
+    /** Runs inside findById, after the row is read: simulates a write that commits while a reader holds the old row. */
+    Runnable afterFind = () -> {};
     /** Runs inside update(), just before the conditional write: simulates another editor committing first. */
     Runnable beforeUpdate = () -> {};
     /** Writes made by "other editors": they committed in their own transaction, so a rollback here keeps them. */
@@ -40,7 +42,11 @@ class InMemoryCatalog implements ProductRepository, ProductEvents, ProductCache,
     @Override
     public Optional<Product> findById(UUID id) {
         dbReads++;
-        return Optional.ofNullable(products.get(id));
+        Optional<Product> found = Optional.ofNullable(products.get(id));
+        Runnable hook = afterFind;
+        afterFind = () -> {};
+        hook.run();
+        return found;
     }
 
     @Override

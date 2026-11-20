@@ -23,8 +23,8 @@ spec: { type: ExternalName, externalName: pgbouncer-payments.e-commerce-platform
 ---
 apiVersion: v1
 kind: Service
-metadata: { name: catalog-db-rw }
-spec: { type: ExternalName, externalName: catalog-db-rw.e-commerce-platform.svc.cluster.local }
+metadata: { name: pgbouncer-catalog }
+spec: { type: ExternalName, externalName: pgbouncer-catalog.e-commerce-platform.svc.cluster.local }
 ---
 apiVersion: v1
 kind: Service

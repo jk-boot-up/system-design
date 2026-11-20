@@ -100,7 +100,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 <tr>
 <td><strong>The cache never outlives a committed change by more than an instant</strong></td>
-<td>Cache-aside: entries are evicted <strong>after</strong> the transaction commits, and expire after 10 minutes in any case</td>
+<td>Cache-aside: entries are evicted <strong>after</strong> the transaction commits, a read that overlapped the commit does not write its old copy back, and entries expire after 10 minutes ± 10 % in any case</td>
 </tr>
 <tr>
 <td><strong>Redis is optional</strong></td>
@@ -171,7 +171,9 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <ul>
 <li><strong>Pods:</strong> stateless, 2–10 replicas. Reads dominate (product pages); writes are staff edits, a few per second at most.</li>
 <li><strong>Reads:</strong> a cache hit is one Redis <code>GET</code>; the 60-second <code>Cache-Control</code> lets the edge cache popular products too. A miss is two
-  indexed queries (product, images).</li>
+  indexed queries (product, images); concurrent misses for one product in a pod share one load (<code>SingleFlight</code>), and the
+  expiry is spread by ± 10 % so entries cached together do not expire together.</li>
+<li><strong>Connections:</strong> through <code>pgbouncer-catalog</code> in transaction mode; 10 pods × 20 client connections share 30 server connections.</li>
 <li><strong>Price lookups:</strong> cart-service batches up to 100 SKUs into one <code>sku IN (…)</code> query and caches the answers for 30 s itself.</li>
 <li><strong>Outbox relay:</strong> every replica polls every 100 ms; <code>FOR UPDATE SKIP LOCKED</code> gives each a separate batch of up to 500 rows.</li>
 <li><strong>Images:</strong> bytes never pass through the service, so uploads do not consume its threads or memory.</li>
@@ -229,7 +231,17 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr>
 <td><code>CatalogServiceTest</code></td>
 <td>application</td>
-<td>Create writes product and event in one transaction; cache hits avoid the database; drafts hidden from shoppers; eviction happens after commit; a stale version is rejected with no event; a write that commits between the check and the update is still caught; upload confirmed only when the object exists</td>
+<td>Create writes product and event in one transaction; cache hits avoid the database; drafts hidden from shoppers; eviction happens after commit; a read that overlaps a committed edit does not re-cache the old version; a stale version is rejected with no event; a write that commits between the check and the update is still caught; upload confirmed only when the object exists</td>
+</tr>
+<tr>
+<td><code>SingleFlightTest</code></td>
+<td>application</td>
+<td>50 concurrent misses for one key load once; every waiter gets the loader's exception and the next miss loads again</td>
+</tr>
+<tr>
+<td><code>RedisProductCacheExpiryTest</code></td>
+<td>adapter</td>
+<td>Expiry stays within ± 10 % of the base and differs between entries written together</td>
 </tr>
 <tr>
 <td><code>HexagonalArchitectureTest</code></td>

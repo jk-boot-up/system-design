@@ -11,7 +11,7 @@ configMapGenerator:
     literals:
       - MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT=http://alloy.monitoring:4318/v1/traces
       - LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs
-      - DB_URL=jdbc:postgresql://catalog-db-rw:5432/catalog
+      - DB_URL=jdbc:postgresql://pgbouncer-catalog:5432/catalog
       - REDIS_URL=redis://redis-cache:6379
       - KAFKA_BOOTSTRAP=kafka-bootstrap:9092
       - S3_ENDPOINT=http://minio:9000

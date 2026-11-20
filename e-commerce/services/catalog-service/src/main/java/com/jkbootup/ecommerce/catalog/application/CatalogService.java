@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -47,6 +48,13 @@ public class CatalogService {
     private final ImageStorage storage;
     private final Transactions tx;
     private final Clock clock;
+    /** Concurrent misses for one product share one database read. */
+    private final SingleFlight<UUID, Product> loads = new SingleFlight<>();
+    /**
+     * Counts evictions. A load that overlaps one does not write its result to the cache: it may have read the row before
+     * the write committed, and caching it would serve the old version until the entry expires.
+     */
+    private final AtomicLong evictions = new AtomicLong();
 
     public CatalogService(ProductRepository products, CategoryRepository categories, ProductEvents events, ProductCache cache,
                           ImageStorage storage, Transactions tx, Clock clock) {
@@ -65,9 +73,15 @@ public class CatalogService {
     public Product product(UUID id) {
         Optional<Product> cached = cache.get(id);
         if (cached.isPresent()) return cached.get();
-        Product p = products.findById(id).orElseThrow(() -> notFound(id));
-        cache.put(p);
-        return p;
+        return loads.load(id, () -> {
+            long seen = evictions.get();
+            Product p = products.findById(id).orElseThrow(() -> notFound(id));
+            if (evictions.get() == seen) {
+                cache.put(p);
+                if (evictions.get() != seen) cache.evict(id);  // a write committed between the check and the put
+            }
+            return p;
+        });
     }
 
     /** A product as shoppers see it: drafts and archived products do not exist for them. */
@@ -178,6 +192,8 @@ public class CatalogService {
             events.productChanged(next, category(next.details().categoryId()));
             return next;
         });
+        evictions.incrementAndGet();
+        loads.forget(id);
         cache.evict(id);                       // after commit
         return saved;
     }

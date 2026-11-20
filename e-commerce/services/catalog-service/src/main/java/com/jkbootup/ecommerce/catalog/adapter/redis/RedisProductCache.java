@@ -17,10 +17,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.DoubleSupplier;
 
 /**
- * Cache-aside product entries in Redis ({@code product:<id>}, JSON, 10 minute expiry). Redis is an optimisation, not a
- * dependency: any Redis error is logged and treated as a miss, so reads fall through to PostgreSQL.
+ * Cache-aside product entries in Redis ({@code product:<id>}, JSON). Each entry expires after the configured time
+ * (10 minutes) plus or minus up to 10 %, chosen at random, so entries written together (after a restart or an import) do
+ * not all expire in the same second. Redis is an optimisation, not a dependency: any Redis error is logged and treated as
+ * a miss, so reads fall through to PostgreSQL.
  */
 public class RedisProductCache implements ProductCache {
 
@@ -33,12 +37,27 @@ public class RedisProductCache implements ProductCache {
 
     private final StringRedisTemplate redis;
     private final JsonMapper json;
+    /** Each expiry is the base time scaled by a random factor in [1 - JITTER, 1 + JITTER). */
+    static final double JITTER = 0.10;
+
     private final Duration ttl;
+    private final DoubleSupplier random;
 
     public RedisProductCache(StringRedisTemplate redis, JsonMapper json, Duration ttl) {
+        this(redis, json, ttl, () -> ThreadLocalRandom.current().nextDouble());
+    }
+
+    RedisProductCache(StringRedisTemplate redis, JsonMapper json, Duration ttl, DoubleSupplier random) {
         this.redis = redis;
         this.json = json;
         this.ttl = ttl;
+        this.random = random;
+    }
+
+    /** The expiry for one entry: random between ttl × 0.9 and ttl × 1.1, to the millisecond. */
+    Duration expiry() {
+        double factor = 1 - JITTER + 2 * JITTER * random.getAsDouble();
+        return Duration.ofMillis(Math.round(ttl.toMillis() * factor));
     }
 
     static String key(UUID id) {
@@ -67,7 +86,7 @@ public class RedisProductCache implements ProductCache {
             Entry e = new Entry(p.id(), p.sku(), d.name(), d.description(), d.categoryId(), d.brand(),
                     d.price().amount().toPlainString(), d.price().currency().getCurrencyCode(), d.attributes(), d.status().name(),
                     p.images(), p.version(), p.createdAt(), p.updatedAt());
-            redis.opsForValue().set(key(p.id()), json.writeValueAsString(e), ttl);
+            redis.opsForValue().set(key(p.id()), json.writeValueAsString(e), expiry());
         } catch (RuntimeException ex) {
             log.warn("Product cache write failed for {}: {}", p.id(), ex.getMessage());
         }

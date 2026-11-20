@@ -43,11 +43,11 @@ connections the database must hold.
 | orders | 30 (`DB_POOL_SIZE`) | 20 | 600 of 2,000 (`max_client_conn`) | 50 (`default_pool_size`) | ~2.5 k/s (500 orders × ~5) |
 | inventory | 20 | 20 | 400 of 2,000 | 50 | ~1.5 k/s |
 | payments | 20 | 10 | 200 of 2,000 | 50 | ~1 k/s |
-| catalog | 20 | 10 | — (direct, no pooler) | 200 of `max_connections` 200 | mostly cache misses |
+| catalog | 20 | 10 | 200 of 2,000 | 30 | mostly cache misses, at most one per product per pod at a time |
 
-Catalog connects directly: at its maximum of 10 pods it would use every one of the database's 200 connections, leaving
-none for migrations or operators. Add `pgbouncer-catalog` (as for the others) or lower its pool before raising its
-`maxReplicas`.
+Catalog used to connect directly, and at its maximum of 10 pods it would have used every one of the database's 200
+connections. It now goes through `pgbouncer-catalog` like the others, with a smaller server pool because almost every read
+is a cache hit.
 
 At 1× one primary per database is comfortable. At 10× the orders primary would need ~25 k writes and reads a second;
 order history moves to read replicas first, then orders are sharded by `customer_id` (Citus), which keeps a customer's

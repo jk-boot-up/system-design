@@ -8,7 +8,7 @@ is published as `catalog.ProductChanged` through a transactional outbox, so sear
 |---|---|
 | Language / framework | Java 25, Spring Boot 4.0 (virtual threads), Flyway, ShedLock, MinIO client |
 | Store | PostgreSQL: `categories`, `products` (attributes as JSONB with a GIN index), `product_images`, `outbox` |
-| Cache | Redis: `product:<id>` JSON, 10-minute expiry, evicted after every committed change (cache-aside) |
+| Cache | Redis: `product:<id>` JSON, 10-minute expiry ± 10 %, evicted after every committed change (cache-aside); concurrent misses for one product share one load |
 | Object storage | Any S3-compatible store (MinIO in the design; RustFS in the container tests, because MinIO no longer publishes community images), bucket `product-images`, keys `products/<productId>/<uuid>.<ext>` |
 | Publishes | `catalog.ProductChanged` on `catalog.events` (key = product id) |
 | Called by | api-gateway (public and staff API), cart-service (`POST /internal/products/prices`) |
