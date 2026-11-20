@@ -1,3 +1,9 @@
+otel_exporter { endpoint ${OTEL_COLLECTOR}; }
+otel_service_name edge;
+otel_trace on;
+otel_trace_context propagate;      # continue an incoming traceparent, and send ours upstream
+otel_span_attr request.id $req_id; # so a problem response's traceId (the request id) finds the trace from the edge too
+
 upstream gateway {
     server ${GATEWAY_UPSTREAM};
     keepalive 64;
@@ -23,7 +29,7 @@ map $http_cookie $shop_cookie {
 
 server {
     listen 8080;
-    location = /healthz { access_log off; return 200 "ok\n"; }
+    location = /healthz { access_log off; otel_trace off; return 200 "ok\n"; }
     location / { return 301 https://$host$request_uri; }
 }
 
@@ -47,7 +53,7 @@ server {
     proxy_hide_header X-Request-Id;          # the gateway echoes the same id; NGINX adds it once itself
     proxy_read_timeout 20s;
 
-    location = /healthz { access_log off; return 200 "ok\n"; }
+    location = /healthz { access_log off; otel_trace off; return 200 "ok\n"; }
 
     # Service-to-service APIs are never exposed, whatever the gateway's routes say.
     location /internal { return 404; }

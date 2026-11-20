@@ -63,6 +63,9 @@ class OrderContainersIT {
         r.add("clients.cart.url", DOWNSTREAM::url);
         r.add("clients.inventory.url", DOWNSTREAM::url);
         r.add("clients.payment.url", DOWNSTREAM::url);
+        r.add("service-auth.token-uri", () -> DOWNSTREAM.url() + "/token");
+        r.add("service-auth.client-id", () -> "order-service");
+        r.add("service-auth.client-secret", () -> "test-secret");
         r.add("order.outbox.poll-interval", () -> "50ms");
     }
 
@@ -86,6 +89,7 @@ class OrderContainersIT {
         DOWNSTREAM.outOfStock = false;
         DOWNSTREAM.declinePayment = false;
         DOWNSTREAM.calls.clear();
+        DOWNSTREAM.authorizations.clear();
     }
 
     @Test
@@ -101,6 +105,9 @@ class OrderContainersIT {
         assertThat(DOWNSTREAM.calls).containsExactly(
                 "GET /internal/carts/{id}/checkout-snapshot", "POST /internal/reservations", "POST /internal/payments/authorize",
                 "POST /internal/reservations/{id}/commit", "POST /internal/payments/{id}/capture");
+        // Every call carried order-service's own token, not the customer's, and one token served them all.
+        assertThat(DOWNSTREAM.authorizations).hasSize(5).allMatch(a -> a.matches("Bearer svc-\\d+"));
+        assertThat(DOWNSTREAM.authorizations).containsOnly(DOWNSTREAM.authorizations.getFirst());
         assertThat(jdbc.sql("select count(*) from orders_default").query(Integer.class).single())
                 .as("the order went into its monthly partition, not the default one").isZero();
 

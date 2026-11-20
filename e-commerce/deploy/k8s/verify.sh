@@ -29,6 +29,8 @@ CRDS=(
   "keda              https://github.com/kedacore/keda/releases/download/v2.21.1/keda-2.21.1-crds.yaml"
   "prometheus-operator https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.94.2/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml"
   "prometheus-rules  https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.94.2/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml"
+  "kyverno           https://raw.githubusercontent.com/kyverno/kyverno/v1.19.2/config/crds/kyverno/kyverno.io_clusterpolicies.yaml"
+  "barman-cloud      https://raw.githubusercontent.com/cloudnative-pg/plugin-barman-cloud/v0.15.1/config/crd/bases/barmancloud.cnpg.io_objectstores.yaml"
 )
 
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT

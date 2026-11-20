@@ -7,6 +7,7 @@ Part of the [e-commerce system design](../../../design/README.md). Animated vers
 | Does | Does not |
 |---|---|
 | Terminate TLS and HTTP/2; compress; redirect plain HTTP (edge) | Hold any business data |
+| Refuse attack-shaped requests with the OWASP Core Rule Set on ModSecurity (edge) | Replace the services' own validation |
 | Micro-cache anonymous product, category and search reads for 5 s (edge) | Cache anything for signed-in customers |
 | Route each public path to one service; rewrite the staff stock path | Aggregate several services into one response |
 | Validate tokens (signature, expiry, issuer, audience) and coarse roles | Replace the services' own checks: each service validates again |
@@ -72,14 +73,28 @@ A bucket holds at most `burst` tokens and gains `rate` tokens per second. A requ
 | Redis hash | `rate:<policy>:<key>` | `tokens` (fractional), `at` (Redis time, seconds) | `burst / rate × 2 + 1` s, so idle buckets disappear |
 | Local LRU map | `<policy>-local:<key>` | tokens, nanoTime | at most 100 000 keys; least recently used dropped |
 
-## 7. Scaling and performance
+## 7. Web application firewall (edge)
+
+The edge image is built on the OWASP Core Rule Set image: NGINX with ModSecurity, which scores every request against the
+rule set (SQL injection, script injection, path traversal, protocol abuse, known scanners). A request whose anomaly score
+reaches 5 is refused with `403` before it reaches the storefront or the gateway, and logged as a JSON audit record with
+the matching rule ids (the edge's stdout, so it lands in Loki). Paranoia level 1 blocks; level 2 runs in detection only,
+so its findings can be reviewed before it is raised. Response bodies are not inspected, so streamed pages are not held
+back.
+
+The services do not rely on it: they validate input and use parameterised queries themselves. The firewall removes the
+noise of automated attacks early and gives one place to block a new attack pattern quickly. The shop's own rules and
+any exclusions for false positives are in [`edge/waf/`](../edge/waf/before-crs.conf); each names the path and argument
+it applies to.
+
+## 8. Scaling and performance
 
 * **Pods:** stateless, 3–20 replicas on CPU. Non-blocking (Netty), so a slow service ties up no threads.
 * **Per request:** one Redis round trip per limit that applies (one, or two on cart item and checkout routes); a cached JWKS check.
 * **Redis:** a dedicated instance (`redis-ratelimit`) so a cache flood cannot slow admission; about 100 bytes per active key.
 * **Edge:** NGINX absorbs read spikes with the micro-cache; at 5 s per URL, 10 000 identical requests per second become 0.2.
 
-## 8. Failure handling
+## 9. Failure handling
 
 | Failure | Behaviour |
 |---|---|
@@ -90,7 +105,7 @@ A bucket holds at most `burst` tokens and gains `rate` tokens per second. A requ
 | A service replaced (new IP address) | DNS answers are cached at most 10 s and idle pooled connections dropped after 30 s, so traffic follows the new instance within seconds instead of failing for the resolver's TTL (600 s in Docker). Found with the compose stack |
 | Edge pod lost | The load balancer drops it; each pod has its own 512 MB cache, refilled within seconds |
 
-## 9. Tests
+## 10. Tests
 
 | Test | Kind | Proves |
 |---|---|---|
@@ -98,4 +113,4 @@ A bucket holds at most `burst` tokens and gains `rate` tokens per second. A requ
 | `RedisTokenBucketsFallbackTest` | adapter | With Redis unreachable, exactly 10 of 15 requests pass (40 × 0.25) and every one is counted as degraded |
 | `ArchitectureTest` | ArchUnit | Pure domain; adapters independent |
 | `GatewayContainersIT` | Redis + stub services | Routes and the reviews-before-catalogue order; stock path rewrite; request id kept or replaced; 401 / 403 / `/internal` denied; guest cart; checkout limited per customer with `Retry-After` while another customer passes; a hot SKU limited across shoppers; down search answers 503 `SEARCH_UNAVAILABLE` |
-| `EdgeContainersIT` | NGINX image + stub gateway | HTTP/2 over TLS; MISS then HIT with one upstream call; signed-in requests bypass the cache; HSTS; request id generated or kept and forwarded with the client address; `/internal` 404 without reaching upstream; HTTP redirects to HTTPS |
+| `EdgeContainersIT` | NGINX image + stub gateway | HTTP/2 over TLS; MISS then HIT with one upstream call; signed-in requests bypass the cache; HSTS; request id generated or kept and forwarded with the client address; `/internal` 404 without reaching upstream; HTTP redirects to HTTPS; the firewall refuses SQL injection, XSS, path traversal and a scanner without reaching upstream, and lets a quoted search and a form post with a token through |

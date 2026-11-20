@@ -1,0 +1,140 @@
+# Backups of every PostgreSQL cluster through the Barman Cloud plugin for CloudNativePG (installed once per cluster,
+# README): WAL files are archived continuously and a base backup is taken every night, so any cluster can be restored to
+# any moment of the last 30 days (point-in-time recovery). Backups go to the "e-commerce-backups" bucket of the
+# environment's object storage, one prefix per cluster, compressed and encrypted by the store (AES-256). Credentials
+# come from the backup-storage Secret (dev-secrets or External Secrets). Restoring: design/15-runbooks.md §15.5.
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: orders-db-backup
+spec:
+  retentionPolicy: "30d"
+  configuration:
+    destinationPath: s3://e-commerce-backups/orders-db
+    endpointURL: https://storage.shop.example
+    s3Credentials:
+      accessKeyId: { name: backup-storage, key: ACCESS_KEY_ID }
+      secretAccessKey: { name: backup-storage, key: ACCESS_SECRET_KEY }
+    wal: { compression: zstd, maxParallel: 4 }
+    data: { compression: snappy, encryption: AES256, jobs: 2 }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: orders-db-nightly
+spec:
+  cluster: { name: orders-db }
+  schedule: "0 0 2 * * *"          # 02:00 every night (seconds field first)
+  immediate: true                  # and one right after the cluster is created
+  backupOwnerReference: self
+  method: plugin
+  pluginConfiguration: { name: barman-cloud.cloudnative-pg.io }
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: inventory-db-backup
+spec:
+  retentionPolicy: "30d"
+  configuration:
+    destinationPath: s3://e-commerce-backups/inventory-db
+    endpointURL: https://storage.shop.example
+    s3Credentials:
+      accessKeyId: { name: backup-storage, key: ACCESS_KEY_ID }
+      secretAccessKey: { name: backup-storage, key: ACCESS_SECRET_KEY }
+    wal: { compression: zstd, maxParallel: 4 }
+    data: { compression: snappy, encryption: AES256, jobs: 2 }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: inventory-db-nightly
+spec:
+  cluster: { name: inventory-db }
+  schedule: "0 0 2 * * *"          # 02:00 every night (seconds field first)
+  immediate: true                  # and one right after the cluster is created
+  backupOwnerReference: self
+  method: plugin
+  pluginConfiguration: { name: barman-cloud.cloudnative-pg.io }
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: payments-db-backup
+spec:
+  retentionPolicy: "30d"
+  configuration:
+    destinationPath: s3://e-commerce-backups/payments-db
+    endpointURL: https://storage.shop.example
+    s3Credentials:
+      accessKeyId: { name: backup-storage, key: ACCESS_KEY_ID }
+      secretAccessKey: { name: backup-storage, key: ACCESS_SECRET_KEY }
+    wal: { compression: zstd, maxParallel: 4 }
+    data: { compression: snappy, encryption: AES256, jobs: 2 }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: payments-db-nightly
+spec:
+  cluster: { name: payments-db }
+  schedule: "0 0 2 * * *"          # 02:00 every night (seconds field first)
+  immediate: true                  # and one right after the cluster is created
+  backupOwnerReference: self
+  method: plugin
+  pluginConfiguration: { name: barman-cloud.cloudnative-pg.io }
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: catalog-db-backup
+spec:
+  retentionPolicy: "30d"
+  configuration:
+    destinationPath: s3://e-commerce-backups/catalog-db
+    endpointURL: https://storage.shop.example
+    s3Credentials:
+      accessKeyId: { name: backup-storage, key: ACCESS_KEY_ID }
+      secretAccessKey: { name: backup-storage, key: ACCESS_SECRET_KEY }
+    wal: { compression: zstd, maxParallel: 4 }
+    data: { compression: snappy, encryption: AES256, jobs: 2 }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: catalog-db-nightly
+spec:
+  cluster: { name: catalog-db }
+  schedule: "0 0 2 * * *"          # 02:00 every night (seconds field first)
+  immediate: true                  # and one right after the cluster is created
+  backupOwnerReference: self
+  method: plugin
+  pluginConfiguration: { name: barman-cloud.cloudnative-pg.io }
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: keycloak-db-backup
+spec:
+  retentionPolicy: "30d"
+  configuration:
+    destinationPath: s3://e-commerce-backups/keycloak-db
+    endpointURL: https://storage.shop.example
+    s3Credentials:
+      accessKeyId: { name: backup-storage, key: ACCESS_KEY_ID }
+      secretAccessKey: { name: backup-storage, key: ACCESS_SECRET_KEY }
+    wal: { compression: zstd, maxParallel: 4 }
+    data: { compression: snappy, encryption: AES256, jobs: 2 }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: keycloak-db-nightly
+spec:
+  cluster: { name: keycloak-db }
+  schedule: "0 0 2 * * *"          # 02:00 every night (seconds field first)
+  immediate: true                  # and one right after the cluster is created
+  backupOwnerReference: self
+  method: plugin
+  pluginConfiguration: { name: barman-cloud.cloudnative-pg.io }

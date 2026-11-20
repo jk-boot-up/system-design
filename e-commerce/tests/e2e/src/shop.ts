@@ -1,5 +1,5 @@
 import { expect, request } from '@playwright/test';
-import { Api, eventually, uniqueId, type Money } from './api.js';
+import { Api, eventually, token, uniqueId, type Money } from './api.js';
 import { env } from './env.js';
 
 export type Product = { id: string; sku: string; name: string; brand: string; price: Money; status: string };
@@ -43,9 +43,12 @@ export async function setStock(staff: Api, sku: string, available: number): Prom
   expect(res.ok(), `set stock ${sku}: ${res.status()} ${await res.text()}`).toBeTruthy();
 }
 
-/** Stock as inventory-service sees it (its internal API: not routed by the gateway or the edge). */
+/**
+ * Stock as inventory-service sees it: its internal API, not routed by the gateway or the edge, and only for staff (or
+ * order-service's own token), so the staff member's token is sent.
+ */
 export async function stockOf(sku: string): Promise<{ available: number; reserved?: number }> {
-  const ctx = await request.newContext();
+  const ctx = await request.newContext({ extraHTTPHeaders: { authorization: `Bearer ${await token('sam')}` } });
   const res = await ctx.get(`${env.inventory}/internal/stock/${sku}`);
   const body = await Api.json<{ available: number; reserved?: number }>(res, 200);
   await ctx.dispose();

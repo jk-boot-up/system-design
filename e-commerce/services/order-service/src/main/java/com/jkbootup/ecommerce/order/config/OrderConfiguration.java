@@ -3,6 +3,7 @@ package com.jkbootup.ecommerce.order.config;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import com.jkbootup.ecommerce.order.adapter.client.CartHttpClient;
+import com.jkbootup.ecommerce.order.adapter.client.ServiceTokens;
 import com.jkbootup.ecommerce.order.adapter.client.InventoryHttpClient;
 import com.jkbootup.ecommerce.order.adapter.client.PaymentHttpClient;
 import com.jkbootup.ecommerce.order.adapter.messaging.OutboxRelay;
@@ -30,6 +31,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -62,12 +64,29 @@ public class OrderConfiguration {
                               @Value("${clients.payment.url:http://localhost:8086}") String paymentUrl,
                               @Value("${clients.connect-timeout:200ms}") Duration connect,
                               @Value("${clients.read-timeout:800ms}") Duration read,
-                              @Value("${clients.payment.read-timeout:2s}") Duration paymentRead) {
+                              @Value("${clients.payment.read-timeout:2s}") Duration paymentRead,
+                              ServiceTokens tokens) {
+        var auth = tokens.interceptor();
         return new CheckoutSaga(orders,
-                new CartHttpClient(client(cartUrl, connect, read, observations)),
-                new InventoryHttpClient(client(inventoryUrl, connect, read, observations), json),
-                new PaymentHttpClient(client(paymentUrl, connect, paymentRead, observations), json),
+                new CartHttpClient(client(cartUrl, connect, read, observations, auth)),
+                new InventoryHttpClient(client(inventoryUrl, connect, read, observations, auth), json),
+                new PaymentHttpClient(client(paymentUrl, connect, paymentRead, observations, auth), json),
                 new SpringTransactions(tx), new UuidV7(), clock);
+    }
+
+    /**
+     * order-service's identity towards cart, inventory and payment: client-credentials tokens from the realm, whose
+     * audience names those three services (realm client {@code order-service}).
+     */
+    @Bean
+    ServiceTokens serviceTokens(ObservationRegistry observations, Clock clock,
+                                @Value("${service-auth.token-uri}") String tokenUri,
+                                @Value("${service-auth.client-id}") String clientId,
+                                @Value("${service-auth.client-secret}") String clientSecret) {
+        var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build());
+        factory.setReadTimeout(Duration.ofSeconds(2));
+        var endpoint = RestClient.builder().baseUrl(tokenUri).requestFactory(factory).observationRegistry(observations).build();
+        return new ServiceTokens(endpoint, clientId, clientSecret, clock, Duration.ofSeconds(5));
     }
 
     @Bean
@@ -113,9 +132,11 @@ public class OrderConfiguration {
     }
 
     /** With the observation registry: a client span per call, and the trace context sent along (traceparent). */
-    private static RestClient client(String baseUrl, Duration connect, Duration read, ObservationRegistry observations) {
+    private static RestClient client(String baseUrl, Duration connect, Duration read, ObservationRegistry observations,
+                                     ClientHttpRequestInterceptor auth) {
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(connect).build());
         factory.setReadTimeout(read);
-        return RestClient.builder().baseUrl(baseUrl).requestFactory(factory).observationRegistry(observations).build();
+        return RestClient.builder().baseUrl(baseUrl).requestFactory(factory).observationRegistry(observations)
+                .requestInterceptor(auth).build();
     }
 }

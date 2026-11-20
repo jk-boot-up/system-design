@@ -15,6 +15,8 @@ x-java: &java
     JWT_ISSUER: http://localhost:8180/realms/shop
     # Keys from inside the network; the issuer claim is still checked against the public URL above.
     SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/shop/protocol/openid-connect/certs
+    # Service-to-service tokens (client credentials) for the callers of /internal: order-service and cart-service.
+    SERVICE_AUTH_TOKEN_URI: http://keycloak:8080/realms/shop/protocol/openid-connect/token
     JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError -XX:TieredStopAtLevel=1
     # Observability (deploy/observability): spans to Alloy, JSON logs with trace ids on stdout.
     MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: http://alloy:4318/v1/traces
@@ -195,6 +197,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.15.1
+    command: [ --config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --enable-feature=exemplar-storage ]
     ports: ["9090:9090"]
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -247,15 +250,17 @@ services:
   payment-service:
     <<: *java
     build: ../../services/payment-service
-    environment: { <<: *java-env, DB_URL: "jdbc:postgresql://postgres:5432/payments" }
+    # Health and metrics on their own port, as in Kubernetes, where only order-service may reach the API port.
+    environment: { <<: *java-env, DB_URL: "jdbc:postgresql://postgres:5432/payments", MANAGEMENT_PORT: "9086" }
     ports: ["8086:8086"]
     depends_on: { <<: *kafka-ready, postgres: { condition: service_healthy } }
-    healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8086 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
+    healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/9086 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
 
   cart-service:
     <<: *java
     build: ../../services/cart-service
-    environment: { <<: *java-env, REDIS_URL: "redis://redis:6379", CATALOG_URL: "http://catalog-service:8081" }
+    environment: { <<: *java-env, REDIS_URL: "redis://redis:6379", CATALOG_URL: "http://catalog-service:8081",
+                   SERVICE_AUTH_CLIENT_SECRET: dev-cart-service-secret-change-me-0123456789 }
     ports: ["8083:8083"]
     depends_on: { <<: *kafka-ready, redis: { condition: service_healthy }, keycloak: { condition: service_healthy } }
     healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8083 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
@@ -269,6 +274,7 @@ services:
       CART_URL: http://cart-service:8083
       INVENTORY_URL: http://inventory-service:8084
       PAYMENT_URL: http://payment-service:8086
+      SERVICE_AUTH_CLIENT_SECRET: dev-order-service-secret-change-me-0123456789
     ports: ["8085:8085"]
     depends_on: { <<: *kafka-ready, postgres: { condition: service_healthy }, keycloak: { condition: service_healthy } }
     healthcheck: { <<: *java-health, test: [CMD, bash, -c, "exec 3<>/dev/tcp/127.0.0.1/8085 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"] }
@@ -299,6 +305,7 @@ services:
       RABBITMQ_URL: amqp://shop:shop@rabbitmq:5672/
       REDIS_URL: redis://redis:6379
       SMTP_ADDR: mailpit:1025
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://alloy:4318/v1/traces
     ports: ["8088:8088"]
     depends_on: { <<: *kafka-ready, rabbitmq: { condition: service_healthy }, redis: { condition: service_healthy }, mailpit: { condition: service_started } }
     mem_limit: 128m
@@ -307,7 +314,7 @@ services:
   recommendation-service:
     build: ../../services/recommendation-service
     restart: unless-stopped
-    environment: { KAFKA_BOOTSTRAP: "kafka:29092", REDIS_URL: "redis://redis:6379" }
+    environment: { KAFKA_BOOTSTRAP: "kafka:29092", REDIS_URL: "redis://redis:6379", OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://alloy:4318/v1/traces" }
     ports: ["8089:8089"]
     depends_on: { <<: *kafka-ready, redis: { condition: service_healthy } }
     healthcheck:
@@ -372,7 +379,7 @@ services:
     ports: ["8000:8080", "8443:8443"]
     volumes: [ "../..:/usr/share/nginx/docs:ro" ]      # the generated HTML documentation at https://localhost:8443/docs/
     depends_on: { api-gateway: { condition: service_healthy }, storefront: { condition: service_healthy } }
-    mem_limit: 64m
+    mem_limit: 160m                                   # the firewall's rule set is loaded in every worker
 
 volumes:
   postgres:

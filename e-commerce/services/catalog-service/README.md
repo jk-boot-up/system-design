@@ -11,7 +11,7 @@ is published as `catalog.ProductChanged` through a transactional outbox, so sear
 | Cache | Redis: `product:<id>` JSON, 10-minute expiry ± 10 %, evicted after every committed change (cache-aside); concurrent misses for one product share one load |
 | Object storage | Any S3-compatible store (MinIO in the design; RustFS in the container tests, because MinIO no longer publishes community images), bucket `product-images`, keys `products/<productId>/<uuid>.<ext>` |
 | Publishes | `catalog.ProductChanged` on `catalog.events` (key = product id) |
-| Called by | api-gateway (public and staff API), cart-service (`POST /internal/products/prices`) |
+| Called by | api-gateway (public and staff API), cart-service (`POST /internal/products/prices`, with its service token: audience `catalog-service`, `azp` `cart-service`) |
 | Port | 8081 |
 | Design | [design/README.md](design/README.md) · [walkthrough](design/walkthrough/index.html) |
 | Prerequisites | [PREREQUISITES.md](PREREQUISITES.md) |

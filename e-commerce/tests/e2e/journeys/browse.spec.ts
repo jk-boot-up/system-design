@@ -1,7 +1,9 @@
 // Browse: staff publishes a product; anyone can read it through the edge, which micro-caches public reads.
 // Who may do what is enforced at the gateway and in the services, not by the client.
-import { expect, test } from '@playwright/test';
-import { Api } from '../src/api.js';
+import { expect, request, test } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { Api, token } from '../src/api.js';
+import { env } from '../src/env.js';
 import { newProduct, type Product } from '../src/shop.js';
 
 test.describe('browse the catalogue', () => {
@@ -39,5 +41,18 @@ test.describe('browse the catalogue', () => {
 
   test('internal APIs are not reachable through the edge', async () => {
     expect((await anonymous.get('/internal/stock/ANY')).status()).toBe(404);
+  });
+
+  test('inside the network, internal APIs still need the calling service\'s own token', async () => {
+    // Reaching the port is not enough (12-security-design §12.4): no token is 401, and a customer's token, whose
+    // audience is the public API, is 403 even though the realm signed it.
+    const direct = await request.newContext();
+    const reserve = { data: { orderId: randomUUID(), lines: [{ sku: 'SKU-ANY', quantity: 1 }] } };
+    await Api.problem(await direct.post(`${env.inventory}/internal/reservations`, reserve), 401, 'UNAUTHENTICATED');
+    const res = await direct.post(`${env.inventory}/internal/reservations`, {
+      ...reserve, headers: { authorization: `Bearer ${await token('ada')}` },
+    });
+    await Api.problem(res, 403, 'FORBIDDEN');
+    await direct.dispose();
   });
 });

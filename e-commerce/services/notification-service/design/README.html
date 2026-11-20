@@ -228,7 +228,12 @@ exchange (<code>at-least-once</code> dead-lettering, so it cannot be dropped on 
 <tr>
 <td><code>test/containers_test.go</code></td>
 <td>Kafka + RabbitMQ + Redis + Mailpit</td>
-<td>Three copies of one event → exactly one email; cancellation email; a recipient failing twice delivered after two delayed retries (3 attempts); a 5xx tried once and a never-working address tried 5 times, both in <code>email.dead</code>; an unreadable event on <code>order.events.dlq</code> with its reason</td>
+<td>Three copies of one event → exactly one email; cancellation email; a recipient failing twice delivered after two delayed retries (3 attempts); a 5xx tried once and a never-working address tried 5 times, both in <code>email.dead</code>; an unreadable event on <code>order.events.dlq</code> with its reason; the spans of two events continue their checkouts' traces, one routing span each and one span per send attempt, also after the delay queues</td>
+</tr>
+<tr>
+<td><code>telemetry_test.go</code></td>
+<td>adapter</td>
+<td>Trace context read from a Kafka record and written to RabbitMQ headers unchanged; log lines carry the trace and span ids; nothing exported without an endpoint</td>
 </tr>
 </tbody>
 </table>

@@ -14,9 +14,9 @@ in [15 Runbooks](15-runbooks.md).
 
 | Signal | Produced by | Conventions |
 |---|---|---|
-| Traces | Java: Micrometer Tracing bridged to OpenTelemetry; storefront: OTel Node SDK with HTTP and undici instrumentation | W3C `traceparent` everywhere, including Kafka record headers and the outbox row; health checks, metrics scrapes and the relay's polling are not traced; query strings are dropped from span names and URLs |
-| Metrics | Micrometer at `/actuator/prometheus`; `/metrics` in Go and Python; Strimzi's Kafka exporter | Prometheus naming; histograms for `http.server.requests` (5 ms – 5 s); the gateway's per-route histogram with buckets at each SLO threshold |
-| Logs | stdout, one JSON object per line | Java: ECS (`LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs`) with `traceId` and `spanId`; storefront: pino with the same fields; labels in Loki are only `service` and `level`, the trace id is structured metadata |
+| Traces | edge: NGINX's OpenTelemetry module (the trace starts where the request enters); Java: Micrometer Tracing bridged to OpenTelemetry; storefront: OTel Node SDK with HTTP and undici instrumentation; notification-service: OTel Go SDK (a span per Kafka record and per email attempt, the context carried in RabbitMQ headers through the retry queues); recommendation-service: OTel Python SDK (FastAPI and a span per Kafka record) | W3C `traceparent` everywhere, including Kafka record headers and the outbox row; health checks, metrics scrapes and the relay's polling are not traced; query strings are dropped from span names and URLs |
+| Metrics | Micrometer at `/actuator/prometheus` (payment-service on its own management port in Kubernetes); `/metrics` in Go and Python; Strimzi's Kafka exporter; CloudNativePG instances (WAL archiving, backups) | Prometheus naming; histograms for `http.server.requests` (5 ms – 5 s) with exemplars (`trace_id`) that Grafana's latency panels show and link to Tempo; the gateway's per-route histogram with buckets at each SLO threshold |
+| Logs | stdout, one JSON object per line | Java: ECS (`LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs`) with `traceId` and `spanId`; storefront, notification and recommendation: the same fields; the edge: its access log with the request id, and the firewall's audit records; labels in Loki are only `service` and `level`, the trace id is structured metadata |
 
 ## 13.2 One trace from click to consumers
 
@@ -107,8 +107,6 @@ an `alloy-sampler` StatefulSet, which decides once the trace is complete.
 
 ## 13.7 Known gaps
 
-* notification-service and recommendation-service export metrics but no traces; their consumers ignore the incoming
-  `traceparent`.
-* The edge logs the request id but starts no trace.
-* Exemplars (a link from a latency bucket to an example trace) are stored by Prometheus but not yet attached by services.
+* The storefront's Node metrics carry no exemplars (prom-client attaches them only to histograms given a trace id by
+  hand); its traces are linked from the gateway's and the edge's instead.
 * Locally, the core stack plus this profile needs about 5 GB of Docker memory under load.

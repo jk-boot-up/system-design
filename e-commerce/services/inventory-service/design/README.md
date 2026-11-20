@@ -101,4 +101,4 @@ Full DDL: [`V1__inventory_schema.sql`](../src/main/resources/db/migration/V1__in
 | `ReservationTest` | domain unit | State rules, idempotent transitions, value validation |
 | `ReservationServiceTest` | application, in-memory test doubles | All-or-nothing, merging, idempotency, expiry, commit-after-expiry |
 | `HexagonalArchitectureTest` | ArchUnit | Domain is pure Java; application depends only on domain; adapters independent |
-| `InventoryContainersIT` | PostgreSQL + Kafka containers | 50 concurrent orders for 10 units → exactly 10 reserved; REST contract and problem details; outbox → Kafka; `OrderCancelled` releases stock, duplicates ignored |
+| `InventoryContainersIT` | PostgreSQL + Kafka containers | 50 concurrent orders for 10 units → exactly 10 reserved; REST contract and problem details; outbox → Kafka; `OrderCancelled` releases stock, duplicates ignored; reservations only with order-service's token (none → 401 problem; customer, staff or cart-service → 403), stock only for staff |

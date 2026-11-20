@@ -10,14 +10,17 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * A real HTTP server standing in for cart, inventory and payment, so the order-service clients, timeouts and error
- * mapping are exercised over the network. Behaviour is switched per test.
+ * A real HTTP server standing in for cart, inventory, payment and the realm's token endpoint, so the order-service
+ * clients, their service token, timeouts and error mapping are exercised over the network. Behaviour is switched per test.
  */
 final class FakeDownstream implements AutoCloseable {
 
     volatile boolean outOfStock;
     volatile boolean declinePayment;
     final List<String> calls = new CopyOnWriteArrayList<>();
+    /** The Authorization header of every call to /internal. */
+    final List<String> authorizations = new CopyOnWriteArrayList<>();
+    final java.util.concurrent.atomic.AtomicInteger tokensIssued = new java.util.concurrent.atomic.AtomicInteger();
     private final HttpServer server;
 
     FakeDownstream() throws IOException {
@@ -32,6 +35,13 @@ final class FakeDownstream implements AutoCloseable {
 
     private void handle(HttpExchange ex) throws IOException {
         String path = ex.getRequestURI().getPath();
+        if (path.equals("/token")) {    // the realm's token endpoint, client-credentials grant
+            boolean ok = "Basic b3JkZXItc2VydmljZTp0ZXN0LXNlY3JldA==".equals(ex.getRequestHeaders().getFirst("Authorization"));
+            if (!ok) reply(ex, 401, "{\"error\":\"invalid_client\"}");
+            else reply(ex, 200, "{\"access_token\":\"svc-" + tokensIssued.incrementAndGet() + "\",\"expires_in\":300}");
+            return;
+        }
+        authorizations.add(String.valueOf(ex.getRequestHeaders().getFirst("Authorization")));
         calls.add(ex.getRequestMethod() + " " + path.replaceAll("[0-9a-f-]{36}", "{id}"));
         if (path.endsWith("/checkout-snapshot")) {
             reply(ex, 200, """

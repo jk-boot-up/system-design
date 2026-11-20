@@ -1,6 +1,7 @@
 # PostgreSQL 17 through CloudNativePG: one cluster per owning service (database per service), three instances spread over
 # zones with one synchronous standby, so a failover loses no committed order or payment. Each cluster's owner credentials
-# come from the secret of the same name, which the service in e-commerce-shop also reads.
+# come from the secret of the same name, which the service in e-commerce-shop also reads. Every cluster archives its WAL
+# and is backed up nightly (backups.yaml).
 # order, inventory, payment and catalog connect through PgBouncer in transaction mode (SPEC: thousands of client
 # connections onto 30-50 server connections); Flyway's transaction-scoped advisory lock and PgBouncer's prepared-statement
 # support make both safe in that mode. Keycloak (two pods) connects to its primary directly (keycloak-db-rw).
@@ -16,6 +17,8 @@ spec:
   postgresql:
     synchronous: { method: any, number: 1 }
     parameters: { max_connections: "200", shared_buffers: 1GB, log_min_duration_statement: "250" }
+  plugins:                         # WAL archive and backups (backups.yaml)
+    - { name: barman-cloud.cloudnative-pg.io, isWALArchiver: true, parameters: { barmanObjectName: orders-db-backup } }
   bootstrap:
     initdb: { database: orders, owner: orders, secret: { name: orders-db } }
   storage: { size: 100Gi }
@@ -35,6 +38,8 @@ spec:
   postgresql:
     synchronous: { method: any, number: 1 }
     parameters: { max_connections: "200", shared_buffers: 512MB, log_min_duration_statement: "250" }
+  plugins:                         # WAL archive and backups (backups.yaml)
+    - { name: barman-cloud.cloudnative-pg.io, isWALArchiver: true, parameters: { barmanObjectName: inventory-db-backup } }
   bootstrap:
     initdb: { database: inventory, owner: inventory, secret: { name: inventory-db } }
   storage: { size: 20Gi }
@@ -54,6 +59,8 @@ spec:
   postgresql:
     synchronous: { method: any, number: 1 }
     parameters: { max_connections: "200", shared_buffers: 512MB, log_min_duration_statement: "250" }
+  plugins:                         # WAL archive and backups (backups.yaml)
+    - { name: barman-cloud.cloudnative-pg.io, isWALArchiver: true, parameters: { barmanObjectName: payments-db-backup } }
   bootstrap:
     initdb: { database: payments, owner: payments, secret: { name: payments-db } }
   storage: { size: 50Gi }
@@ -73,6 +80,8 @@ spec:
   postgresql:
     synchronous: { method: any, number: 1 }
     parameters: { max_connections: "200", shared_buffers: 512MB, log_min_duration_statement: "250" }
+  plugins:                         # WAL archive and backups (backups.yaml)
+    - { name: barman-cloud.cloudnative-pg.io, isWALArchiver: true, parameters: { barmanObjectName: catalog-db-backup } }
   bootstrap:
     initdb: { database: catalog, owner: catalog, secret: { name: catalog-db } }
   storage: { size: 20Gi }
@@ -92,6 +101,8 @@ spec:
   postgresql:
     synchronous: { method: any, number: 1 }
     parameters: { max_connections: "100", shared_buffers: 256MB, log_min_duration_statement: "250" }
+  plugins:                         # WAL archive and backups (backups.yaml)
+    - { name: barman-cloud.cloudnative-pg.io, isWALArchiver: true, parameters: { barmanObjectName: keycloak-db-backup } }
   bootstrap:
     initdb: { database: keycloak, owner: keycloak, secret: { name: keycloak-db } }
   storage: { size: 10Gi }

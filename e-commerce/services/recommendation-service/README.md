@@ -26,6 +26,7 @@ recommendation-service/
 │  ├─ adapters/redis_store.py   Lua script: seen-check and all ZINCRBYs in one atomic step; top N with ZRANGE REV
 │  ├─ adapters/kafka_consumer.py  manual commits after each event; retry with back-off; dead-letter producer
 │  ├─ adapters/http.py          FastAPI routes, problem responses, metrics
+│  ├─ telemetry.py              OpenTelemetry setup, trace context from Kafka headers, trace ids in logs
 │  └─ main.py                   API and consumer in one asyncio process
 ├─ tests/                       domain, use cases with fakes, API, import boundaries, Redis + Kafka containers
 ├─ Dockerfile, k8s/, pyproject.toml (exact versions)
@@ -46,6 +47,7 @@ curl -s localhost:8089/api/v1/products/SKU-1001/recommendations?limit=5
 | `KAFKA_BOOTSTRAP` | `localhost:9092` | Kafka |
 | `REDIS_URL` | `redis://localhost:6379` | Co-purchase counts |
 | `PORT` | `8089` | HTTP port |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | unset | Where spans go (OTLP over HTTP); unset, none are exported |
 
 ## API
 

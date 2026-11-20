@@ -5,6 +5,14 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -52,8 +60,38 @@ class PaymentContainersIT {
         r.add("payment.outbox.poll-interval", () -> "50ms");
     }
 
+    @MockitoBean
+    JwtDecoder jwtDecoder;      // tokens come from the jwt() post-processor; no identity provider needed
+
     @Autowired
+    WebApplicationContext context;
+
+    /** Every request as order-service, with its client-credentials token. */
     MockMvc mvc;
+    /** Requests with no token unless the test adds one. */
+    MockMvc anonymous;
+
+    @BeforeEach
+    void clients() {
+        mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity())
+                .defaultRequest(get("/").with(jwt().jwt(j -> j.audience(List.of("payment-service")).claim("azp", "order-service"))))
+                .build();
+        anonymous = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    }
+
+    @Test
+    void onlyOrderServiceMayCallPayments() throws Exception {
+        String body = authorize(UUID.randomUUID(), "tok_ok");
+        anonymous.perform(post("/internal/payments/authorize").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        anonymous.perform(post("/internal/payments/authorize").with(jwt().jwt(j -> j.audience(List.of("shop-api")).claim("azp", "shop-web")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        anonymous.perform(post("/internal/payments/authorize").with(jwt().jwt(j -> j.audience(List.of("payment-service")).claim("azp", "cart-service")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        anonymous.perform(get("/actuator/health")).andExpect(status().isOk());
+    }
 
     @Autowired
     PaymentReconciler reconciler;

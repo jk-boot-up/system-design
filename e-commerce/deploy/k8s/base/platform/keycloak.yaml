@@ -38,7 +38,8 @@ spec:
   issuerRef: { kind: ClusterIssuer, name: letsencrypt }
   privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }
 ---
-# The shop realm: roles, the storefront's confidential client, the public API client with PKCE, the shop-api audience and a "roles" claim, as in
+# The shop realm: roles, the storefront's confidential client, the public API client with PKCE, the shop-api audience and a "roles" claim,
+# and one client-credentials client per service that calls another's /internal API (its token's audience names the callees), as in
 # deploy/compose/keycloak/shop-realm.json, without its test users (the dev overlay adds them).
 apiVersion: k8s.keycloak.org/v2beta1
 kind: KeycloakRealmImport
@@ -46,14 +47,16 @@ metadata:
   name: shop
 spec:
   keycloakCRName: keycloak
-  # The storefront's client secret is never written here: the operator substitutes it from the Secret.
+  # Client secrets are never written here: the operator substitutes them from the Secrets.
   placeholders:
     STOREFRONT_CLIENT_SECRET: { secret: { name: storefront-oidc, key: client-secret } }
+    ORDER_SERVICE_CLIENT_SECRET: { secret: { name: order-service-oidc, key: client-secret } }
+    CART_SERVICE_CLIENT_SECRET: { secret: { name: cart-service-oidc, key: client-secret } }
   realm:
     realm: shop
     enabled: true
     sslRequired: external
-    accessTokenLifespan: 900
+    accessTokenLifespan: 300          # SPEC §8.1: 5 minutes for user tokens (the local compose realm uses 15 for load tests)
     ssoSessionIdleTimeout: 1800
     ssoSessionMaxLifespan: 43200
     revokeRefreshToken: true
@@ -106,6 +109,40 @@ spec:
             protocol: openid-connect
             protocolMapper: oidc-amr-mapper
             config: { access.token.claim: "true", id.token.claim: "true", introspection.token.claim: "true" }
+      # Service identities (12-security-design §12.4): client credentials only, no users, no realm roles in the token; the
+      # audience lists exactly the services this one may call, and each callee also checks the caller (azp).
+      - clientId: order-service
+        name: order-service
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        secret: ${ORDER_SERVICE_CLIENT_SECRET}
+        attributes: { access.token.lifespan: "900" }    # 15 minutes; renewed after 10, so Keycloak may be down ~5 minutes
+        standardFlowEnabled: false
+        directAccessGrantsEnabled: false
+        implicitFlowEnabled: false
+        serviceAccountsEnabled: true
+        fullScopeAllowed: false
+        protocolMappers:
+          - { name: audience cart-service, protocol: openid-connect, protocolMapper: oidc-audience-mapper,
+              config: { included.custom.audience: cart-service, access.token.claim: "true", id.token.claim: "false" } }
+          - { name: audience inventory-service, protocol: openid-connect, protocolMapper: oidc-audience-mapper,
+              config: { included.custom.audience: inventory-service, access.token.claim: "true", id.token.claim: "false" } }
+          - { name: audience payment-service, protocol: openid-connect, protocolMapper: oidc-audience-mapper,
+              config: { included.custom.audience: payment-service, access.token.claim: "true", id.token.claim: "false" } }
+      - clientId: cart-service
+        name: cart-service
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        secret: ${CART_SERVICE_CLIENT_SECRET}
+        attributes: { access.token.lifespan: "900" }    # 15 minutes; renewed after 10, so Keycloak may be down ~5 minutes
+        standardFlowEnabled: false
+        directAccessGrantsEnabled: false
+        implicitFlowEnabled: false
+        serviceAccountsEnabled: true
+        fullScopeAllowed: false
+        protocolMappers:
+          - { name: audience catalog-service, protocol: openid-connect, protocolMapper: oidc-audience-mapper,
+              config: { included.custom.audience: catalog-service, access.token.claim: "true", id.token.claim: "false" } }
       # Public client for bearer-token API clients (tools, the end-to-end tests in dev); not used by browsers.
       - clientId: shop-web
         name: Shop web app

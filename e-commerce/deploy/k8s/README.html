@@ -56,7 +56,8 @@ kubectl apply --server-side -k overlays/dev   # deploy (operators installed firs
   namespaces.yaml        e-commerce-shop (services, edge, analytics) and e-commerce-platform (data stores, Kafka, Keycloak)
   shop/                  the 11 service bases + NGINX edge, unchanged; default deny; aliases to the platform stores;
                          in-cluster JWK set URIs; RuntimeDefault seccomp; the edge certificate; KEDA credentials
-  platform/              PostgreSQL + PgBouncer, Kafka + topics, Redis, OpenSearch, Cassandra, RabbitMQ, Keycloak + realm
+  platform/              PostgreSQL + PgBouncer, Kafka + topics, Redis, OpenSearch, Cassandra, RabbitMQ, Keycloak + realm;
+                         backups.yaml: WAL archive and nightly backups of every PostgreSQL cluster (30 days)
 components/
   hosts/                 copies an overlay's host names (its environment.yaml) into issuers, CORS, realm, certificates
   single-replica/        dev sizing: one of everything, replication factor 1
@@ -66,6 +67,8 @@ components/
   local-object-storage/  RustFS as the S3 store (dev, staging)
   self-signed-tls/       self-signed ClusterIssuer (dev)
   test-users/            ada, bob (customers) and sam (staff), and the password grant (dev)
+  signed-images/         Kyverno policy: only images signed by the CI image workflow on main, with a signed SBOM (staging, prod)
+  encrypted-storage/     every data store's volumes on the encrypted StorageClass "encrypted-ssd" (staging, prod)
 overlays/
   dev/  staging/  prod/</code></pre>
 <h2 id="environments">Environments<a class="headerlink" href="#environments" title="Permanent link">#</a></h2>
@@ -127,6 +130,12 @@ overlays/
 <td>sign-up only</td>
 <td>sign-up only</td>
 </tr>
+<tr>
+<td>Images</td>
+<td>built locally, unsigned</td>
+<td>signed by CI, digest-pinned by Kyverno</td>
+<td>signed by CI, digest-pinned by Kyverno</td>
+</tr>
 </tbody>
 </table>
 <h2 id="where-things-run">Where things run<a class="headerlink" href="#where-things-run" title="Permanent link">#</a></h2>
@@ -136,7 +145,7 @@ overlays/
   (<code>kafka-bootstrap</code>, <code>pgbouncer-orders</code>, <code>redis-cart</code>, …) are <code>ExternalName</code> aliases to the platform namespace, so the bases
   stay the same as in the local stack.</li>
 <li><strong>e-commerce-platform</strong>: one CloudNativePG cluster per owning service (orders, inventory, payments, catalog) and one for
-  Keycloak; PgBouncer poolers in transaction mode for orders, inventory and payments; Kafka in KRaft mode with the topics of
+  Keycloak; PgBouncer poolers in transaction mode for orders, inventory, payments and catalog; Kafka in KRaft mode with the topics of
   the event catalogue; Redis per use (<code>redis-cache</code>, <code>redis-ratelimit</code>, <code>redis-cart</code>, <code>redis-reco</code>, <code>redis-notify</code>);
   OpenSearch; Cassandra (data centre <code>dc1</code>); RabbitMQ with notification's own user; Keycloak with the <code>shop</code> realm. Ingress
   is allowed from this namespace, the shop namespace, the operators, <code>monitoring</code> and <code>ingress-nginx</code>.</li>
@@ -164,6 +173,12 @@ overlays/
 <td>1.30.2</td>
 <td><code>cnpg-system</code></td>
 <td><code>kubectl apply --server-side -f https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.2/cnpg-1.30.2.yaml</code></td>
+</tr>
+<tr>
+<td>Barman Cloud plugin for CloudNativePG</td>
+<td>0.15.1</td>
+<td><code>cnpg-system</code></td>
+<td><code>kubectl apply -f https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v0.15.1/manifest.yaml</code> (after cert-manager)</td>
 </tr>
 <tr>
 <td>Strimzi</td>
@@ -214,6 +229,12 @@ overlays/
 <td>Helm chart <code>kedacore/keda</code></td>
 </tr>
 <tr>
+<td>Kyverno</td>
+<td>1.19.2</td>
+<td><code>kyverno</code></td>
+<td>Helm chart <code>kyverno/kyverno</code> (staging, prod: verifies image signatures)</td>
+</tr>
+<tr>
 <td>kube-prometheus-stack (Prometheus Operator 0.94.2, Prometheus, Alertmanager, Grafana)</td>
 <td>92.18.0</td>
 <td><code>monitoring</code></td>
@@ -262,12 +283,31 @@ overlays/
 <td><code>default_password</code>, <code>grafana_password</code></td>
 <td>ClickHouse passwords</td>
 </tr>
+<tr>
+<td><code>e-commerce/storefront</code></td>
+<td><code>client_secret</code>, <code>session_keys</code></td>
+<td>the storefront's realm client secret (also in Keycloak's realm import) and its session encryption keys</td>
+</tr>
+<tr>
+<td><code>e-commerce/order-service-oidc</code>, <code>cart-service-oidc</code></td>
+<td><code>client_secret</code></td>
+<td>the service's realm client secret, in both namespaces: Keycloak's realm import and the service read the same value (ADR 0014)</td>
+</tr>
+<tr>
+<td><code>e-commerce/backup-storage</code></td>
+<td><code>access_key</code>, <code>secret_key</code></td>
+<td>the database backups' key: write access to the <code>e-commerce-backups</code> bucket only</td>
+</tr>
 </tbody>
 </table>
 <ul>
 <li>An <code>egress-gateway</code> namespace (payment provider, object storage) and an ingress controller in <code>ingress-nginx</code> in front of
   Keycloak.</li>
 <li>Nodes with <code>vm.max_map_count=262144</code> for OpenSearch (the operator's privileged init container is off).</li>
+<li>Staging and production: a StorageClass <code>encrypted-ssd</code> whose volumes are encrypted at rest with a customer-managed key
+  (for example the provider's CSI driver with a KMS key), and an <code>e-commerce-backups</code> bucket with versioning and an
+  object lock or retention rule, so a compromised cluster cannot delete its own backups. In dev the backup bucket is
+  created in RustFS by a Job.</li>
 </ul>
 <h2 id="using-dev">Using dev<a class="headerlink" href="#using-dev" title="Permanent link">#</a></h2>
 <pre class="highlight"><code class="language-bash">kubectl -n e-commerce-shop port-forward svc/edge 8443:443           # the shop API through the edge

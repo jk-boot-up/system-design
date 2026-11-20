@@ -11,3 +11,4 @@ configMapGenerator:
     literals:
       - KAFKA_BOOTSTRAP=kafka-bootstrap:9092
       - REDIS_URL=redis://redis-reco:6379
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://alloy.monitoring:4318/v1/traces

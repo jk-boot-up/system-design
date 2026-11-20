@@ -251,7 +251,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr>
 <td><code>CatalogContainersIT</code></td>
 <td>PostgreSQL + Redis + Kafka + S3 (RustFS)</td>
-<td>428 without If-Match, 200 with the current ETag, 412 with a stale one; cache entry evicted; events with versions 1 and 2 on Kafka; real presigned upload to MinIO then confirm; price lookup; 401 and 403 for non-staff; SKU uniqueness</td>
+<td>428 without If-Match, 200 with the current ETag, 412 with a stale one; cache entry evicted; events with versions 1 and 2 on Kafka; real presigned upload to MinIO then confirm; price lookup only with cart-service's token (none → 401, a customer's or order-service's → 403); 401 and 403 for non-staff; SKU uniqueness</td>
 </tr>
 </tbody>
 </table>

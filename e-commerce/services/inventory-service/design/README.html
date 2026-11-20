@@ -245,7 +245,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr>
 <td><code>InventoryContainersIT</code></td>
 <td>PostgreSQL + Kafka containers</td>
-<td>50 concurrent orders for 10 units → exactly 10 reserved; REST contract and problem details; outbox → Kafka; <code>OrderCancelled</code> releases stock, duplicates ignored</td>
+<td>50 concurrent orders for 10 units → exactly 10 reserved; REST contract and problem details; outbox → Kafka; <code>OrderCancelled</code> releases stock, duplicates ignored; reservations only with order-service's token (none → 401 problem; customer, staff or cart-service → 403), stock only for staff</td>
 </tr>
 </tbody>
 </table>

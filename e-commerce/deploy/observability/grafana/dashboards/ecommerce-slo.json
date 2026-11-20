@@ -1048,7 +1048,8 @@
           "legendFormat": "{{routeId}}",
           "datasource": {
             "uid": "prometheus"
-          }
+          },
+          "exemplar": true
         }
       ],
       "fieldConfig": {

@@ -69,3 +69,10 @@ spring.kafka.listener.observation-enabled: true
 management.metrics.distribution.percentiles-histogram.http.server.requests: true
 management.metrics.distribution.minimum-expected-value.http.server.requests: 5ms
 management.metrics.distribution.maximum-expected-value.http.server.requests: 5s
+
+# This service's identity for calls to other services: the client-credentials grant against the realm (realm client of
+# the same name). The secret comes from the environment (compose: .env defaults; Kubernetes: the service's secret).
+service-auth:
+  token-uri: ${SERVICE_AUTH_TOKEN_URI:${JWT_ISSUER:http://localhost:8180/realms/shop}/protocol/openid-connect/token}
+  client-id: ${SERVICE_AUTH_CLIENT_ID:${spring.application.name}}
+  client-secret: ${SERVICE_AUTH_CLIENT_SECRET:}

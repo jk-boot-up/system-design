@@ -1,0 +1,30 @@
+# Creates the e-commerce-backups bucket in RustFS once (the Barman Cloud plugin expects it to exist). Safe to run again.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-bucket
+  namespace: e-commerce-platform
+spec:
+  backoffLimit: 10                 # RustFS may still be starting
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: create
+          image: amazon/aws-cli:2.39.5
+          command: [ sh, -c ]
+          args:
+            - aws --endpoint-url http://minio:9000 s3api head-bucket --bucket e-commerce-backups 2>/dev/null
+              || aws --endpoint-url http://minio:9000 s3api create-bucket --bucket e-commerce-backups
+          env:
+            - { name: AWS_ACCESS_KEY_ID, valueFrom: { secretKeyRef: { name: backup-storage, key: ACCESS_KEY_ID } } }
+            - { name: AWS_SECRET_ACCESS_KEY, valueFrom: { secretKeyRef: { name: backup-storage, key: ACCESS_SECRET_KEY } } }
+            - { name: AWS_DEFAULT_REGION, value: us-east-1 }
+            - { name: HOME, value: /tmp }
+          resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { memory: 128Mi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [ { name: tmp, mountPath: /tmp } ]
+      volumes: [ { name: tmp, emptyDir: {} } ]

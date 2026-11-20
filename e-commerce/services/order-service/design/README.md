@@ -139,4 +139,5 @@ Indexes:
 | `CheckoutSagaTest` | application with test doubles | Happy path, idempotent replay, out of stock, declined, unknown, outages before and after authorisation, expired reservation, failed capture, recovery, customer cancellation, ownership, millisecond ids |
 | `UuidV7Test` | adapter unit | Version, variant, embedded time, ordering |
 | `HexagonalArchitectureTest` | ArchUnit | Layering and adapter independence |
-| `OrderContainersIT` | PostgreSQL + Kafka + real HTTP | End-to-end checkout, monthly partition used, replay, 402 and 409 mappings, events on Kafka, private paginated history, cancellation, validation |
+| `ServiceTokensTest` | adapter, real HTTP token endpoint | Client-credentials request with basic auth; token reused until two thirds of its life; one request for 32 concurrent callers; a failed renewal keeps the current token and retries at most every 5 s; no token → the call is not sent (`ResourceAccessException`) |
+| `OrderContainersIT` | PostgreSQL + Kafka + real HTTP | Every downstream call carries order-service's own token (one token for all five); end-to-end checkout, monthly partition used, replay, 402 and 409 mappings, events on Kafka, private paginated history, cancellation, validation |

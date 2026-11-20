@@ -24,6 +24,7 @@ import (
 	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/adapter/kafka"
 	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/adapter/rabbit"
 	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/adapter/smtp"
+	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/adapter/telemetry"
 	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/app"
 )
 
@@ -35,7 +36,7 @@ func env(k, def string) string {
 }
 
 func main() {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})).With("service", "notification-service"))
+	slog.SetDefault(slog.New(telemetry.LogHandler{Handler: slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})}).With("service", "notification-service"))
 	if err := run(); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("stopped", "err", err)
 		os.Exit(1)
@@ -46,6 +47,15 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	role := env("ROLE", "all")
+	shutdownTracing, err := telemetry.Setup(ctx, "notification-service")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		flush, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = shutdownTracing(flush)
+	}()
 	delays, err := rabbit.ParseDelays(env("RETRY_DELAYS", "30s,2m,10m"))
 	if err != nil {
 		return err

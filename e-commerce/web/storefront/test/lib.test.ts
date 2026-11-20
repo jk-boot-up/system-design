@@ -49,6 +49,8 @@ describe('content security policy', () => {
     expect(csp).toContain("base-uri 'none'");
     expect(csp).toContain('form-action \'self\' https://id.example');
     expect(csp).not.toContain('unsafe-eval');
+    expect(csp).toContain("require-trusted-types-for 'script'");
+    expect(csp).toContain("trusted-types 'none'");
     expect(csp).not.toMatch(/script-src[^;]*unsafe-inline/);
   });
 });

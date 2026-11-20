@@ -89,9 +89,44 @@ Common first steps for every incident:
     Usually nothing else is needed.
   * Sagas interrupted by the failover are finished by recovery (15.3); outbox rows are published once writes succeed
     again (15.1).
-  * If the cluster cannot elect a primary (two of three instances lost), restore from backup. Backups are not yet
-    configured ([12 §12.8](12-security-design.md#128-gaps-designed-not-yet-built)); until they are, this is data loss.
+  * If the cluster cannot elect a primary (two of three instances lost), or data was destroyed (a bad migration, a
+    deleted table), restore from backup, below.
 * **Over when:** the cluster reports healthy with three instances and the service's error rate is normal.
+
+**Restoring from backup.** Every cluster archives its write-ahead log continuously and takes a base backup nightly
+(`base/platform/backups.yaml`, kept 30 days), so it can be restored to any moment in that window, to within the last
+archived WAL file (seconds).
+
+1. Check that backups are current: `kubectl -n e-commerce-platform get backups` (the latest `<name>-nightly` is
+   `completed`) and `kubectl cnpg status <name>-db` (WAL archiving `OK`, last archived WAL recent).
+2. Choose the target: the latest state after a lost cluster, or a moment just before the damage (from the audit log or
+   the failing deploy's time), in UTC.
+3. Scale the owning service to zero (`kubectl -n e-commerce-shop scale deploy/<service> --replicas=0`) so nothing writes
+   to a half-restored database. Its outbox keeps the events it had not yet published; consumers are idempotent.
+4. Create a new cluster from the backup, alongside the old one:
+   ```yaml
+   apiVersion: postgresql.cnpg.io/v1
+   kind: Cluster
+   metadata: { name: orders-db-restore, namespace: e-commerce-platform }
+   spec:
+     instances: 3                                   # and the same storage, resources and affinity as orders-db
+     bootstrap:
+       recovery:
+         source: orders-db
+         recoveryTarget: { targetTime: "2026-11-20 09:41:00+00" }   # omit for the latest state
+     externalClusters:
+       - name: orders-db
+         plugin: { name: barman-cloud.cloudnative-pg.io, parameters: { barmanObjectName: orders-db-backup, serverName: orders-db } }
+     plugins:                                       # its own archive, so the old cluster's backups stay intact
+       - { name: barman-cloud.cloudnative-pg.io, isWALArchiver: true, parameters: { barmanObjectName: orders-db-restore-backup } }
+   ```
+   (`orders-db-restore-backup` is an `ObjectStore` like `orders-db-backup` with the prefix `orders-db-restore`.)
+5. Check the data (row counts, the latest orders), then point the pooler at it: set `spec.cluster.name` of
+   `pgbouncer-orders` to `orders-db-restore`. Scale the service back up.
+6. Orders created after the target time are gone from the database but still in `order.events`; reconcile them from
+   the topic (and payments from the provider) before telling customers anything. Saga recovery (15.3) finishes the
+   in-flight ones.
+7. Keep the old cluster until the restored one is confirmed, then delete it and rename in Git on the next release.
 
 ## 15.6 Kafka broker loss
 
@@ -122,3 +157,19 @@ Common first steps for every incident:
 * **Already in place:** jittered expiry and per-pod single-flight (`RedisProductCache`, `SingleFlight` in catalog-service);
   a read that overlaps a committed edit does not write the old version back into the cache.
 * **Over when:** the hit rate is back above 90 % and database CPU is normal.
+
+## 15.8 Identity provider (Keycloak) unavailable
+
+* **Signals:** sign-in fails on the storefront; checkout or add-to-cart start failing a few minutes later with
+  `503`/`PRICING_PENDING`; logs of order-service and cart-service show `Service token renewal failed`.
+* **Confirm:** `kubectl -n e-commerce-platform get pods -l app=keycloak`; the token endpoint
+  (`/realms/shop/protocol/openid-connect/token`) answers 5xx or times out.
+* **What keeps working, and for how long:** customers already signed in keep browsing and buying until their access
+  token expires (5 minutes; the storefront cannot refresh it). Service calls keep working on the cached service tokens
+  for about 5 minutes: each is renewed after 10 of its 15 minutes, and a failed renewal is retried every 5 seconds while
+  the current token stays valid ([ADR 0014](adr/0014-service-identity-with-client-credentials-tokens.md)). After that,
+  checkout answers `503` and carts show prices as pending; nothing is lost or charged twice.
+* **Act now:** restart the failing Keycloak pods; check `keycloak-db` (a failover there stops Keycloak too, see 15.5).
+  If a client secret was rotated in the vault, make sure both the realm import and the service picked up the same value
+  (both read one key); a mismatch shows as `invalid_client` in the service's log.
+* **Over when:** the token endpoint answers, the renewal warnings stop and the checkout SLO stops burning.

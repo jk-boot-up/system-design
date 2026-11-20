@@ -99,6 +99,7 @@ to a stricter local bucket when Redis is down), and turns a down service into a 
 │  └─ config/                   rate policies, JWT decoder (issuer + audience), access rules
 ├─ src/main/resources/application.yaml   routes, circuit breakers, time limits, rate limits
 ├─ edge/                        nginx.conf, server template, security headers, dev certificate, Dockerfile, k8s/
+│  └─ waf/                      the shop's own firewall rules and exclusions (OWASP Core Rule Set plugin)
 ├─ src/test/java/…              buckets, Redis-down fallback, ArchUnit, gateway + Redis + stub services, NGINX image
 ├─ Dockerfile, k8s/, build files</code></pre>
 <h2 id="build-test-run">Build, test, run<a class="headerlink" href="#build-test-run" title="Permanent link">#</a></h2>
@@ -144,6 +145,16 @@ docker build -t e-commerce/edge edge &amp;&amp; docker run --rm -p 8443:8443 -e 
 <td><code>GATEWAY_UPSTREAM</code> (edge)</td>
 <td><code>api-gateway:8080</code></td>
 <td>Where NGINX forwards</td>
+</tr>
+<tr>
+<td><code>MODSEC_RULE_ENGINE</code> (edge)</td>
+<td><code>On</code></td>
+<td>Firewall mode: <code>On</code> refuses, <code>DetectionOnly</code> only logs (for a new rule set version)</td>
+</tr>
+<tr>
+<td><code>BLOCKING_PARANOIA</code>, <code>DETECTION_PARANOIA</code>, <code>ANOMALY_INBOUND</code> (edge)</td>
+<td><code>1</code>, <code>2</code>, <code>5</code></td>
+<td>Core Rule Set strictness: level 1 blocks, level 2 is logged only so it can be tuned; refuse at an anomaly score of 5</td>
 </tr>
 </tbody>
 </table>

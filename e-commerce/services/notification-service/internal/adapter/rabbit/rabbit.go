@@ -10,7 +10,12 @@ import (
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
+	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/adapter/telemetry"
 	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/app"
 	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/domain"
 )
@@ -109,6 +114,11 @@ func (b *Broker) publish(ctx context.Context, exchange, key string, job domain.E
 	if err != nil {
 		return err
 	}
+	// The job carries the trace context it was created in; delay queues dead-letter it back with its headers intact.
+	if headers == nil {
+		headers = amqp.Table{}
+	}
+	otel.GetTextMapPropagator().Inject(ctx, telemetry.AMQPHeaders(headers))
 	b.mu.Lock()
 	dc, err := b.pub.PublishWithDeferredConfirmWithContext(ctx, exchange, key, true, false, amqp.Publishing{
 		ContentType: "application/json", DeliveryMode: amqp.Persistent, Priority: job.Priority,
@@ -185,12 +195,24 @@ func (b *Broker) handle(ctx context.Context, d amqp.Delivery, w app.Worker, obse
 		observe(app.Dead, time.Since(start))
 		return
 	}
+	ctx, span := telemetry.Tracer().Start(otel.GetTextMapPropagator().Extract(ctx, telemetry.AMQPHeaders(d.Headers)),
+		QueueSend+" process", trace.WithSpanKind(trace.SpanKindConsumer), trace.WithAttributes(
+			attribute.String("messaging.system", "rabbitmq"), attribute.String("messaging.destination.name", QueueSend),
+			attribute.String("messaging.message.id", job.EventID), attribute.String("email.kind", job.Kind),
+			attribute.Int("email.attempt", job.Attempt)))
+	defer span.End()
 	res, err := w.Handle(ctx, job)
 	if err != nil {
 		// The job could not be handed on (broker trouble): put it back; RabbitMQ redelivers it.
-		slog.Warn("job not handed on, requeued", "eventId", job.EventID, "err", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "job not handed on")
+		slog.WarnContext(ctx, "job not handed on, requeued", "eventId", job.EventID, "err", err)
 		_ = d.Nack(false, true)
 		return
+	}
+	span.SetAttributes(attribute.String("email.result", string(res)))
+	if res == app.Retried || res == app.Dead {
+		span.SetStatus(codes.Error, "email not sent")
 	}
 	_ = d.Ack(false)
 	observe(res, time.Since(start))

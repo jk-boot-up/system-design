@@ -63,7 +63,7 @@ authorisation, secrets, data protection, and the supply chain. The storefront's 
 <tr>
 <td>B1 Internet → edge</td>
 <td>everything</td>
-<td>TLS 1.2+, HSTS preload; per-address rate limits; only the edge has a <code>LoadBalancer</code></td>
+<td>TLS 1.2+, HSTS preload; web application firewall (OWASP Core Rule Set); per-address rate limits; only the edge has a <code>LoadBalancer</code></td>
 </tr>
 <tr>
 <td>B2 Edge → storefront / Keycloak</td>
@@ -83,7 +83,7 @@ authorisation, secrets, data protection, and the supply chain. The storefront's 
 <tr>
 <td>B5 Service → service (<code>/internal</code>)</td>
 <td>checkout saga calls, price lookups</td>
-<td>network policy: only the named caller may reach the port (e.g. only order-service → payment-service)</td>
+<td>the caller's client-credentials token: audience must name the callee and <code>azp</code> must be an allowed caller (<a href="adr/0014-service-identity-with-client-credentials-tokens.html">ADR 0014</a>); network policy as a second check</td>
 </tr>
 <tr>
 <td>B6 Services → platform stores</td>
@@ -118,7 +118,7 @@ authorisation, secrets, data protection, and the supply chain. The storefront's 
 <td>S</td>
 <td>Spoofing a service</td>
 <td>B5</td>
-<td>network policies admit only the named caller; mTLS planned (12.8)</td>
+<td>a token for the callee from the caller's own realm client (<code>InternalCallers</code>); network policies admit only the named caller</td>
 </tr>
 <tr>
 <td>T</td>
@@ -142,7 +142,13 @@ authorisation, secrets, data protection, and the supply chain. The storefront's 
 <td>I</td>
 <td>Token theft through XSS</td>
 <td>storefront</td>
-<td>no tokens in the browser; strict CSP with nonces; React escaping</td>
+<td>no tokens in the browser; strict CSP with nonces and enforced Trusted Types; React escaping</td>
+</tr>
+<tr>
+<td>T</td>
+<td>Injection (SQL, script, path traversal) in requests</td>
+<td>B1</td>
+<td>parameterised queries and validation in every service; before that, the edge's firewall refuses requests that look like attacks (anomaly score ≥ 5) and logs them</td>
 </tr>
 <tr>
 <td>I</td>
@@ -160,7 +166,7 @@ authorisation, secrets, data protection, and the supply chain. The storefront's 
 <td>D</td>
 <td>Floods, scraping, credential stuffing</td>
 <td>B1, B3</td>
-<td>edge limits per address; gateway token buckets per user and per address; sign-in limits; admission control per hot SKU</td>
+<td>known scanners refused by the firewall; edge limits per address; gateway token buckets per user and per address; sign-in limits; admission control per hot SKU</td>
 </tr>
 <tr>
 <td>D</td>
@@ -193,7 +199,8 @@ authorisation, secrets, data protection, and the supply chain. The storefront's 
 <ul>
 <li>The storefront is a confidential client; the browser never holds a token. A guest cart uses a random <code>__Host-guest</code>
   cookie, merged into the account at sign-in.</li>
-<li>Access tokens live 5 minutes; the BFF refreshes them 60 s before expiry; refresh tokens rotate. Sessions end after 30
+<li>Access tokens live 5 minutes (15 in the local compose realm, so load tests outlast them); the BFF refreshes them 60 s
+  before expiry; refresh tokens rotate. Service tokens (client credentials) live 15 minutes and are renewed after 10. Sessions end after 30
   minutes idle or 12 hours. Sign-out ends the Keycloak session too.</li>
 <li>The API (<code>shop-web</code>, public client with the password grant) is enabled only in dev, for tests and API exploration.</li>
 </ul>
@@ -224,7 +231,11 @@ authorisation, secrets, data protection, and the supply chain. The storefront's 
 </tr>
 <tr>
 <td>Internal: saga calls, prices</td>
-<td>not routed by the gateway; network policy per callee</td>
+<td>not routed by the gateway; the callee checks the caller's service token (audience = callee, <code>azp</code> = allowed caller); network policy per callee</td>
+</tr>
+<tr>
+<td>Stock (<code>/internal/stock</code>, reached through the gateway's staff route)</td>
+<td>inventory <code>hasRole("staff")</code> on the forwarded staff token</td>
 </tr>
 </tbody>
 </table>
@@ -248,6 +259,11 @@ authorisation, secrets, data protection, and the supply chain. The storefront's 
 <td>Storefront client secret and session key</td>
 <td>vault</td>
 <td>External Secret; the session key has a key id so it can rotate</td>
+</tr>
+<tr>
+<td>order-service and cart-service realm client secrets</td>
+<td>vault</td>
+<td>External Secrets in both namespaces: Keycloak's realm import and the service read the same key</td>
 </tr>
 <tr>
 <td>Payment provider key</td>
@@ -281,12 +297,12 @@ contain no secrets; configuration comes from ConfigMaps and Secrets at run time.
 <tr>
 <td>Customer identity (name, email)</td>
 <td>Keycloak; the email is stored with the order (<code>orders.customer_email</code>) and carried in <code>order.events</code> for receipts</td>
-<td>TLS outside the cluster; the storefront masks it in logs; storage encryption is the cluster's (12.8)</td>
+<td>TLS outside the cluster; the storefront masks it in logs; every data store's volumes are encrypted (below)</td>
 </tr>
 <tr>
 <td>Orders and payments</td>
 <td>PostgreSQL <code>orders</code>, <code>payments</code></td>
-<td>per-service database user; three replicas across zones in prod; backups not yet configured (12.8)</td>
+<td>per-service database user; three replicas across zones in prod; continuous WAL archive and nightly backups, restorable to any moment of the last 30 days</td>
 </tr>
 <tr>
 <td>Sessions and tokens</td>
@@ -300,12 +316,37 @@ contain no secrets; configuration comes from ConfigMaps and Secrets at run time.
 </tr>
 </tbody>
 </table>
+<ul>
+<li><strong>Encryption at rest:</strong> in staging and production every data store's volumes (PostgreSQL, Kafka, the durable Redis
+  instances, OpenSearch, Cassandra, RabbitMQ, ClickHouse) use the StorageClass <code>encrypted-ssd</code>, which the cluster provides
+  with a customer-managed key (<a href="../deploy/k8s/components/encrypted-storage/kustomization.yaml"><code>components/encrypted-storage</code></a>).
+  A store cannot come up on unencrypted disks by mistake: without that class its volumes stay pending.</li>
+<li><strong>Backups:</strong> each PostgreSQL cluster (orders, inventory, payments, catalog, Keycloak) archives its write-ahead log
+  continuously and takes a base backup every night to the <code>e-commerce-backups</code> bucket, compressed and encrypted
+  (AES-256), kept 30 days (<a href="../deploy/k8s/base/platform/backups.yaml"><code>base/platform/backups.yaml</code></a>); restoring is
+  <a href="15-runbooks.html#155-database-failover-postgresql">runbook 15.5</a>. The other stores are rebuilt rather than restored:
+  search from catalog's events, analytics from Kafka, carts and caches are disposable; Kafka itself is replicated three
+  times across zones, and reviews have Cassandra replication factor 3.</li>
+</ul>
 <p>Retention and deletion follow <a href="04-database-design.html">04 Database design</a> (retention section).</p>
 <h2 id="127-supply-chain-and-builds">12.7 Supply chain and builds<a class="headerlink" href="#127-supply-chain-and-builds" title="Permanent link">#</a></h2>
 <ul>
 <li>Pinned versions everywhere: Gradle version catalogs (<code>gradle/libs.versions.toml</code>) in every Java service,
   <code>package-lock.json</code> with integrity hashes, Go modules, <code>pyproject.toml</code>; image tags pinned in compose and Kubernetes.</li>
-<li>CI per service: tests and image build; the storefront adds <code>npm audit</code>, a CycloneDX SBOM and a bundle budget.</li>
+<li>CI per service: tests, then one shared image job (<a href="../../.github/workflows/e-commerce-image.yml"><code>e-commerce-image.yml</code></a>)
+  for every image (the 11 services, the edge, the storefront, analytics, dlq-replay). It writes a <strong>CycloneDX SBOM of the
+  image</strong> (Syft: the application's libraries, the runtime and the OS packages) and fails on fixable critical
+  vulnerabilities in it (Trivy). The storefront also runs <code>npm audit</code>, keeps its npm SBOM and a bundle budget.</li>
+<li>On <code>main</code> the image job pushes the image, <strong>signs it with Sigstore keyless signing</strong> (the certificate names the workflow
+  and commit, recorded in the public transparency log), attaches the SBOM as a signed attestation and adds GitHub's
+  SLSA build provenance.</li>
+<li><strong>Admission:</strong> in staging and production a Kyverno policy (<a href="../deploy/k8s/components/signed-images/policy.yaml"><code>components/signed-images</code></a>)
+  admits a pod in the shop namespace only if each e-commerce image is signed by that workflow on <code>main</code> and has the
+  signed SBOM; it replaces the tag with the verified digest, so a re-pushed tag cannot change what runs.</li>
+<li><strong>Dependency updates:</strong> Renovate (<a href="../../renovate.json"><code>renovate.json</code></a>) opens weekly pull requests per project for
+  Gradle, npm, Go, Python, Dockerfiles, compose, Kubernetes manifests and GitHub Actions (pinned to digests). Releases must
+  be 14 days old; security fixes come at once. Database majors and operator versions wait for approval on the dashboard,
+  because they need a migration or a CRD update. Nothing merges without the project's CI passing and a review.</li>
 <li>Base images: distroless or slim, non-root. Nightly ZAP baseline scan against the storefront through the edge.</li>
 </ul>
 <h2 id="128-gaps-designed-not-yet-built">12.8 Gaps (designed, not yet built)<a class="headerlink" href="#128-gaps-designed-not-yet-built" title="Permanent link">#</a></h2>
@@ -319,44 +360,14 @@ contain no secrets; configuration comes from ConfigMaps and Secrets at run time.
 </thead>
 <tbody>
 <tr>
-<td>mTLS between services (SPEC §8.1)</td>
-<td>B5 relies on network policies only; a pod that can reach a port can call <code>/internal</code> without credentials</td>
-<td>a mesh with mTLS and per-service identities, or client-credential tokens for internal calls</td>
+<td>Encryption between pods</td>
+<td>internal calls carry service tokens (<a href="adr/0014-service-identity-with-client-credentials-tokens.html">ADR 0014</a>) but travel as plain HTTP; someone able to read pod traffic could replay a token within its 15 minutes</td>
+<td>a mesh with mTLS, or the CNI's transparent encryption (WireGuard)</td>
 </tr>
 <tr>
-<td>WAF and bot detection</td>
-<td>only rate limits and lockout stop automated abuse</td>
-<td>WAF at the CDN in front of the edge</td>
-</tr>
-<tr>
-<td>Image signing and admission policy</td>
-<td>an unsigned image could be deployed</td>
-<td>cosign signatures with provenance; an admission policy that requires them</td>
-</tr>
-<tr>
-<td>Trusted Types enforcement</td>
-<td>report-only</td>
-<td>enforce once reports are clean (<a href="16-storefront-ui.html#166-security-design">16 §16.6</a>)</td>
-</tr>
-<tr>
-<td>Automated dependency updates</td>
-<td>versions go stale unless someone bumps them</td>
-<td>Renovate (or Dependabot) across Gradle, npm, Go and Python</td>
-</tr>
-<tr>
-<td>SBOMs for the backend services</td>
-<td>only the storefront produces one</td>
-<td>CycloneDX Gradle, Go and Python plugins in each service's CI</td>
-</tr>
-<tr>
-<td>Database backups and volume encryption</td>
-<td>a lost cluster loses orders; disks rely on the provider's defaults</td>
-<td>CloudNativePG backups to object storage with point-in-time recovery; an encrypted storage class</td>
-</tr>
-<tr>
-<td>payment-service ingress</td>
-<td>also admits any pod in <code>e-commerce-platform</code> on 8086</td>
-<td>narrow it to the monitoring scrape port once metrics move to a separate port</td>
+<td>Bot management</td>
+<td>the firewall refuses known scanners and attack patterns, and rate limits slow the rest; a careful bot that behaves like a browser is only rate-limited</td>
+<td>bot scoring and challenges at a CDN in front of the edge</td>
 </tr>
 </tbody>
 </table>

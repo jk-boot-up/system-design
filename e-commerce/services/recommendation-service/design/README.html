@@ -203,9 +203,14 @@ acceptable, and a sharded design would count per-product with idempotent increme
 <td>Domain and use cases import no framework or adapter; adapters independent</td>
 </tr>
 <tr>
+<td><code>test_telemetry.py</code></td>
+<td>tracing</td>
+<td>Kafka headers give the producer's trace; an API request continues the gateway's trace and probes are not traced; log lines carry the trace id</td>
+</tr>
+<tr>
 <td><code>test_containers.py</code></td>
 <td>Redis + Kafka</td>
-<td>Three copies of one order count once; ranking; single-product order ignored; garbage on the DLQ with its reason; API reads the same sets; 20 concurrent duplicate scripts count once; seen key expires; lists trimmed</td>
+<td>Three copies of one order count once; one consumer span per record, the traced event's continuing its checkout's trace; ranking; single-product order ignored; garbage on the DLQ with its reason; API reads the same sets; 20 concurrent duplicate scripts count once; seen key expires; lists trimmed</td>
 </tr>
 </tbody>
 </table>

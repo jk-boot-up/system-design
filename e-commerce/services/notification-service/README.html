@@ -105,6 +105,7 @@ publisher confirms, before the Kafka offset is committed). A <strong>worker</str
 ├─ internal/adapter/dedupe/     Redis sent log
 ├─ internal/adapter/smtp/       SMTP mailer; 5xx = permanent, everything else retried
 ├─ internal/adapter/httpapi/    health and metrics
+├─ internal/adapter/telemetry/  OpenTelemetry setup, trace context in Kafka and RabbitMQ headers, trace ids in logs
 ├─ test/                        Kafka + RabbitMQ + Redis + Mailpit containers (build tag containers)
 ├─ Dockerfile (distroless), k8s/</code></pre>
 <h2 id="build-test-run">Build, test, run<a class="headerlink" href="#build-test-run" title="Permanent link">#</a></h2>
@@ -155,6 +156,11 @@ open http://localhost:8025                               # Mailpit: the emails i
 <td><code>PORT</code></td>
 <td><code>8088</code></td>
 <td>Health and metrics</td>
+</tr>
+<tr>
+<td><code>OTEL_EXPORTER_OTLP_TRACES_ENDPOINT</code></td>
+<td>unset</td>
+<td>Where spans go (OTLP over HTTP); unset, none are exported</td>
 </tr>
 </tbody>
 </table>

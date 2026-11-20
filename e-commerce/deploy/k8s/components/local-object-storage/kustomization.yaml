@@ -3,6 +3,12 @@
 # straight to storage with presigned URLs; in dev, port-forward svc/minio 9000 and they use http://localhost:9000.
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
-resources: [ storage.yaml ]
+resources: [ storage.yaml, backup-bucket.yaml ]
 configMapGenerator:
   - { name: catalog-service, namespace: e-commerce-shop, behavior: merge, literals: [ "S3_PUBLIC_ENDPOINT=http://localhost:9000" ] }
+# Database backups go to RustFS too: its endpoint, without forced server-side encryption (RustFS does not offer it).
+patches:
+  - target: { group: barmancloud.cnpg.io, kind: ObjectStore }
+    patch: |-
+      - { op: replace, path: /spec/configuration/endpointURL, value: "http://minio.e-commerce-platform.svc.cluster.local:9000" }
+      - { op: remove, path: /spec/configuration/data/encryption }

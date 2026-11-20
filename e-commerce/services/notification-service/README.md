@@ -29,6 +29,7 @@ notification-service/
 ├─ internal/adapter/dedupe/     Redis sent log
 ├─ internal/adapter/smtp/       SMTP mailer; 5xx = permanent, everything else retried
 ├─ internal/adapter/httpapi/    health and metrics
+├─ internal/adapter/telemetry/  OpenTelemetry setup, trace context in Kafka and RabbitMQ headers, trace ids in logs
 ├─ test/                        Kafka + RabbitMQ + Redis + Mailpit containers (build tag containers)
 ├─ Dockerfile (distroless), k8s/
 ```
@@ -51,6 +52,7 @@ open http://localhost:8025                               # Mailpit: the emails i
 | `RETRY_DELAYS` | `30s,2m,10m` | One delay queue each; failures after the last reuse it |
 | `ROLE` | `all` | `router`, `worker` or both |
 | `PORT` | `8088` | Health and metrics |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | unset | Where spans go (OTLP over HTTP); unset, none are exported |
 
 ## Operations
 

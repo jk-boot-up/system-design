@@ -111,7 +111,9 @@ class Dashboard:
             "id": len(self.panels) + 1, "type": kind, "title": title, "description": description,
             "datasource": {"type": "prometheus" if datasource == "prometheus" else datasource, "uid": datasource},
             "gridPos": {"x": self.x, "y": self.y, "w": w, "h": h},
-            "targets": [{"refId": chr(65 + i), "expr": e, "legendFormat": legend, "datasource": {"uid": datasource}}
+            # Latency panels show exemplars: points linking a histogram bucket to a trace that landed in it (Tempo).
+            "targets": [{"refId": chr(65 + i), "expr": e, "legendFormat": legend, "datasource": {"uid": datasource},
+                         **({"exemplar": True} if "histogram_quantile" in e else {})}
                         for i, (e, legend) in enumerate(targets)],
             "fieldConfig": {"defaults": {"unit": unit}, "overrides": []},
             "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}}

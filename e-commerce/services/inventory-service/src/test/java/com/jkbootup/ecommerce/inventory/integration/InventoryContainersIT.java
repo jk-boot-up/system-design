@@ -13,6 +13,10 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -62,8 +66,30 @@ class InventoryContainersIT {
         registry.add("inventory.outbox.poll-interval", () -> "50ms");
     }
 
+    /** Stands in for the realm: each test token names who is calling. */
+    @MockitoBean
+    JwtDecoder jwtDecoder;
+
     @Autowired
     ReservationService service;
+
+    @BeforeEach
+    void tokens() {
+        org.mockito.Mockito.when(jwtDecoder.decode(org.mockito.ArgumentMatchers.anyString())).thenAnswer(call -> {
+            String token = call.getArgument(0);
+            Jwt.Builder jwt = Jwt.withTokenValue(token).header("alg", "RS256").subject(token);
+            return switch (token) {
+                case "order-service" -> jwt.audience(List.of("inventory-service")).claim("azp", "order-service").build();
+                case "cart-service" -> jwt.audience(List.of("catalog-service")).claim("azp", "cart-service").build();
+                case "staff" -> jwt.audience(List.of("shop-api")).claim("azp", "shop-storefront").claim("roles", List.of("staff")).build();
+                default -> jwt.audience(List.of("shop-api")).claim("azp", "shop-web").claim("roles", List.of("customer")).build();
+            };
+        });
+    }
+
+    private RestClient as(String caller) {
+        return RestClient.builder().baseUrl("http://localhost:" + port).defaultHeaders(h -> h.setBearerAuth(caller)).build();
+    }
 
     @Value("${local.server.port}")
     int port;
@@ -88,8 +114,8 @@ class InventoryContainersIT {
 
     @Test
     void restContractReservesAndRejectsWithProblemDetails() {
-        RestClient http = RestClient.create("http://localhost:" + port);
-        http.put().uri("/internal/stock/SKU-REST").contentType(MediaType.APPLICATION_JSON)
+        RestClient http = as("order-service");
+        as("staff").put().uri("/internal/stock/SKU-REST").contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("available", 3)).retrieve().toBodilessEntity();
         UUID order = UUID.randomUUID();
         Map<String, Object> ok = http.post().uri("/internal/reservations").contentType(MediaType.APPLICATION_JSON)
@@ -107,6 +133,33 @@ class InventoryContainersIT {
 
         http.post().uri("/internal/reservations/{id}/release", order).retrieve().toBodilessEntity();
         assertThat(service.level(Sku.of("SKU-REST")).orElseThrow().available()).isEqualTo(3);
+    }
+
+    @Test
+    void onlyOrderServiceReservesAndOnlyStaffSetStock() {
+        Map<String, Object> reserve = Map.of("orderId", UUID.randomUUID(), "lines", List.of(Map.of("sku", "SKU-AUTH", "quantity", 1)));
+        assertThatThrownBy(() -> RestClient.create("http://localhost:" + port).post().uri("/internal/reservations")
+                .contentType(MediaType.APPLICATION_JSON).body(reserve).retrieve().toBodilessEntity())
+                .isInstanceOfSatisfying(HttpClientErrorException.class, e -> {
+                    assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+                    assertThat(e.getResponseBodyAsString()).contains("\"code\":\"UNAUTHENTICATED\"");
+                });
+        for (String caller : List.of("customer", "staff", "cart-service")) {
+            assertThatThrownBy(() -> as(caller).post().uri("/internal/reservations").contentType(MediaType.APPLICATION_JSON)
+                    .body(reserve).retrieve().toBodilessEntity())
+                    .as(caller).isInstanceOfSatisfying(HttpClientErrorException.class,
+                            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+        }
+        for (String caller : List.of("customer", "order-service")) {
+            assertThatThrownBy(() -> as(caller).put().uri("/internal/stock/SKU-AUTH").contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("available", 1)).retrieve().toBodilessEntity())
+                    .as(caller).isInstanceOfSatisfying(HttpClientErrorException.class,
+                            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+        }
+        as("staff").put().uri("/internal/stock/SKU-AUTH").contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("available", 1)).retrieve().toBodilessEntity();
+        as("order-service").post().uri("/internal/reservations").contentType(MediaType.APPLICATION_JSON)
+                .body(reserve).retrieve().toBodilessEntity();
     }
 
     @Test

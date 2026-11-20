@@ -21,10 +21,17 @@ spring:
       properties:
         enable.idempotence: true
         linger.ms: 5
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER:http://localhost:8180/realms/shop}
 server:
   port: ${PORT:8086}
   shutdown: graceful
 management:
+  server:
+    port: ${MANAGEMENT_PORT:${server.port}}   # Kubernetes: 9086, so only order-service can reach the API port (k8s/networkpolicy.yaml)
   endpoints:
     web:
       exposure:

@@ -107,4 +107,4 @@ amount, currency and token only for a void recorded before any authorisation.
 | `PaymentTest` | domain | Lifecycle, void blocks capture, illegal transitions, input checks |
 | `PaymentServiceTest` | application with the real simulated provider | Authorise, capture, refund; one charge on repeat; decline; **late success after timeout is voided**; void before authorise blocks it; never-seen authorisation declined; captured payments refunded, not voided |
 | `HexagonalArchitectureTest` | ArchUnit | Layering and adapter independence |
-| `PaymentContainersIT` | PostgreSQL + Kafka | HTTP status codes per outcome, validation, late success voided with full audit trail, capture and refund idempotent and published |
+| `PaymentContainersIT` | PostgreSQL + Kafka | HTTP status codes per outcome, validation, late success voided with full audit trail, capture and refund idempotent and published; only order-service's token is accepted (none → 401 problem, customer or another service → 403), health stays open |

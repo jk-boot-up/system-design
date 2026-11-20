@@ -185,8 +185,18 @@ class CatalogContainersIT {
     void pricesForCartAndAccessRules() throws Exception {
         String cat = category("prices");
         product("SKU-PRICE-1", cat, "19.99");
-        mvc.perform(post("/internal/products/prices").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"skus\":[\"SKU-PRICE-1\",\"SKU-NONE\"]}"))
+        String skus = "{\"skus\":[\"SKU-PRICE-1\",\"SKU-NONE\"]}";
+        // Only cart-service's client-credentials token: not anonymous, not a customer, not another service.
+        mvc.perform(post("/internal/products/prices").contentType(MediaType.APPLICATION_JSON).content(skus))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/internal/products/prices").with(jwt().jwt(j -> j.audience(java.util.List.of("shop-api")).claim("azp", "shop-web")))
+                        .contentType(MediaType.APPLICATION_JSON).content(skus))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/internal/products/prices").with(jwt().jwt(j -> j.audience(java.util.List.of("catalog-service")).claim("azp", "order-service")))
+                        .contentType(MediaType.APPLICATION_JSON).content(skus))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/internal/products/prices").with(jwt().jwt(j -> j.audience(java.util.List.of("catalog-service")).claim("azp", "cart-service")))
+                        .contentType(MediaType.APPLICATION_JSON).content(skus))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].price.amount").value("19.99"))
                 .andExpect(jsonPath("$.items[0].status").value("ACTIVE"));

@@ -41,6 +41,9 @@ grafana:
       searchNamespace: ALL
       folderAnnotation: grafana_folder
       provider: { foldersFromFilesStructure: true }
+    datasources:
+      # Exemplars on latency panels open the trace behind them (services attach trace_id to histogram buckets).
+      exemplarTraceIdDestinations: { datasourceUid: tempo, traceIdLabelName: trace_id }
   additionalDataSources:
     - name: Tempo
       uid: tempo

@@ -78,7 +78,7 @@ is published as <code>catalog.ProductChanged</code> through a transactional outb
 </tr>
 <tr>
 <td>Called by</td>
-<td>api-gateway (public and staff API), cart-service (<code>POST /internal/products/prices</code>)</td>
+<td>api-gateway (public and staff API), cart-service (<code>POST /internal/products/prices</code>, with its service token: audience <code>catalog-service</code>, <code>azp</code> <code>cart-service</code>)</td>
 </tr>
 <tr>
 <td>Port</td>

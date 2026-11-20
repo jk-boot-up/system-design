@@ -1,0 +1,39 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: e-commerce-signed-images
+  annotations:
+    policies.kyverno.io/title: Signed e-commerce images
+    policies.kyverno.io/description: >-
+      Images under registry.shop.example/e-commerce must be signed by the repository's image workflow on main and carry
+      a signed CycloneDX SBOM attestation. See design/12-security-design.md §12.7.
+spec:
+  background: false
+  webhookTimeoutSeconds: 15
+  rules:
+    - name: signed-by-ci-on-main
+      match:
+        any:
+          - resources:
+              kinds: [ Pod ]
+              namespaces: [ e-commerce-shop ]
+      verifyImages:
+        - imageReferences: [ "registry.shop.example/e-commerce/*" ]
+          failureAction: Enforce
+          mutateDigest: true
+          verifyDigest: true
+          required: true
+          attestors:
+            - entries:
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subject: https://github.com/jk-boot-up/system-design/.github/workflows/e-commerce-image.yml@refs/heads/main
+                    rekor: { url: https://rekor.sigstore.dev }
+          attestations:
+            - type: https://cyclonedx.org/bom
+              attestors:
+                - entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subject: https://github.com/jk-boot-up/system-design/.github/workflows/e-commerce-image.yml@refs/heads/main
+                        rekor: { url: https://rekor.sigstore.dev }

@@ -62,18 +62,18 @@ in <a href="15-runbooks.html">15 Runbooks</a>.</p>
 <tbody>
 <tr>
 <td>Traces</td>
-<td>Java: Micrometer Tracing bridged to OpenTelemetry; storefront: OTel Node SDK with HTTP and undici instrumentation</td>
+<td>edge: NGINX's OpenTelemetry module (the trace starts where the request enters); Java: Micrometer Tracing bridged to OpenTelemetry; storefront: OTel Node SDK with HTTP and undici instrumentation; notification-service: OTel Go SDK (a span per Kafka record and per email attempt, the context carried in RabbitMQ headers through the retry queues); recommendation-service: OTel Python SDK (FastAPI and a span per Kafka record)</td>
 <td>W3C <code>traceparent</code> everywhere, including Kafka record headers and the outbox row; health checks, metrics scrapes and the relay's polling are not traced; query strings are dropped from span names and URLs</td>
 </tr>
 <tr>
 <td>Metrics</td>
-<td>Micrometer at <code>/actuator/prometheus</code>; <code>/metrics</code> in Go and Python; Strimzi's Kafka exporter</td>
-<td>Prometheus naming; histograms for <code>http.server.requests</code> (5 ms – 5 s); the gateway's per-route histogram with buckets at each SLO threshold</td>
+<td>Micrometer at <code>/actuator/prometheus</code> (payment-service on its own management port in Kubernetes); <code>/metrics</code> in Go and Python; Strimzi's Kafka exporter; CloudNativePG instances (WAL archiving, backups)</td>
+<td>Prometheus naming; histograms for <code>http.server.requests</code> (5 ms – 5 s) with exemplars (<code>trace_id</code>) that Grafana's latency panels show and link to Tempo; the gateway's per-route histogram with buckets at each SLO threshold</td>
 </tr>
 <tr>
 <td>Logs</td>
 <td>stdout, one JSON object per line</td>
-<td>Java: ECS (<code>LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs</code>) with <code>traceId</code> and <code>spanId</code>; storefront: pino with the same fields; labels in Loki are only <code>service</code> and <code>level</code>, the trace id is structured metadata</td>
+<td>Java: ECS (<code>LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs</code>) with <code>traceId</code> and <code>spanId</code>; storefront, notification and recommendation: the same fields; the edge: its access log with the request id, and the firewall's audit records; labels in Loki are only <code>service</code> and <code>level</code>, the trace id is structured metadata</td>
 </tr>
 </tbody>
 </table>
@@ -305,10 +305,8 @@ starts fast and stops soon after the problem does.</p>
 an <code>alloy-sampler</code> StatefulSet, which decides once the trace is complete.</p>
 <h2 id="137-known-gaps">13.7 Known gaps<a class="headerlink" href="#137-known-gaps" title="Permanent link">#</a></h2>
 <ul>
-<li>notification-service and recommendation-service export metrics but no traces; their consumers ignore the incoming
-  <code>traceparent</code>.</li>
-<li>The edge logs the request id but starts no trace.</li>
-<li>Exemplars (a link from a latency bucket to an example trace) are stored by Prometheus but not yet attached by services.</li>
+<li>The storefront's Node metrics carry no exemplars (prom-client attaches them only to histograms given a trace id by
+  hand); its traces are linked from the gateway's and the edge's instead.</li>
 <li>Locally, the core stack plus this profile needs about 5 GB of Docker memory under load.</li>
 </ul>
 </main>

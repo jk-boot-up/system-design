@@ -10,7 +10,7 @@ retries**, and **no charge for a cancelled order**, even when the provider answe
 | Provider | `PaymentProvider` port; `SimulatedPaymentProvider` adapter (test tokens `tok_ok`, `tok_decline`, `tok_timeout`) |
 | Publishes | `payment.PaymentCaptured`, `payment.PaymentFailed`, `payment.PaymentRefunded` on `payment.events` |
 | Called by | order-service (internal API) |
-| Port | 8086 |
+| Port | 8086 (API); health and metrics on 9086 in compose and Kubernetes, so only order-service needs 8086 |
 | Design | [design/README.md](design/README.md) · [walkthrough](design/walkthrough/index.html) |
 | Prerequisites | [PREREQUISITES.md](PREREQUISITES.md) |
 
@@ -38,14 +38,16 @@ payment-service/
 ```bash
 ./gradlew build                      # unit + architecture tests
 ./gradlew test -PwithContainers      # + PostgreSQL and Kafka
-cd ../../deploy/compose && docker compose up -d postgres kafka && cd - && ./gradlew bootRun
+cd ../../deploy/compose && docker compose up -d postgres kafka keycloak && cd - && ./gradlew bootRun
 ```
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `DB_URL`, `DB_USER`, `DB_PASSWORD` | `jdbc:postgresql://localhost:5432/payments`, `payments`, `payments` | Database |
 | `KAFKA_BOOTSTRAP` | `localhost:9092` | Kafka |
+| `JWT_ISSUER` | `http://localhost:8180/realms/shop` | Keycloak realm; every `/internal/payments` call needs order-service's service token (audience `payment-service`, [ADR 0014](../../design/adr/0014-service-identity-with-client-credentials-tokens.md)) |
 | `PORT` | `8086` | HTTP port |
+| `MANAGEMENT_PORT` | same as `PORT` | Health and metrics; compose and Kubernetes set `9086`, outside the API's network policy |
 | `payment.provider.timeout` | `1500ms` | Deadline for provider calls; below order-service's 2 s, so this service answers 504 itself |
 | `payment.reconcile.settle-after` | `30s` | Age after which unsettled payments are reconciled |
 
@@ -53,10 +55,13 @@ cd ../../deploy/compose && docker compose up -d postgres kafka && cd - && ./grad
 
 ```bash
 O=0193a1b0-0000-7000-8000-0000000000aa
-curl -X POST localhost:8086/internal/payments/authorize -H 'content-type: application/json' \
+# a service token as order-service gets one (client credentials; realm client "order-service")
+SVC=$(curl -s -u order-service:dev-order-service-secret-change-me-0123456789 -d grant_type=client_credentials \
+  localhost:8180/realms/shop/protocol/openid-connect/token | jq -r .access_token)
+curl -X POST localhost:8086/internal/payments/authorize -H "authorization: Bearer $SVC" -H 'content-type: application/json' \
   -d "{\"orderId\":\"$O\",\"amount\":{\"amount\":\"179.80\",\"currency\":\"EUR\"},\"paymentToken\":\"tok_ok\"}"
-curl -X POST localhost:8086/internal/payments/$O/capture
-curl -X POST localhost:8086/internal/payments/$O/refund
+curl -X POST localhost:8086/internal/payments/$O/capture -H "authorization: Bearer $SVC"
+curl -X POST localhost:8086/internal/payments/$O/refund -H "authorization: Bearer $SVC"
 ```
 
 ## Operations

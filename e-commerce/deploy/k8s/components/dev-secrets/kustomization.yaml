@@ -1,5 +1,6 @@
 # Fixed, well-known passwords for the dev cluster only (synthetic data, no outside access). Each pair of secrets that must
-# agree (a database's owner in both namespaces, catalog's DB user, notification's AMQP URL) is written out side by side.
+# agree (a database's owner in both namespaces, catalog's DB user, notification's AMQP URL, a service's realm client
+# secret) is written out side by side.
 # Staging and production use components/external-secrets instead.
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
@@ -14,11 +15,16 @@ secretGenerator:
   - { name: keycloak-db,  namespace: e-commerce-platform, type: kubernetes.io/basic-auth, literals: [ username=keycloak,  password=dev-keycloak ] }
   - { name: notification-rabbitmq, namespace: e-commerce-platform, literals: [ username=notification, password=dev-notification ] }
   - { name: storefront-oidc, namespace: e-commerce-platform, literals: [ client-secret=dev-storefront-secret-change-me-0123456789 ] }
+  - { name: order-service-oidc, namespace: e-commerce-platform, literals: [ client-secret=dev-order-service-secret-change-me-0123456789 ] }
+  - { name: cart-service-oidc,  namespace: e-commerce-platform, literals: [ client-secret=dev-cart-service-secret-change-me-0123456789 ] }
   - { name: object-storage, namespace: e-commerce-platform, literals: [ RUSTFS_ACCESS_KEY=dev-catalog, RUSTFS_SECRET_KEY=dev-catalog-secret ] }
+  - { name: backup-storage, namespace: e-commerce-platform, literals: [ ACCESS_KEY_ID=dev-catalog, ACCESS_SECRET_KEY=dev-catalog-secret ] }
   # e-commerce-shop: what the services read
   - { name: orders-db,    namespace: e-commerce-shop, type: kubernetes.io/basic-auth, literals: [ username=orders,    password=dev-orders ] }
   - { name: inventory-db, namespace: e-commerce-shop, type: kubernetes.io/basic-auth, literals: [ username=inventory, password=dev-inventory ] }
   - { name: payments-db,  namespace: e-commerce-shop, type: kubernetes.io/basic-auth, literals: [ username=payments,  password=dev-payments ] }
+  - { name: order-service-oidc, namespace: e-commerce-shop, literals: [ client-secret=dev-order-service-secret-change-me-0123456789 ] }
+  - { name: cart-service-oidc,  namespace: e-commerce-shop, literals: [ client-secret=dev-cart-service-secret-change-me-0123456789 ] }
   - name: catalog-service
     namespace: e-commerce-shop
     literals: [ DB_USER=catalog, DB_PASSWORD=dev-catalog, S3_ACCESS_KEY=dev-catalog, S3_SECRET_KEY=dev-catalog-secret ]

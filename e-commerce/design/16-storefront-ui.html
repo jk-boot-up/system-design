@@ -578,7 +578,7 @@ dev; brute-force detection on; password policy (length ≥ 12, breached-password
 </tr>
 <tr>
 <td>XSS runs actions as the user</td>
-<td>Strict CSP with a per-request nonce, no inline scripts or <code>eval</code>, no third-party scripts; React escapes output; <code>dangerouslySetInnerHTML</code> banned by lint; review bodies are plain text; Trusted Types first in report-only mode, enforced once reports are clean</td>
+<td>Strict CSP with a per-request nonce, no inline scripts or <code>eval</code>, no third-party scripts; React escapes output; <code>dangerouslySetInnerHTML</code> banned by lint; review bodies are plain text; Trusted Types enforced (<code>require-trusted-types-for 'script'</code>, no policies allowed), and every browser journey fails on any CSP violation</td>
 </tr>
 <tr>
 <td>CSRF</td>

@@ -1,0 +1,27 @@
+# Every data store's volumes use the StorageClass "encrypted-ssd", which the cluster provides with encryption at rest
+# under a customer-managed key (README, "Cluster prerequisites"). Staging and production; dev on kind uses the default.
+# A store whose disks are not encrypted therefore cannot be created by mistake: its claims stay Pending.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - target: { group: postgresql.cnpg.io, kind: Cluster }
+    patch: |-
+      - { op: add, path: /spec/storage/storageClass, value: encrypted-ssd }
+  - target: { group: kafka.strimzi.io, kind: KafkaNodePool }
+    patch: |-
+      - { op: add, path: /spec/storage/volumes/0/class, value: encrypted-ssd }
+  - target: { group: redis.redis.opstreelabs.in, kind: Redis, name: redis-cart|redis-reco|redis-notify|redis-session }   # the caches keep nothing on disk
+    patch: |-
+      - { op: add, path: /spec/storage/volumeClaimTemplate/spec/storageClassName, value: encrypted-ssd }
+  - target: { group: opensearch.org, kind: OpenSearchCluster }
+    patch: |-
+      - { op: add, path: /spec/nodePools/0/persistence, value: { pvc: { storageClass: encrypted-ssd, accessModes: [ReadWriteOnce] } } }
+  - target: { group: k8ssandra.io, kind: K8ssandraCluster }
+    patch: |-
+      - { op: add, path: /spec/cassandra/datacenters/0/storageConfig/cassandraDataVolumeClaimSpec/storageClassName, value: encrypted-ssd }
+  - target: { group: rabbitmq.com, kind: RabbitmqCluster }
+    patch: |-
+      - { op: add, path: /spec/persistence/storageClassName, value: encrypted-ssd }
+  - target: { kind: StatefulSet, name: analytics }
+    patch: |-
+      - { op: add, path: /spec/volumeClaimTemplates/0/spec/storageClassName, value: encrypted-ssd }

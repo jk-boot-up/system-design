@@ -1,0 +1,7 @@
+# Admits a pod in the shop namespace only if every e-commerce image in it was signed by this repository's image workflow
+# on main (.github/workflows/e-commerce-image.yml, Sigstore keyless) and carries a signed CycloneDX SBOM. Kyverno
+# replaces each tag with the verified digest, so what runs is exactly what was signed. Staging and production only: dev
+# runs locally built images. Needs Kyverno (README).
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: [ policy.yaml ]

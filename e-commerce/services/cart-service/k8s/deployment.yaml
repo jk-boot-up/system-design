@@ -25,6 +25,9 @@ spec:
           image: e-commerce/cart-service:0.1.0
           ports: [ { name: http, containerPort: 8083 } ]
           envFrom: [ { configMapRef: { name: cart-service } } ]
+          env:
+            - name: SERVICE_AUTH_CLIENT_SECRET    # its realm client's secret, for client-credentials tokens
+              valueFrom: { secretKeyRef: { name: cart-service-oidc, key: client-secret } }
           resources:
             requests: { cpu: 500m, memory: 768Mi }
             limits: { memory: 768Mi }

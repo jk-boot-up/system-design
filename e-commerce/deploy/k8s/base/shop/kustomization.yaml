@@ -28,6 +28,11 @@ configMapGenerator:
   - { name: cart-service, behavior: merge, literals: [ "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/certs" ] }
   - { name: order-service, behavior: merge, literals: [ "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/certs" ] }
   - { name: review-service, behavior: merge, literals: [ "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/certs" ] }
+  - { name: inventory-service, behavior: merge, literals: [ "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/certs" ] }
+  - { name: payment-service, behavior: merge, literals: [ "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/certs" ] }
+  # Service tokens (client credentials, ADR 0014) for the callers of /internal, also from inside the cluster.
+  - { name: order-service, behavior: merge, literals: [ "SERVICE_AUTH_TOKEN_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/token" ] }
+  - { name: cart-service, behavior: merge, literals: [ "SERVICE_AUTH_TOKEN_URI=http://keycloak:8080/realms/shop/protocol/openid-connect/token" ] }
 # RuntimeDefault seccomp for every pod, the one "restricted" requirement the service bases leave to the platform.
 patches:
   - target: { kind: Deployment|StatefulSet }

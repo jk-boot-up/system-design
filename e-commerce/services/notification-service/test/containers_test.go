@@ -22,6 +22,10 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/adapter/dedupe"
 	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/adapter/kafka"
@@ -164,6 +168,10 @@ func TestEventsBecomeEmailsOnceWithRetriesAndDeadLetters(t *testing.T) {
 	}
 	mailer := &flaky{real: smtp.Mailer{Addr: smtpAddr, From: "Shop <orders@shop.example>", Timeout: 5 * time.Second}, tries: map[string]int{}}
 	worker := app.Worker{Mailer: mailer, SentLog: dedupe.RedisSentLog{R: rdb}, Scheduler: broker}
+	// Spans are recorded in memory, so the test can follow each event's trace through Kafka, RabbitMQ and the retries.
+	spans := tracetest.NewSpanRecorder()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(spans)))
+	otel.SetTextMapPropagator(propagation.TraceContext{})
 	runCtx, stop := context.WithCancel(ctx)
 	defer stop()
 	go func() {
@@ -176,8 +184,8 @@ func TestEventsBecomeEmailsOnceWithRetriesAndDeadLetters(t *testing.T) {
 	if _, err := kadm.NewClient(producer).CreateTopics(ctx, 3, 1, nil, kafka.Topic, kafka.Topic+".dlq"); err != nil {
 		t.Fatal(err)
 	}
-	send := func(key string, value []byte) {
-		if err := producer.ProduceSync(ctx, &kgo.Record{Topic: kafka.Topic, Key: []byte(key), Value: value}).FirstErr(); err != nil {
+	send := func(key string, value []byte, headers ...kgo.RecordHeader) {
+		if err := producer.ProduceSync(ctx, &kgo.Record{Topic: kafka.Topic, Key: []byte(key), Value: value, Headers: headers}).FirstErr(); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -187,8 +195,12 @@ func TestEventsBecomeEmailsOnceWithRetriesAndDeadLetters(t *testing.T) {
 		send("o-1", event("evt-1", "order.OrderConfirmed", "ada@example.com"))
 	}
 	send("o-1", event("evt-1b", "order.OrderPlaced", "ada@example.com"))
-	send("o-2", event("evt-2", "order.OrderCancelled", "bob@example.com"))
-	send("o-3", event("evt-3", "order.OrderConfirmed", "flaky-2@example.com"))
+	// Two events carry the trace of the checkout that wrote them (order-service's outbox sets traceparent).
+	const bobTrace, flakyTrace = "4bf92f3577b34da6a3ce929d0e0e4736", "0af7651916cd43dd8448eb211c80319c"
+	send("o-2", event("evt-2", "order.OrderCancelled", "bob@example.com"),
+		kgo.RecordHeader{Key: "traceparent", Value: []byte("00-" + bobTrace + "-00f067aa0ba902b7-01")})
+	send("o-3", event("evt-3", "order.OrderConfirmed", "flaky-2@example.com"),
+		kgo.RecordHeader{Key: "traceparent", Value: []byte("00-" + flakyTrace + "-00f067aa0ba902b7-01")})
 	send("o-4", event("evt-4", "order.OrderConfirmed", "bounce@example.com"))
 	send("o-5", event("evt-5", "order.OrderConfirmed", "never@example.com"))
 	send("o-6", []byte("this is not json"))
@@ -218,6 +230,27 @@ func TestEventsBecomeEmailsOnceWithRetriesAndDeadLetters(t *testing.T) {
 		t.Errorf("results %v", results)
 	}
 	mu.Unlock()
+
+	// Each event's spans continue the checkout's trace: routing it, and every attempt to send its email, including the
+	// two that came back from the delay queues.
+	byTrace := map[string][]string{}
+	for _, s := range spans.Ended() {
+		byTrace[s.SpanContext().TraceID().String()] = append(byTrace[s.SpanContext().TraceID().String()], s.Name())
+	}
+	count := func(names []string, name string) (n int) {
+		for _, x := range names {
+			if x == name {
+				n++
+			}
+		}
+		return n
+	}
+	if b := byTrace[bobTrace]; count(b, kafka.Topic+" process") != 1 || count(b, rabbit.QueueSend+" process") != 1 {
+		t.Errorf("bob's trace has spans %v", b)
+	}
+	if f := byTrace[flakyTrace]; count(f, kafka.Topic+" process") != 1 || count(f, rabbit.QueueSend+" process") != 3 {
+		t.Errorf("flaky-2's trace has spans %v", f)
+	}
 
 	// The unreadable event is on the dead-letter topic, with its reason.
 	dlq, _ := kgo.NewClient(kgo.SeedBrokers(brokers...), kgo.ConsumeTopics(kafka.Topic+".dlq"), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()))

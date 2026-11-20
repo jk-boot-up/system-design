@@ -30,6 +30,8 @@ spec:
               valueFrom: { secretKeyRef: { name: orders-db, key: username } }
             - name: DB_PASSWORD
               valueFrom: { secretKeyRef: { name: orders-db, key: password } }
+            - name: SERVICE_AUTH_CLIENT_SECRET    # its realm client's secret, for client-credentials tokens
+              valueFrom: { secretKeyRef: { name: order-service-oidc, key: client-secret } }
           resources:
             requests: { cpu: 500m, memory: 768Mi }
             limits: { memory: 768Mi }

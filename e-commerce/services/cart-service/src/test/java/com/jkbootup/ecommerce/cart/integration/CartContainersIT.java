@@ -17,6 +17,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.kafka.KafkaContainer;
 
@@ -24,6 +25,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Properties;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,7 +52,19 @@ class CartContainersIT {
         KAFKA.start();
         try {
             CATALOG = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            CATALOG.createContext("/token", ex -> {   // the realm's token endpoint (client-credentials grant)
+                byte[] body = "{\"access_token\":\"cart-svc\",\"expires_in\":300}".getBytes(StandardCharsets.UTF_8);
+                ex.getResponseHeaders().add("Content-Type", "application/json");
+                ex.sendResponseHeaders(200, body.length);
+                ex.getResponseBody().write(body);
+                ex.close();
+            });
             CATALOG.createContext("/internal/products/prices", ex -> {
+                if (!"Bearer cart-svc".equals(ex.getRequestHeaders().getFirst("Authorization"))) {
+                    ex.sendResponseHeaders(401, -1);   // catalog accepts only cart-service's token
+                    ex.close();
+                    return;
+                }
                 byte[] body = """
                         {"items":[{"sku":"SKU-1001","name":"Trail Runner","price":{"amount":"89.90","currency":"EUR"},"status":"ACTIVE"}]}"""
                         .getBytes(StandardCharsets.UTF_8);
@@ -71,6 +85,13 @@ class CartContainersIT {
         r.add("spring.data.redis.url", () -> "redis://" + REDIS.getHost() + ":" + REDIS.getMappedPort(6379));
         r.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         r.add("clients.catalog.url", () -> "http://127.0.0.1:" + CATALOG.getAddress().getPort());
+        r.add("service-auth.token-uri", () -> "http://127.0.0.1:" + CATALOG.getAddress().getPort() + "/token");
+        r.add("service-auth.client-secret", () -> "test-secret");
+    }
+
+    /** order-service's client-credentials token, as the realm issues it. */
+    private static RequestPostProcessor orderService() {
+        return jwt().jwt(j -> j.audience(List.of("cart-service")).claim("azp", "order-service"));
     }
 
     @MockitoBean
@@ -98,7 +119,7 @@ class CartContainersIT {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.lines[0].quantity").value(2));
         assertThat(redis.hasKey("cart:g:" + guest)).isFalse();
 
-        mvc.perform(get("/internal/carts/{c}/checkout-snapshot", customer))
+        mvc.perform(get("/internal/carts/{c}/checkout-snapshot", customer).with(orderService()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.lines[0].unitPrice.amount").value("89.90"));
     }
 
@@ -112,9 +133,25 @@ class CartContainersIT {
         mvc.perform(get("/api/v1/cart").with(jwt().jwt(j -> j.subject(customer.toString()))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.pricing").value("PENDING"))
                 .andExpect(jsonPath("$.checkoutReady").value(false));
-        mvc.perform(get("/internal/carts/{c}/checkout-snapshot", customer))
+        mvc.perform(get("/internal/carts/{c}/checkout-snapshot", customer).with(orderService()))
                 .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("PRICING_UNAVAILABLE"));
         catalogUp = true;
+    }
+
+    @Test
+    void onlyOrderServicesTokenMayReadACheckoutSnapshot() throws Exception {
+        UUID customer = UUID.randomUUID();
+        String path = "/internal/carts/" + customer + "/checkout-snapshot";
+        mvc.perform(get(path)).andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        // A customer's own token (audience: the public API) is not enough, even for their own cart.
+        mvc.perform(get(path).with(jwt().jwt(j -> j.subject(customer.toString()).audience(List.of("shop-api")).claim("azp", "shop-web"))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        // Another service's token, or order-service's token meant for another service.
+        mvc.perform(get(path).with(jwt().jwt(j -> j.audience(List.of("cart-service")).claim("azp", "cart-service"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get(path).with(jwt().jwt(j -> j.audience(List.of("payment-service")).claim("azp", "order-service"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get(path).with(orderService())).andExpect(status().isOk());
     }
 
     @Test

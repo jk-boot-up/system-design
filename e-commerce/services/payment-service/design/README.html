@@ -216,7 +216,7 @@ amount, currency and token only for a void recorded before any authorisation.</p
 <tr>
 <td><code>PaymentContainersIT</code></td>
 <td>PostgreSQL + Kafka</td>
-<td>HTTP status codes per outcome, validation, late success voided with full audit trail, capture and refund idempotent and published</td>
+<td>HTTP status codes per outcome, validation, late success voided with full audit trail, capture and refund idempotent and published; only order-service's token is accepted (none → 401 problem, customer or another service → 403), health stays open</td>
 </tr>
 </tbody>
 </table>

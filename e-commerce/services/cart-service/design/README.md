@@ -84,4 +84,5 @@ Prices live only in the in-process Caffeine cache (30 s, at most 100 000 SKUs), 
 | `CartTest` | domain | Set and remove lines, validation, merge with cap, owner keys |
 | `CartServiceTest` | application | Pricing, inactive products block checkout, degraded pricing, guest merge, clear-once |
 | `HexagonalArchitectureTest` | ArchUnit | Layering |
-| `CartContainersIT` | Redis + Kafka + fake catalog over HTTP | Guest cart priced and stored with expiry, merge on sign-in, snapshot; catalogue outage → PENDING and 503 snapshot; `OrderConfirmed` empties the cart; validation and auth |
+| `ServiceTokensTest` | adapter, real HTTP token endpoint | Client-credentials request with basic auth; token reused until two thirds of its life; one request for 32 concurrent callers; a failed renewal keeps the current token and retries at most every 5 s; no token → the call is not sent (`ResourceAccessException`) |
+| `CartContainersIT` | Redis + Kafka + fake catalog over HTTP | Guest cart priced and stored with expiry, merge on sign-in, snapshot; catalogue outage → PENDING and 503 snapshot; `OrderConfirmed` empties the cart; validation and auth; price lookups carry cart-service's token; only order-service's token reads a snapshot (none → 401, a customer's, another service's, or one for another audience → 403) |

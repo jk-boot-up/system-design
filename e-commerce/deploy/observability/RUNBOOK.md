@@ -86,3 +86,18 @@ publishes.
 
 * **Act:** restore `redis-ratelimit`. Until then each gateway replica applies the full limit, so the effective limit is
   multiplied by the replica count.
+
+## PostgreSQL backups
+
+`PostgresBackupTooOld` (ticket): a cluster's last base backup is more than 26 hours old. `PostgresWalArchivingStalled`
+(page): no write-ahead log file archived for 15 minutes.
+
+* **Confirm:** `kubectl -n e-commerce-platform get backups` (the latest `<cluster>-nightly` and its error);
+  `kubectl cnpg status <cluster>` (WAL archiving, last failed WAL); the `plugin-barman-cloud` container's log in the
+  primary pod.
+* **Act:** usually object storage: expired or wrong credentials (`backup-storage` secret), the bucket missing or full,
+  the egress gateway blocking `storage.shop.example`. Fix it; archiving resumes by itself and the next backup runs at
+  02:00, or take one now with `kubectl cnpg backup <cluster> --method plugin --plugin-name barman-cloud.cloudnative-pg.io`.
+  While archiving is stalled, watch the cluster's disk: WAL is kept until it is archived.
+* **Restore:** [15.5](../../design/15-runbooks.md#155-database-failover-postgresql).
+

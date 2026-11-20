@@ -150,6 +150,16 @@ docker build -t e-commerce/order-service .</code></pre>
 <td>Downstream services</td>
 </tr>
 <tr>
+<td><code>SERVICE_AUTH_CLIENT_SECRET</code></td>
+<td>—</td>
+<td>Secret of the realm client <code>order-service</code>; its client-credentials token goes on every call to cart, inventory and payment (<a href="../../design/adr/0014-service-identity-with-client-credentials-tokens.html">ADR 0014</a>)</td>
+</tr>
+<tr>
+<td><code>SERVICE_AUTH_TOKEN_URI</code></td>
+<td><code>$JWT_ISSUER/protocol/openid-connect/token</code></td>
+<td>Token endpoint (inside the network in compose and Kubernetes)</td>
+</tr>
+<tr>
 <td><code>PORT</code></td>
 <td><code>8085</code></td>
 <td>HTTP port</td>

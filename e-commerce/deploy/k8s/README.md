@@ -17,7 +17,8 @@ base/
   namespaces.yaml        e-commerce-shop (services, edge, analytics) and e-commerce-platform (data stores, Kafka, Keycloak)
   shop/                  the 11 service bases + NGINX edge, unchanged; default deny; aliases to the platform stores;
                          in-cluster JWK set URIs; RuntimeDefault seccomp; the edge certificate; KEDA credentials
-  platform/              PostgreSQL + PgBouncer, Kafka + topics, Redis, OpenSearch, Cassandra, RabbitMQ, Keycloak + realm
+  platform/              PostgreSQL + PgBouncer, Kafka + topics, Redis, OpenSearch, Cassandra, RabbitMQ, Keycloak + realm;
+                         backups.yaml: WAL archive and nightly backups of every PostgreSQL cluster (30 days)
 components/
   hosts/                 copies an overlay's host names (its environment.yaml) into issuers, CORS, realm, certificates
   single-replica/        dev sizing: one of everything, replication factor 1
@@ -27,6 +28,8 @@ components/
   local-object-storage/  RustFS as the S3 store (dev, staging)
   self-signed-tls/       self-signed ClusterIssuer (dev)
   test-users/            ada, bob (customers) and sam (staff), and the password grant (dev)
+  signed-images/         Kyverno policy: only images signed by the CI image workflow on main, with a signed SBOM (staging, prod)
+  encrypted-storage/     every data store's volumes on the encrypted StorageClass "encrypted-ssd" (staging, prod)
 overlays/
   dev/  staging/  prod/
 ```
@@ -43,6 +46,7 @@ overlays/
 | Object storage | RustFS | RustFS | provider S3 at `storage.shop.example` (egress gateway) |
 | Certificates | self-signed | Let's Encrypt staging | Let's Encrypt |
 | Keycloak users | test users, password grant | sign-up only | sign-up only |
+| Images | built locally, unsigned | signed by CI, digest-pinned by Kyverno | signed by CI, digest-pinned by Kyverno |
 
 ## Where things run
 
@@ -51,7 +55,7 @@ overlays/
   (`kafka-bootstrap`, `pgbouncer-orders`, `redis-cart`, …) are `ExternalName` aliases to the platform namespace, so the bases
   stay the same as in the local stack.
 * **e-commerce-platform**: one CloudNativePG cluster per owning service (orders, inventory, payments, catalog) and one for
-  Keycloak; PgBouncer poolers in transaction mode for orders, inventory and payments; Kafka in KRaft mode with the topics of
+  Keycloak; PgBouncer poolers in transaction mode for orders, inventory, payments and catalog; Kafka in KRaft mode with the topics of
   the event catalogue; Redis per use (`redis-cache`, `redis-ratelimit`, `redis-cart`, `redis-reco`, `redis-notify`);
   OpenSearch; Cassandra (data centre `dc1`); RabbitMQ with notification's own user; Keycloak with the `shop` realm. Ingress
   is allowed from this namespace, the shop namespace, the operators, `monitoring` and `ingress-nginx`.
@@ -64,6 +68,7 @@ overlays/
 |---|---|---|---|
 | cert-manager | 1.21.3 | `cert-manager` | Helm chart `jetstack/cert-manager`, `crds.enabled=true` |
 | CloudNativePG | 1.30.2 | `cnpg-system` | `kubectl apply --server-side -f https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.2/cnpg-1.30.2.yaml` |
+| Barman Cloud plugin for CloudNativePG | 0.15.1 | `cnpg-system` | `kubectl apply -f https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v0.15.1/manifest.yaml` (after cert-manager) |
 | Strimzi | 1.3.1 | `strimzi` | Helm chart `strimzi/strimzi-kafka-operator`, `watchNamespaces={e-commerce-platform}` |
 | OpsTree Redis operator | 0.27.0 | `redis-operator` | Helm chart `ot-helm/redis-operator` |
 | OpenSearch operator | 3.0.0 | `opensearch-operator` | Helm chart `opensearch-operator/opensearch-operator` |
@@ -72,6 +77,7 @@ overlays/
 | Keycloak operator | 26.8.2 | **`e-commerce-platform`** (it watches only its own namespace) | the `keycloak-k8s-resources` manifests |
 | External Secrets Operator | 2.15.0 | `external-secrets` | Helm chart `external-secrets/external-secrets` (staging, prod) |
 | KEDA | 2.21.1 | `keda` | Helm chart `kedacore/keda` |
+| Kyverno | 1.19.2 | `kyverno` | Helm chart `kyverno/kyverno` (staging, prod: verifies image signatures) |
 | kube-prometheus-stack (Prometheus Operator 0.94.2, Prometheus, Alertmanager, Grafana) | 92.18.0 | `monitoring` | Helm, values in [`deploy/observability/k8s/values`](../observability/k8s/values/) |
 | Tempo, Loki, Alloy (agents and tail sampler) | 2.10.10, 3.7.9, chart 1.15.0 | `monitoring` | Helm, same values directory ([observability README](../observability/README.md)) |
 
@@ -88,10 +94,17 @@ Cluster-level objects the staging and prod overlays expect:
 | `e-commerce/notification-rabbitmq` | `username`, `password` | the RabbitMQ user and notification's `RABBITMQ_URL` |
 | `e-commerce/object-storage` | `access_key`, `secret_key` | catalog's `S3_ACCESS_KEY`, `S3_SECRET_KEY` |
 | `e-commerce/analytics` | `default_password`, `grafana_password` | ClickHouse passwords |
+| `e-commerce/storefront` | `client_secret`, `session_keys` | the storefront's realm client secret (also in Keycloak's realm import) and its session encryption keys |
+| `e-commerce/order-service-oidc`, `cart-service-oidc` | `client_secret` | the service's realm client secret, in both namespaces: Keycloak's realm import and the service read the same value (ADR 0014) |
+| `e-commerce/backup-storage` | `access_key`, `secret_key` | the database backups' key: write access to the `e-commerce-backups` bucket only |
 
 * An `egress-gateway` namespace (payment provider, object storage) and an ingress controller in `ingress-nginx` in front of
   Keycloak.
 * Nodes with `vm.max_map_count=262144` for OpenSearch (the operator's privileged init container is off).
+* Staging and production: a StorageClass `encrypted-ssd` whose volumes are encrypted at rest with a customer-managed key
+  (for example the provider's CSI driver with a KMS key), and an `e-commerce-backups` bucket with versioning and an
+  object lock or retention rule, so a compromised cluster cannot delete its own backups. In dev the backup bucket is
+  created in RustFS by a Job.
 
 ## Using dev
 

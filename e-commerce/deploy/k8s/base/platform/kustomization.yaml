@@ -7,6 +7,7 @@ labels:
   - pairs: { app.kubernetes.io/part-of: e-commerce }
 resources:
   - postgres.yaml
+  - backups.yaml
   - kafka.yaml
   - topics.yaml
   - redis.yaml

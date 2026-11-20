@@ -111,4 +111,4 @@ Schema: [V1__catalog_schema.sql](../src/main/resources/db/migration/V1__catalog_
 | `SingleFlightTest` | application | 50 concurrent misses for one key load once; every waiter gets the loader's exception and the next miss loads again |
 | `RedisProductCacheExpiryTest` | adapter | Expiry stays within ± 10 % of the base and differs between entries written together |
 | `HexagonalArchitectureTest` | ArchUnit | Layering |
-| `CatalogContainersIT` | PostgreSQL + Redis + Kafka + S3 (RustFS) | 428 without If-Match, 200 with the current ETag, 412 with a stale one; cache entry evicted; events with versions 1 and 2 on Kafka; real presigned upload to MinIO then confirm; price lookup; 401 and 403 for non-staff; SKU uniqueness |
+| `CatalogContainersIT` | PostgreSQL + Redis + Kafka + S3 (RustFS) | 428 without If-Match, 200 with the current ETag, 412 with a stale one; cache entry evicted; events with versions 1 and 2 on Kafka; real presigned upload to MinIO then confirm; price lookup only with cart-service's token (none → 401, a customer's or order-service's → 403); 401 and 403 for non-staff; SKU uniqueness |

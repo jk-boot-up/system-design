@@ -7,6 +7,8 @@ resources: [ ../../base, environment.yaml ]
 components:
   - ../../components/hosts
   - ../../components/external-secrets
+  - ../../components/signed-images
+  - ../../components/encrypted-storage
   - ../../components/local-mail
   - ../../components/local-object-storage
 patches:

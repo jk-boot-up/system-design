@@ -9,7 +9,7 @@ scrape_configs:
     honor_labels: true      # the gateway already labels its series service="api-gateway"
     static_configs:
       - targets: [api-gateway:8080, catalog-service:8081, search-service:8082, cart-service:8083, inventory-service:8084,
-                  order-service:8085, payment-service:8086, review-service:8087]
+                  order-service:8085, payment-service:9086, review-service:8087]   # payment: management port
     relabel_configs: &service-from-host
       - { source_labels: [__address__], regex: "([^:]+):.*", target_label: service }
   - job_name: services

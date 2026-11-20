@@ -7,8 +7,11 @@ import logging
 from collections.abc import Callable
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, TopicPartition
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode
 
 from ..app import CoPurchaseStore, Learned, learn
+from ..telemetry import context_of, tracer
 
 TOPIC = "order.events"
 GROUP = "recommendation-service"
@@ -45,7 +48,10 @@ async def consume(bootstrap: str, store: CoPurchaseStore, observe: Callable[[Lea
             batches = await consumer.getmany(timeout_ms=500, max_records=200)
             for tp, records in batches.items():
                 for record in records:
-                    await _learn_until_done(record.value, store, KafkaDeadEvents(producer, record), observe, stop)
+                    # Continue the trace of the checkout that wrote the event.
+                    with tracer.start_as_current_span(f"{TOPIC} process", context=context_of(record.headers),
+                                                      kind=SpanKind.CONSUMER, attributes=_attributes(record)):
+                        await _learn_until_done(record.value, store, KafkaDeadEvents(producer, record), observe, stop)
                     if stop.is_set():
                         return
                     await consumer.commit({TopicPartition(tp.topic, tp.partition): record.offset + 1})
@@ -54,14 +60,24 @@ async def consume(bootstrap: str, store: CoPurchaseStore, observe: Callable[[Lea
         await producer.stop()
 
 
+def _attributes(record) -> dict:
+    return {"messaging.system": "kafka", "messaging.destination.name": record.topic, "messaging.consumer.group.name": GROUP,
+            "messaging.destination.partition.id": str(record.partition), "messaging.kafka.offset": record.offset}
+
+
 async def _learn_until_done(value, store, dead, observe, stop: asyncio.Event) -> None:
     """Redis down holds the partition: the event is retried with back-off, never skipped."""
     delay = 0.2
+    span = trace.get_current_span()
     while not stop.is_set():
         try:
-            observe(await learn(value, store, dead))
+            learned = await learn(value, store, dead)
+            span.set_attribute("recommendation.learned", str(learned))
+            observe(learned)
             return
         except Exception as e:  # noqa: BLE001 - any store or producer failure is retried the same way
+            span.record_exception(e)
+            span.set_status(Status(StatusCode.ERROR, "event not counted"))
             log.warning("event not counted, retrying in %.1fs: %s", delay, e)
             try:
                 await asyncio.wait_for(stop.wait(), timeout=delay)

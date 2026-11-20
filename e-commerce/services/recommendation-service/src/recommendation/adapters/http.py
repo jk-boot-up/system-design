@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse, Response
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Counter, generate_latest
 from pydantic import BaseModel
 from redis.exceptions import RedisError
@@ -66,4 +67,6 @@ def create_app(store: CoPurchaseStore, metrics: Metrics, ready=lambda: True) -> 
     async def metrics_endpoint():
         return Response(generate_latest(metrics.registry), media_type=CONTENT_TYPE_LATEST)
 
+    # A server span per request, continuing the gateway's traceparent; probes and scrapes are not traced.
+    FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,readyz,metrics")
     return app

@@ -77,7 +77,7 @@ retries</strong>, and <strong>no charge for a cancelled order</strong>, even whe
 </tr>
 <tr>
 <td>Port</td>
-<td>8086</td>
+<td>8086 (API); health and metrics on 9086 in compose and Kubernetes, so only order-service needs 8086</td>
 </tr>
 <tr>
 <td>Design</td>
@@ -107,7 +107,7 @@ retries</strong>, and <strong>no charge for a cancelled order</strong>, even whe
 <h2 id="build-test-run">Build, test, run<a class="headerlink" href="#build-test-run" title="Permanent link">#</a></h2>
 <pre class="highlight"><code class="language-bash">./gradlew build                      # unit + architecture tests
 ./gradlew test -PwithContainers      # + PostgreSQL and Kafka
-cd ../../deploy/compose &amp;&amp; docker compose up -d postgres kafka &amp;&amp; cd - &amp;&amp; ./gradlew bootRun</code></pre>
+cd ../../deploy/compose &amp;&amp; docker compose up -d postgres kafka keycloak &amp;&amp; cd - &amp;&amp; ./gradlew bootRun</code></pre>
 <table>
 <thead>
 <tr>
@@ -128,9 +128,19 @@ cd ../../deploy/compose &amp;&amp; docker compose up -d postgres kafka &amp;&amp
 <td>Kafka</td>
 </tr>
 <tr>
+<td><code>JWT_ISSUER</code></td>
+<td><code>http://localhost:8180/realms/shop</code></td>
+<td>Keycloak realm; every <code>/internal/payments</code> call needs order-service's service token (audience <code>payment-service</code>, <a href="../../design/adr/0014-service-identity-with-client-credentials-tokens.html">ADR 0014</a>)</td>
+</tr>
+<tr>
 <td><code>PORT</code></td>
 <td><code>8086</code></td>
 <td>HTTP port</td>
+</tr>
+<tr>
+<td><code>MANAGEMENT_PORT</code></td>
+<td>same as <code>PORT</code></td>
+<td>Health and metrics; compose and Kubernetes set <code>9086</code>, outside the API's network policy</td>
 </tr>
 <tr>
 <td><code>payment.provider.timeout</code></td>
@@ -146,10 +156,13 @@ cd ../../deploy/compose &amp;&amp; docker compose up -d postgres kafka &amp;&amp
 </table>
 <h2 id="try-it">Try it<a class="headerlink" href="#try-it" title="Permanent link">#</a></h2>
 <pre class="highlight"><code class="language-bash">O=0193a1b0-0000-7000-8000-0000000000aa
-curl -X POST localhost:8086/internal/payments/authorize -H 'content-type: application/json' \
+# a service token as order-service gets one (client credentials; realm client "order-service")
+SVC=$(curl -s -u order-service:dev-order-service-secret-change-me-0123456789 -d grant_type=client_credentials \
+  localhost:8180/realms/shop/protocol/openid-connect/token | jq -r .access_token)
+curl -X POST localhost:8086/internal/payments/authorize -H "authorization: Bearer $SVC" -H 'content-type: application/json' \
   -d "{\"orderId\":\"$O\",\"amount\":{\"amount\":\"179.80\",\"currency\":\"EUR\"},\"paymentToken\":\"tok_ok\"}"
-curl -X POST localhost:8086/internal/payments/$O/capture
-curl -X POST localhost:8086/internal/payments/$O/refund</code></pre>
+curl -X POST localhost:8086/internal/payments/$O/capture -H "authorization: Bearer $SVC"
+curl -X POST localhost:8086/internal/payments/$O/refund -H "authorization: Bearer $SVC"</code></pre>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">#</a></h2>
 <table>
 <thead>

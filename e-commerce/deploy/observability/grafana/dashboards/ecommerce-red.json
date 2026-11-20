@@ -297,7 +297,8 @@
           "legendFormat": "{{method}} {{uri}}",
           "datasource": {
             "uid": "prometheus"
-          }
+          },
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -339,7 +340,8 @@
           "legendFormat": "{{method}} {{uri}}",
           "datasource": {
             "uid": "prometheus"
-          }
+          },
+          "exemplar": true
         }
       ],
       "fieldConfig": {

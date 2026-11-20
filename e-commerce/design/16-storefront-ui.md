@@ -205,7 +205,7 @@ dev; brute-force detection on; password policy (length ≥ 12, breached-password
 | Threat | Control |
 |---|---|
 | XSS steals tokens | No tokens in the browser (§16.5). |
-| XSS runs actions as the user | Strict CSP with a per-request nonce, no inline scripts or `eval`, no third-party scripts; React escapes output; `dangerouslySetInnerHTML` banned by lint; review bodies are plain text; Trusted Types first in report-only mode, enforced once reports are clean |
+| XSS runs actions as the user | Strict CSP with a per-request nonce, no inline scripts or `eval`, no third-party scripts; React escapes output; `dangerouslySetInnerHTML` banned by lint; review bodies are plain text; Trusted Types enforced (`require-trusted-types-for 'script'`, no policies allowed), and every browser journey fails on any CSP violation |
 | CSRF | `SameSite=Lax` cookie, every state-changing request is POST/PUT/DELETE, plus a check of `Origin` (must equal the shop origin) and a per-session CSRF token on every form and fetch; actions reject anything else |
 | Clickjacking | `frame-ancestors 'none'` and `X-Frame-Options: DENY` |
 | Session theft or fixation | `__Host-` cookie, rotation at sign-in, idle and absolute timeouts, sessions revocable server-side |

@@ -19,7 +19,7 @@ spec:
       securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
       containers:
         - name: dlq-replay
-          image: registry.shop.example/e-commerce/dlq-replay:latest
+          image: registry.shop.example/e-commerce/dlq-replay:COMMIT   # the commit CI built and signed (staging, prod admit signed images only)
           args: [replay, --dlq, order.events.dlq, --dry-run]   # start with a dry run; remove --dry-run to replay
           env:
             - { name: KAFKA_BOOTSTRAP, value: kafka-bootstrap:9092 }

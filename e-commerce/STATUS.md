@@ -3,21 +3,21 @@
 Current progress of the e-commerce platform. Updated with every change of state; the detailed work lists are in
 [design/DESIGN-PLAN.md](design/DESIGN-PLAN.md) and [design/IMPLEMENTATION-PLAN.md](design/IMPLEMENTATION-PLAN.md).
 
-**Last updated:** 2026-11-19 · **Branch:** `system-design-e-commerce-draft-1` (fast-forwarded to `main`)
+**Last updated:** 2026-11-20 · **Branch:** `system-design-e-commerce-draft-1` (fast-forwarded to `main`)
 
 ## At a glance
 
 | Area | Progress | Done | Next |
 |---|---|---|---|
 | Specification and plans | ██████████ 100% | SPEC, PLAN, design plan, implementation plan, prerequisites | Keep in step with changes |
-| System design documents | ██████████ 100% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, system/module/service diagrams, security, observability, capacity, runbooks, storefront, 13 ADRs | Keep in step with changes |
+| System design documents | ██████████ 100% | HLD, DFD, deployment, database, sequence, flow, state, class/UML, API and event catalogues, system/module/service diagrams, security, observability, capacity, runbooks, storefront, 14 ADRs | Keep in step with changes |
 | Documentation tooling | ██████████ 100% | Diagrams → SVG (light + dark), Markdown → HTML, link checker, walkthrough engine with themes and narration | — |
 | Services (11) | ██████████ 100% | all eleven complete | — |
 | Walkthroughs | ██████████ 100% | every service and the whole system | — |
 | Local stack and Kubernetes overlays | ██████████ 100% | Compose stack with profiles and smoke test; dev, staging and prod overlays with operator-managed stores, checked against the operators' CRDs | — |
 | Storefront (web UI) | ██████████ 100% | React Router 8 server rendering + backend-for-frontend (`web/storefront`): every page, sign-in, checkout, staff; compose, edge and k8s wiring; CI | Component tests when pages gain client logic |
 | End-to-end and performance tests | █████████░ 90% | End-to-end journeys (`tests/e2e`): 22 across core, the storefront in a browser and every profile; ZAP and Lighthouse; Gatling for browse, cart, checkout and search; nightly CI | Reviews journey and search simulation need > 4 GB of Docker memory |
-| Observability | █████████░ 90% | Traces across HTTP, the outbox and Kafka; logs in Loki; SLOs and burn-rate alerts; platform alerts with tests; runbook; dashboards; k8s stack with tail sampling | Traces from the Go and Python services; exemplars |
+| Observability | ██████████ 100% | Traces from the edge through every service, the outbox, Kafka and RabbitMQ (Java, Node, Go, Python); exemplars on latency panels; logs in Loki; SLOs and burn-rate alerts; platform and backup alerts with tests; runbook; dashboards; k8s stack with tail sampling | — |
 
 ## Services
 
@@ -37,13 +37,31 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## Recently completed
 
+* Hardening (design/12 gaps closed):
+  * Service identity (ADR 0014): order-service and cart-service call inventory, payment, cart and catalog with
+    client-credentials tokens from their own realm clients; each callee checks the audience and the calling client
+    (`InternalCallers`), and inventory's stock endpoints need the staff role. Tokens are cached and renewed early, so a
+    Keycloak outage is felt only after about 5 minutes (runbook 15.8).
+  * Supply chain: one image workflow for every image: an SBOM of the image (Syft) and a vulnerability gate (Trivy); on
+    `main` a keyless Sigstore signature, the SBOM as a signed attestation and SLSA provenance. Kyverno admits only signed
+    images in staging and production and pins them to the verified digest. Renovate for every ecosystem.
+  * Data protection: WAL archive and nightly backups of every PostgreSQL cluster (Barman Cloud plugin, 30 days,
+    point-in-time recovery), restore steps in runbook 15.5, alerts for old backups and stalled archiving; every data
+    store on an encrypted StorageClass in staging and production.
+  * Edge: the OWASP Core Rule Set on ModSecurity in front of everything (blocks injection, XSS, traversal, known scanners;
+    the sign-in callback's `iss` excluded on that path only); Trusted Types enforced in the storefront and every browser
+    journey fails on a CSP violation; payment-service's health and metrics on their own port, so only order-service
+    reaches its API.
+  * Tracing in notification-service (Go) and recommendation-service (Python), continuing the checkout's trace through
+    Kafka, RabbitMQ and its retry queues; the edge starts traces; exemplars link latency panels to Tempo.
+  * Still open: encryption between pods (mesh or WireGuard) and bot management at a CDN (design/12 §12.8).
+
 * System walkthrough (`design/walkthrough`): 11 animated scenarios, 64 narrated steps: architecture tour, browse and
   search, cart with guest merge, checkout, out of stock, payment declined, payment timeout, cancellation and refund,
   event fan-out, flash sale, a dependency failing. Every step plays without errors in Chromium.
 * Design documents 11–15: the system and service-interaction map as wired in the code, modules inside a service and
   communication diagrams of checkout, indexing and cancellation; security (trust boundaries, STRIDE, sign-in, secrets,
-  data protection and the gaps: no mTLS on internal calls, no database backups, no SBOMs or automated updates for the
-  backend); observability and SLOs; capacity at 1× and 10× with connection and partition budgets (catalog can exhaust its
+  data protection and its gaps, since closed except encryption between pods and bot management); observability and SLOs; capacity at 1× and 10× with connection and partition budgets (catalog can exhaust its
   database's connections at full scale-out); runbooks for outbox backlog, DLQ replay, stuck sagas, hot SKUs, database
   failover, broker loss and cache stampede (product cache entries expire together: no jitter yet).
 * Observability (`deploy/observability`, ADR 0013): every Java service and the storefront export OpenTelemetry traces
@@ -157,5 +175,6 @@ Current progress of the e-commerce platform. Updated with every change of state;
 | Item | Note |
 |---|---|
 | Maven Central rate limits (HTTP 429) during builds | Builds retry with back-off; CI caches dependencies |
+| Gradle's wrapper download fails inside Docker builds on this machine | `release-assets.githubusercontent.com` is unreachable from the Docker VM. Image builds use BuildKit's cache of `/root/.gradle`: after pruning the build cache, copy the host's `~/.gradle/wrapper/dists/gradle-9.8.2-bin` into it once |
 | Search simulation and core + observability exceed a 4 GB Docker VM | OpenSearch and Keycloak are OOM-killed under load; Keycloak now restarts by itself. Use 6 GB+ for these runs |
 | Whole local stack needs about 16 GB of memory | Each service's README shows how to start only the infrastructure it needs |

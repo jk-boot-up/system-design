@@ -99,7 +99,7 @@ priced snapshot at checkout, and empties a customer's cart once their order is c
 │  ├─ adapter/redis/            RedisCartRepository (atomic line write + expiry), RedisProcessedEvents
 │  ├─ adapter/client/           CatalogPricingClient (cache + circuit breaker)
 │  ├─ adapter/messaging/        OrderConfirmedListener
-│  └─ config/                   wiring, security (guests allowed, tokens validated when present)
+│  └─ config/                   wiring, security (guests allowed, tokens validated when present; checkout snapshot for order-service's token only)
 ├─ src/test/java/…              domain, service, ArchUnit, Redis + Kafka containers with a fake catalog
 ├─ Dockerfile, k8s/, build files</code></pre>
 <h2 id="build-test-run">Build, test, run<a class="headerlink" href="#build-test-run" title="Permanent link">#</a></h2>
@@ -129,6 +129,16 @@ cd ../../deploy/compose &amp;&amp; docker compose up -d redis kafka &amp;&amp; c
 <td><code>CATALOG_URL</code></td>
 <td><code>http://localhost:8081</code></td>
 <td>catalog-service</td>
+</tr>
+<tr>
+<td><code>SERVICE_AUTH_CLIENT_SECRET</code></td>
+<td>—</td>
+<td>Secret of the realm client <code>cart-service</code>; its client-credentials token goes on every price lookup (<a href="../../design/adr/0014-service-identity-with-client-credentials-tokens.html">ADR 0014</a>)</td>
+</tr>
+<tr>
+<td><code>SERVICE_AUTH_TOKEN_URI</code></td>
+<td><code>$JWT_ISSUER/protocol/openid-connect/token</code></td>
+<td>Token endpoint</td>
 </tr>
 <tr>
 <td><code>JWT_ISSUER</code></td>

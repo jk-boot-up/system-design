@@ -8,7 +8,12 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
+	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/adapter/telemetry"
 	"github.com/jkbootup/system-design/e-commerce/notification-service/internal/app"
 )
 
@@ -67,15 +72,26 @@ func (c *Consumer) Run(ctx context.Context, router app.Router, observe func(app.
 		fetches.EachError(func(t string, p int32, err error) { slog.Warn("fetch error", "topic", t, "partition", p, "err", err) })
 		var done []*kgo.Record
 		fetches.EachRecord(func(r *kgo.Record) {
+			// Continue the trace of the request that wrote the event (its traceparent header, from order-service's outbox).
+			rctx, span := telemetry.Tracer().Start(otel.GetTextMapPropagator().Extract(ctx, telemetry.KafkaHeaders{R: r}),
+				Topic+" process", trace.WithSpanKind(trace.SpanKindConsumer), trace.WithAttributes(
+					attribute.String("messaging.system", "kafka"), attribute.String("messaging.destination.name", r.Topic),
+					attribute.String("messaging.consumer.group.name", Group), attribute.Int("messaging.destination.partition.id", int(r.Partition)),
+					attribute.Int64("messaging.kafka.offset", r.Offset)))
+			defer span.End()
+			rctx = context.WithValue(rctx, sourceKey{}, r)
 			backoff := 200 * time.Millisecond
 			for ctx.Err() == nil {
-				res, err := router.Route(context.WithValue(ctx, sourceKey{}, r), r.Value)
+				res, err := router.Route(rctx, r.Value)
 				if err == nil {
+					span.SetAttributes(attribute.String("notification.route", string(res)))
 					observe(res)
 					done = append(done, r)
 					return
 				}
-				slog.Warn("event not queued, retrying", "offset", r.Offset, "err", err)
+				span.RecordError(err)
+				span.SetStatus(codes.Error, "event not queued")
+				slog.WarnContext(rctx, "event not queued, retrying", "offset", r.Offset, "err", err)
 				select {
 				case <-ctx.Done():
 				case <-time.After(backoff):

@@ -93,8 +93,8 @@ public class CatalogConfiguration {
     }
 
     /**
-     * Reads are public, staff endpoints need the {@code staff} role from the token's {@code roles} claim, and /internal
-     * relies on the network policy (only cart-service may call it).
+     * Reads are public, staff endpoints need the {@code staff} role from the token's {@code roles} claim, and price
+     * lookups are for cart-service only, with its client-credentials token ({@link InternalCallers}).
      */
     @Bean
     SecurityFilterChain security(HttpSecurity http) throws Exception {
@@ -110,7 +110,8 @@ public class CatalogConfiguration {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()   // an error page must never turn into a 403
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("staff")
-                        .requestMatchers("/api/v1/products/**", "/api/v1/categories", "/internal/**").permitAll()
+                        .requestMatchers("/internal/products/prices").access(InternalCallers.only("catalog-service", "cart-service"))
+                        .requestMatchers("/api/v1/products/**", "/api/v1/categories").permitAll()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(converter)).authenticationEntryPoint(problems).accessDeniedHandler(problems))
                 .exceptionHandling(e -> e.authenticationEntryPoint(problems).accessDeniedHandler(problems))

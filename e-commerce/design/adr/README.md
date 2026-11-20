@@ -15,3 +15,4 @@
 | 0011 | [Diagrams as rendered SVG from editable sources](0011-diagrams-as-rendered-svg-from-editable-sources.md) | Accepted |
 | 0012 | [Storefront server-rendered with React Router and a backend-for-frontend](0012-storefront-server-rendered-with-react-router-and-a-backend-for-frontend.md) | Accepted |
 | 0013 | [Observability with OpenTelemetry, Grafana Alloy and SLOs measured at the gateway](0013-observability-with-opentelemetry-alloy-and-slos-at-the-gateway.md) | Accepted |
+| 0014 | [Service identity with client-credentials tokens on internal calls](0014-service-identity-with-client-credentials-tokens.md) | Accepted |

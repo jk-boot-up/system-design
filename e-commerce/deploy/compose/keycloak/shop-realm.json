@@ -128,6 +128,84 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "order-service",
+      "name": "order-service",
+      "description": "order-service calling cart, inventory and payment (client credentials); the token's audience names exactly those three.",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-order-service-secret-change-me-0123456789",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "client.secret.creation.time": "1763510400",
+        "access.token.lifespan": "900"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience cart-service",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "cart-service",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience inventory-service",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "inventory-service",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience payment-service",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "payment-service",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "cart-service",
+      "name": "cart-service",
+      "description": "cart-service calling catalog for prices (client credentials); the token's audience names catalog-service only.",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-cart-service-secret-change-me-0123456789",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "client.secret.creation.time": "1763510400",
+        "access.token.lifespan": "900"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience catalog-service",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "catalog-service",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "users": [

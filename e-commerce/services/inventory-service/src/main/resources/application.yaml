@@ -27,6 +27,11 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     listener:
       ack-mode: record
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER:http://localhost:8180/realms/shop}
 server:
   port: ${PORT:8084}
   shutdown: graceful

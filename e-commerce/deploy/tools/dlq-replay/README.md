@@ -48,7 +48,7 @@ which offset per partition) goes to stderr.
 In Kubernetes, build and push the image, then run it as a Job in the shop namespace (its network policy allows only Kafka):
 
 ```bash
-docker build -t registry.shop.example/e-commerce/dlq-replay:latest . && docker push registry.shop.example/e-commerce/dlq-replay:latest
+# CI builds, signs and publishes the image on main (.github/workflows/e-commerce-image.yml); set its tag in job.yaml
 kubectl -n e-commerce-shop apply -f networkpolicy.yaml
 kubectl -n e-commerce-shop create -f job.yaml          # edit args first: it starts as a dry run
 kubectl -n e-commerce-shop logs -f job/dlq-replay

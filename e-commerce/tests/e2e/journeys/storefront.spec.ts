@@ -12,6 +12,23 @@ test.describe.configure({ mode: 'serial' });
 
 const PASSWORDS: Record<string, string> = { ada: 'ada', bob: 'bob', sam: 'sam' };
 
+// Every page of every journey is watched for Content-Security-Policy violations (Trusted Types included): the page
+// records them as they happen and each test fails if any page of ours reported one. Keycloak's pages are its own.
+test.beforeEach(async ({ context }) => {
+  await context.addInitScript(() => {
+    const seen: string[] = [];
+    (window as unknown as { __cspViolations: string[] }).__cspViolations = seen;
+    document.addEventListener('securitypolicyviolation', (e) => seen.push(`${e.violatedDirective} ${e.blockedURI} ${e.sample}`));
+  });
+});
+test.afterEach(async ({ context }) => {
+  for (const p of context.pages()) {
+    if (p.isClosed() || new URL(p.url()).origin !== new URL(env.edge).origin) continue;
+    const violations = await p.evaluate(() => (window as unknown as { __cspViolations?: string[] }).__cspViolations ?? []);
+    expect(violations, `CSP violations on ${p.url()}`).toEqual([]);
+  }
+});
+
 async function signIn(page: Page, user: 'ada' | 'bob' | 'sam') {
   await page.getByRole('link', { name: 'Sign in' }).click();
   await page.waitForURL(/\/realms\/shop\//);
@@ -125,12 +142,25 @@ test('a declined card keeps the cart, and the shopper can pay again', async ({ p
   await expect(page.getByText('Thank you! Your order is confirmed.')).toBeVisible();
 });
 
-test('pages carry a strict CSP with a fresh nonce, and cross-site or token-less posts are refused', async ({ page, request }) => {
+test('pages carry a strict CSP with a fresh nonce and enforced Trusted Types, and cross-site or token-less posts are refused', async ({ page, request }) => {
   const first = await request.get('/');
   const second = await request.get('/');
   const csp = first.headers()['content-security-policy'] ?? '';
   expect(csp).toMatch(/script-src 'nonce-[A-Za-z0-9+/=]+' 'strict-dynamic'/);
   expect(csp).toContain("frame-ancestors 'none'");
+  expect(csp).toContain("require-trusted-types-for 'script'");
+  // The browser enforces it: a string assigned to a script sink throws instead of running.
+  await page.goto('/');
+  const blocked = await page.evaluate(() => {
+    try {
+      document.createElement('div').innerHTML = '<img src=x onerror=alert(1)>';
+      return false;
+    } catch (e) {
+      return e instanceof TypeError;
+    }
+  });
+  expect(blocked).toBe(true);
+  await page.evaluate(() => { (window as unknown as { __cspViolations: string[] }).__cspViolations.length = 0; });  // ours, on purpose
   expect(csp).not.toEqual(second.headers()['content-security-policy']);
   expect(first.headers()['x-frame-options']).toBe('DENY');
   expect(first.headers()['strict-transport-security']).toContain('max-age=63072000');

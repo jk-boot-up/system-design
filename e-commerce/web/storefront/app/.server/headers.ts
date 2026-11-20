@@ -22,6 +22,9 @@ export function contentSecurityPolicy(nonce: string, opts: { dev: boolean; image
     "base-uri 'none'",
     "object-src 'none'",
   ];
-  if (!opts.dev) directives.push('upgrade-insecure-requests');
+  // Trusted Types, enforced: no string reaches a script sink (innerHTML, eval, script src or text, …) and no page may
+  // create a policy that would let one through. React escapes everything it renders and the storefront has no raw-HTML
+  // rendering (lint bans it), so nothing needs a policy; the browser journeys fail on any violation.
+  if (!opts.dev) directives.push("require-trusted-types-for 'script'", "trusted-types 'none'", 'upgrade-insecure-requests');
   return directives.join('; ');
 }

@@ -11,12 +11,30 @@ spec:
     matchExpressions:
       - key: app.kubernetes.io/name
         operator: In
-        values: [api-gateway, catalog-service, search-service, cart-service, inventory-service, order-service, payment-service, review-service]
+        values: [api-gateway, catalog-service, search-service, cart-service, inventory-service, order-service, review-service]
   podMetricsEndpoints:
     - port: http
       path: /actuator/prometheus
       interval: 15s
       relabelings: &service
+        - { sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_name], targetLabel: service }
+        - { targetLabel: job, replacement: spring }
+---
+# payment-service serves health and metrics on its own management port (9086), apart from the API order-service calls.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: payment-service
+  namespace: e-commerce-shop
+  labels: { release: kube-prometheus-stack }
+spec:
+  selector:
+    matchLabels: { app.kubernetes.io/name: payment-service }
+  podMetricsEndpoints:
+    - port: management
+      path: /actuator/prometheus
+      interval: 15s
+      relabelings:
         - { sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_name], targetLabel: service }
         - { targetLabel: job, replacement: spring }
 ---
@@ -53,3 +71,21 @@ spec:
       interval: 30s
       relabelings:
         - { targetLabel: job, replacement: kafka }
+---
+# CloudNativePG instances: replication, WAL archiving and (Barman Cloud plugin) backup times, for the backup alerts.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgres
+  namespace: e-commerce-platform
+  labels: { release: kube-prometheus-stack }
+spec:
+  selector:
+    matchLabels: { cnpg.io/podRole: instance }
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      relabelings:
+        - { sourceLabels: [__meta_kubernetes_pod_label_cnpg_io_cluster], targetLabel: cluster }
+        - { targetLabel: job, replacement: postgres }
+

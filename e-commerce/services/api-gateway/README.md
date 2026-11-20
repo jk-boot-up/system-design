@@ -29,6 +29,7 @@ api-gateway/
 │  └─ config/                   rate policies, JWT decoder (issuer + audience), access rules
 ├─ src/main/resources/application.yaml   routes, circuit breakers, time limits, rate limits
 ├─ edge/                        nginx.conf, server template, security headers, dev certificate, Dockerfile, k8s/
+│  └─ waf/                      the shop's own firewall rules and exclusions (OWASP Core Rule Set plugin)
 ├─ src/test/java/…              buckets, Redis-down fallback, ArchUnit, gateway + Redis + stub services, NGINX image
 ├─ Dockerfile, k8s/, build files
 ```
@@ -50,6 +51,8 @@ docker build -t e-commerce/edge edge && docker run --rm -p 8443:8443 -e GATEWAY_
 | `CATALOG_URL` … `RECOMMENDATION_URL` | `http://localhost:8081` … `8089` | Where each route goes |
 | `PORT` | `8080` | HTTP port |
 | `GATEWAY_UPSTREAM` (edge) | `api-gateway:8080` | Where NGINX forwards |
+| `MODSEC_RULE_ENGINE` (edge) | `On` | Firewall mode: `On` refuses, `DetectionOnly` only logs (for a new rule set version) |
+| `BLOCKING_PARANOIA`, `DETECTION_PARANOIA`, `ANOMALY_INBOUND` (edge) | `1`, `2`, `5` | Core Rule Set strictness: level 1 blocks, level 2 is logged only so it can be tuned; refuse at an anomaly score of 5 |
 
 ## Routes
 

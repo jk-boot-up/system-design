@@ -38,6 +38,12 @@
     - select: { kind: ConfigMap, name: review-service }
       fieldPaths: [ data.JWT_ISSUER ]
       options: { delimiter: /, index: 2 }
+    - select: { kind: ConfigMap, name: inventory-service }
+      fieldPaths: [ data.JWT_ISSUER ]
+      options: { delimiter: /, index: 2 }
+    - select: { kind: ConfigMap, name: payment-service }
+      fieldPaths: [ data.JWT_ISSUER ]
+      options: { delimiter: /, index: 2 }
     - select: { kind: ConfigMap, name: storefront }
       fieldPaths: [ data.OIDC_ISSUER ]
       options: { delimiter: /, index: 2 }

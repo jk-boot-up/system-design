@@ -105,7 +105,7 @@ export KAFKA_BOOTSTRAP=localhost:9092
 <p>Each replayed record is printed as one JSON line on stdout; a summary (<code>parked</code>, <code>matching</code>, <code>replayed</code>, <code>deleted</code> up to
 which offset per partition) goes to stderr.</p>
 <p>In Kubernetes, build and push the image, then run it as a Job in the shop namespace (its network policy allows only Kafka):</p>
-<pre class="highlight"><code class="language-bash">docker build -t registry.shop.example/e-commerce/dlq-replay:latest . &amp;&amp; docker push registry.shop.example/e-commerce/dlq-replay:latest
+<pre class="highlight"><code class="language-bash"># CI builds, signs and publishes the image on main (.github/workflows/e-commerce-image.yml); set its tag in job.yaml
 kubectl -n e-commerce-shop apply -f networkpolicy.yaml
 kubectl -n e-commerce-shop create -f job.yaml          # edit args first: it starts as a dry run
 kubectl -n e-commerce-shop logs -f job/dlq-replay</code></pre>

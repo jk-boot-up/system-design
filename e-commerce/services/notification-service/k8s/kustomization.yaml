@@ -14,4 +14,5 @@ configMapGenerator:
       - SMTP_ADDR=mailpit:1025
       - MAIL_FROM=Shop <orders@shop.example>
       - RETRY_DELAYS=30s,2m,10m
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://alloy.monitoring:4318/v1/traces
 # RABBITMQ_URL (with credentials) comes from the notification-service secret (see deploy/k8s overlays).

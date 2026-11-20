@@ -129,10 +129,43 @@ from orders where status in ('PENDING', 'CANCELLING') group by 1, 2;</code></pre
     Usually nothing else is needed.</li>
 <li>Sagas interrupted by the failover are finished by recovery (15.3); outbox rows are published once writes succeed
     again (15.1).</li>
-<li>If the cluster cannot elect a primary (two of three instances lost), restore from backup. Backups are not yet
-    configured (<a href="12-security-design.html#128-gaps-designed-not-yet-built">12 §12.8</a>); until they are, this is data loss.</li>
+<li>If the cluster cannot elect a primary (two of three instances lost), or data was destroyed (a bad migration, a
+    deleted table), restore from backup, below.</li>
 <li><strong>Over when:</strong> the cluster reports healthy with three instances and the service's error rate is normal.</li>
 </ul>
+<p><strong>Restoring from backup.</strong> Every cluster archives its write-ahead log continuously and takes a base backup nightly
+(<code>base/platform/backups.yaml</code>, kept 30 days), so it can be restored to any moment in that window, to within the last
+archived WAL file (seconds).</p>
+<ol>
+<li>Check that backups are current: <code>kubectl -n e-commerce-platform get backups</code> (the latest <code>&lt;name&gt;-nightly</code> is
+   <code>completed</code>) and <code>kubectl cnpg status &lt;name&gt;-db</code> (WAL archiving <code>OK</code>, last archived WAL recent).</li>
+<li>Choose the target: the latest state after a lost cluster, or a moment just before the damage (from the audit log or
+   the failing deploy's time), in UTC.</li>
+<li>Scale the owning service to zero (<code>kubectl -n e-commerce-shop scale deploy/&lt;service&gt; --replicas=0</code>) so nothing writes
+   to a half-restored database. Its outbox keeps the events it had not yet published; consumers are idempotent.</li>
+<li>Create a new cluster from the backup, alongside the old one:
+   <pre class="highlight"><code class="language-yaml">apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata: { name: orders-db-restore, namespace: e-commerce-platform }
+spec:
+  instances: 3                                   # and the same storage, resources and affinity as orders-db
+  bootstrap:
+    recovery:
+      source: orders-db
+      recoveryTarget: { targetTime: "2026-11-20 09:41:00+00" }   # omit for the latest state
+  externalClusters:
+    - name: orders-db
+      plugin: { name: barman-cloud.cloudnative-pg.io, parameters: { barmanObjectName: orders-db-backup, serverName: orders-db } }
+  plugins:                                       # its own archive, so the old cluster's backups stay intact
+    - { name: barman-cloud.cloudnative-pg.io, isWALArchiver: true, parameters: { barmanObjectName: orders-db-restore-backup } }</code></pre>
+   (<code>orders-db-restore-backup</code> is an <code>ObjectStore</code> like <code>orders-db-backup</code> with the prefix <code>orders-db-restore</code>.)</li>
+<li>Check the data (row counts, the latest orders), then point the pooler at it: set <code>spec.cluster.name</code> of
+   <code>pgbouncer-orders</code> to <code>orders-db-restore</code>. Scale the service back up.</li>
+<li>Orders created after the target time are gone from the database but still in <code>order.events</code>; reconcile them from
+   the topic (and payments from the provider) before telling customers anything. Saga recovery (15.3) finishes the
+   in-flight ones.</li>
+<li>Keep the old cluster until the restored one is confirmed, then delete it and rename in Git on the next release.</li>
+</ol>
 <h2 id="156-kafka-broker-loss">15.6 Kafka broker loss<a class="headerlink" href="#156-kafka-broker-loss" title="Permanent link">#</a></h2>
 <ul>
 <li><strong>Signals:</strong> <code>OutboxBacklogStale</code> on several services at once; consumer lag rising everywhere; under-replicated
@@ -162,6 +195,22 @@ from orders where status in ('PENDING', 'CANCELLING') group by 1, 2;</code></pre
 <li><strong>Already in place:</strong> jittered expiry and per-pod single-flight (<code>RedisProductCache</code>, <code>SingleFlight</code> in catalog-service);
   a read that overlaps a committed edit does not write the old version back into the cache.</li>
 <li><strong>Over when:</strong> the hit rate is back above 90 % and database CPU is normal.</li>
+</ul>
+<h2 id="158-identity-provider-keycloak-unavailable">15.8 Identity provider (Keycloak) unavailable<a class="headerlink" href="#158-identity-provider-keycloak-unavailable" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Signals:</strong> sign-in fails on the storefront; checkout or add-to-cart start failing a few minutes later with
+  <code>503</code>/<code>PRICING_PENDING</code>; logs of order-service and cart-service show <code>Service token renewal failed</code>.</li>
+<li><strong>Confirm:</strong> <code>kubectl -n e-commerce-platform get pods -l app=keycloak</code>; the token endpoint
+  (<code>/realms/shop/protocol/openid-connect/token</code>) answers 5xx or times out.</li>
+<li><strong>What keeps working, and for how long:</strong> customers already signed in keep browsing and buying until their access
+  token expires (5 minutes; the storefront cannot refresh it). Service calls keep working on the cached service tokens
+  for about 5 minutes: each is renewed after 10 of its 15 minutes, and a failed renewal is retried every 5 seconds while
+  the current token stays valid (<a href="adr/0014-service-identity-with-client-credentials-tokens.html">ADR 0014</a>). After that,
+  checkout answers <code>503</code> and carts show prices as pending; nothing is lost or charged twice.</li>
+<li><strong>Act now:</strong> restart the failing Keycloak pods; check <code>keycloak-db</code> (a failover there stops Keycloak too, see 15.5).
+  If a client secret was rotated in the vault, make sure both the realm import and the service picked up the same value
+  (both read one key); a mismatch shows as <code>invalid_client</code> in the service's log.</li>
+<li><strong>Over when:</strong> the token endpoint answers, the renewal warnings stop and the checkout SLO stops burning.</li>
 </ul>
 </main>
 <script>

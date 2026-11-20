@@ -97,3 +97,33 @@ tests:
               summary: "search-latency is burning its error budget fast"
               description: "search-latency: more than 1% of requests slower than 300 ms (objective 99.00% over 30 days). Check the SLO dashboard, then the service's RED dashboard and the traces of failing requests."
               runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#error-budget-burn
+
+  # orders-db's nightly backup stopped two days ago; inventory-db's is fresh. Then orders-db's WAL archiving stalls.
+  - interval: 5m
+    input_series:
+      - series: 'barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{cluster="orders-db", pod="orders-db-1"}'
+        values: '-172800x12'
+      - series: 'barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{cluster="inventory-db", pod="inventory-db-1"}'
+        values: '-3600x12'
+      - series: 'cnpg_pg_stat_archiver_seconds_since_last_archival{cluster="orders-db", pod="orders-db-1"}'
+        values: '60 360 660 960 1260 1560 1860'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: PostgresBackupTooOld
+        exp_alerts:
+          - exp_labels: { severity: ticket, cluster: orders-db }
+            exp_annotations:
+              summary: "orders-db: the last base backup is 2d 0h 20m 0s old"
+              description: "The nightly backup did not complete. Restores still work from the older backup plus the WAL archive, but take longer and depend on more files."
+              runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#postgresql-backups
+      - eval_time: 10m
+        alertname: PostgresWalArchivingStalled
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: PostgresWalArchivingStalled
+        exp_alerts:
+          - exp_labels: { severity: page, cluster: orders-db }
+            exp_annotations:
+              summary: "orders-db: no WAL file archived for 26m 0s"
+              description: "Point-in-time recovery stops at the last archived file, and unarchived WAL accumulates on the database's disk until it fills."
+              runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#postgresql-backups

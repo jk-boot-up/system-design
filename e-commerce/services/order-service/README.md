@@ -59,6 +59,8 @@ cd ../../deploy/compose && docker compose up -d postgres kafka keycloak    # inf
 | `KAFKA_BOOTSTRAP` | `localhost:9092` | Kafka |
 | `JWT_ISSUER` | `http://localhost:8180/realms/shop` | Keycloak realm that signs customer tokens |
 | `CART_URL`, `INVENTORY_URL`, `PAYMENT_URL` | `http://localhost:8083`, `:8084`, `:8086` | Downstream services |
+| `SERVICE_AUTH_CLIENT_SECRET` | — | Secret of the realm client `order-service`; its client-credentials token goes on every call to cart, inventory and payment ([ADR 0014](../../design/adr/0014-service-identity-with-client-credentials-tokens.md)) |
+| `SERVICE_AUTH_TOKEN_URI` | `$JWT_ISSUER/protocol/openid-connect/token` | Token endpoint (inside the network in compose and Kubernetes) |
 | `PORT` | `8085` | HTTP port |
 
 Timeouts: connect 200 ms, read 800 ms (payment 2 s). Circuit breakers open at 50% failures over 20 calls for 10 s.

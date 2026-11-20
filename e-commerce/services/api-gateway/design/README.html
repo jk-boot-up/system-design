@@ -60,6 +60,10 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <td>Hold any business data</td>
 </tr>
 <tr>
+<td>Refuse attack-shaped requests with the OWASP Core Rule Set on ModSecurity (edge)</td>
+<td>Replace the services' own validation</td>
+</tr>
+<tr>
 <td>Micro-cache anonymous product, category and search reads for 5 s (edge)</td>
 <td>Cache anything for signed-in customers</td>
 </tr>
@@ -158,14 +162,25 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 </tbody>
 </table>
-<h2 id="7-scaling-and-performance">7. Scaling and performance<a class="headerlink" href="#7-scaling-and-performance" title="Permanent link">#</a></h2>
+<h2 id="7-web-application-firewall-edge">7. Web application firewall (edge)<a class="headerlink" href="#7-web-application-firewall-edge" title="Permanent link">#</a></h2>
+<p>The edge image is built on the OWASP Core Rule Set image: NGINX with ModSecurity, which scores every request against the
+rule set (SQL injection, script injection, path traversal, protocol abuse, known scanners). A request whose anomaly score
+reaches 5 is refused with <code>403</code> before it reaches the storefront or the gateway, and logged as a JSON audit record with
+the matching rule ids (the edge's stdout, so it lands in Loki). Paranoia level 1 blocks; level 2 runs in detection only,
+so its findings can be reviewed before it is raised. Response bodies are not inspected, so streamed pages are not held
+back.</p>
+<p>The services do not rely on it: they validate input and use parameterised queries themselves. The firewall removes the
+noise of automated attacks early and gives one place to block a new attack pattern quickly. The shop's own rules and
+any exclusions for false positives are in <a href="../edge/waf/before-crs.conf"><code>edge/waf/</code></a>; each names the path and argument
+it applies to.</p>
+<h2 id="8-scaling-and-performance">8. Scaling and performance<a class="headerlink" href="#8-scaling-and-performance" title="Permanent link">#</a></h2>
 <ul>
 <li><strong>Pods:</strong> stateless, 3–20 replicas on CPU. Non-blocking (Netty), so a slow service ties up no threads.</li>
 <li><strong>Per request:</strong> one Redis round trip per limit that applies (one, or two on cart item and checkout routes); a cached JWKS check.</li>
 <li><strong>Redis:</strong> a dedicated instance (<code>redis-ratelimit</code>) so a cache flood cannot slow admission; about 100 bytes per active key.</li>
 <li><strong>Edge:</strong> NGINX absorbs read spikes with the micro-cache; at 5 s per URL, 10 000 identical requests per second become 0.2.</li>
 </ul>
-<h2 id="8-failure-handling">8. Failure handling<a class="headerlink" href="#8-failure-handling" title="Permanent link">#</a></h2>
+<h2 id="9-failure-handling">9. Failure handling<a class="headerlink" href="#9-failure-handling" title="Permanent link">#</a></h2>
 <table>
 <thead>
 <tr>
@@ -200,7 +215,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </tr>
 </tbody>
 </table>
-<h2 id="9-tests">9. Tests<a class="headerlink" href="#9-tests" title="Permanent link">#</a></h2>
+<h2 id="10-tests">10. Tests<a class="headerlink" href="#10-tests" title="Permanent link">#</a></h2>
 <table>
 <thead>
 <tr>
@@ -233,7 +248,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <tr>
 <td><code>EdgeContainersIT</code></td>
 <td>NGINX image + stub gateway</td>
-<td>HTTP/2 over TLS; MISS then HIT with one upstream call; signed-in requests bypass the cache; HSTS; request id generated or kept and forwarded with the client address; <code>/internal</code> 404 without reaching upstream; HTTP redirects to HTTPS</td>
+<td>HTTP/2 over TLS; MISS then HIT with one upstream call; signed-in requests bypass the cache; HSTS; request id generated or kept and forwarded with the client address; <code>/internal</code> 404 without reaching upstream; HTTP redirects to HTTPS; the firewall refuses SQL injection, XSS, path traversal and a scanner without reaching upstream, and lets a quoted search and a form post with a token through</td>
 </tr>
 </tbody>
 </table>

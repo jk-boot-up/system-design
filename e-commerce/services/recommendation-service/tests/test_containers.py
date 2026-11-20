@@ -34,7 +34,7 @@ async def eventually(check, seconds=30):
     raise AssertionError("timed out")
 
 
-async def test_kafka_to_redis_counts_each_order_once_and_dead_letters_garbage(containers):
+async def test_kafka_to_redis_counts_each_order_once_and_dead_letters_garbage(containers, spans):
     redis_url, bootstrap = containers
     redis = Redis.from_url(redis_url)
     store = RedisCoPurchaseStore(redis)
@@ -47,7 +47,9 @@ async def test_kafka_to_redis_counts_each_order_once_and_dead_letters_garbage(co
     await producer.start()
     for _ in range(3):  # the same order delivered three times
         await producer.send_and_wait(TOPIC, confirmed("e1", "TENT", "STOVE", "MUG"), key=b"o-e1")
-    await producer.send_and_wait(TOPIC, confirmed("e2", "TENT", "STOVE"), key=b"o-e2")
+    # e2 carries the trace of the checkout that wrote it (order-service's outbox sets traceparent).
+    await producer.send_and_wait(TOPIC, confirmed("e2", "TENT", "STOVE"), key=b"o-e2",
+                                 headers=[("traceparent", b"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")])
     await producer.send_and_wait(TOPIC, confirmed("e3", "TENT"), key=b"o-e3")
     await producer.send_and_wait(TOPIC, b"not json", key=b"x")
     await producer.stop()
@@ -60,6 +62,11 @@ async def test_kafka_to_redis_counts_each_order_once_and_dead_letters_garbage(co
         await eventually(lambda: _async(len(results) == 6))
         assert sorted(r.value for r in results) == ["counted", "counted", "dead_letter", "duplicate", "duplicate", "ignored"]
         assert [(r.sku, r.score) for r in await store.top("MUG", 10)] == [("TENT", 1), ("STOVE", 1)]  # ties: member descending
+        consumed = [s for s in spans.get_finished_spans() if s.name == TOPIC + " process"]
+        assert len(consumed) == 6
+        e2 = [s for s in consumed if format(s.context.trace_id, "032x") == "4bf92f3577b34da6a3ce929d0e0e4736"]
+        assert len(e2) == 1 and e2[0].attributes["recommendation.learned"] == "counted"
+        assert e2[0].parent is not None and format(e2[0].parent.span_id, "016x") == "00f067aa0ba902b7"
     finally:
         stop.set()
         await task

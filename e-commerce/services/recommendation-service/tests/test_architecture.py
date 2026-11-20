@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 SRC = Path(__file__).parent.parent / "src" / "recommendation"
-FORBIDDEN = ("redis", "aiokafka", "fastapi", "uvicorn", "prometheus_client", "pydantic")
+FORBIDDEN = ("redis", "aiokafka", "fastapi", "uvicorn", "prometheus_client", "pydantic", "opentelemetry")
 
 
 def imports(path: Path) -> set[str]:

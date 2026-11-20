@@ -48,7 +48,7 @@ docker build -t e-commerce/inventory-service .
 
 ```bash
 # infrastructure only (from e-commerce/deploy/compose)
-docker compose up -d postgres kafka
+docker compose up -d postgres kafka keycloak
 # the service
 ./gradlew bootRun
 ```
@@ -61,16 +61,22 @@ Configuration (environment variables):
 | `DB_USER` / `DB_PASSWORD` | `inventory` / `inventory` | Database credentials (from a secret in Kubernetes) |
 | `DB_POOL_SIZE` | `20` | HikariCP pool size per pod |
 | `KAFKA_BOOTSTRAP` | `localhost:9092` | Kafka bootstrap servers |
+| `JWT_ISSUER` | `http://localhost:8180/realms/shop` | Keycloak realm. Reservations need order-service's service token (audience `inventory-service`); stock needs a staff token ([ADR 0014](../../design/adr/0014-service-identity-with-client-credentials-tokens.md)) |
 | `PORT` | `8084` | HTTP port |
 
 ## Try it
 
 ```bash
-curl -X PUT localhost:8084/internal/stock/SKU-1001 -H 'content-type: application/json' -d '{"available": 3}'
-curl -X POST localhost:8084/internal/reservations -H 'content-type: application/json' \
+# a service token as order-service gets one (client credentials; realm client "order-service")
+SVC=$(curl -s -u order-service:dev-order-service-secret-change-me-0123456789 -d grant_type=client_credentials \
+  localhost:8180/realms/shop/protocol/openid-connect/token | jq -r .access_token)
+STAFF=…   # a staff access token (realm shop, role staff)
+curl -X PUT localhost:8084/internal/stock/SKU-1001 -H "authorization: Bearer $STAFF" -H 'content-type: application/json' -d '{"available": 3}'
+curl -X POST localhost:8084/internal/reservations -H "authorization: Bearer $SVC" -H 'content-type: application/json' \
      -d '{"orderId":"0193a1b0-0000-7000-8000-000000000001","lines":[{"sku":"SKU-1001","quantity":2}]}'
-curl localhost:8084/internal/stock/SKU-1001        # {"available":1,"reserved":2,...}
-curl -X POST localhost:8084/internal/reservations/0193a1b0-0000-7000-8000-000000000001/commit
+curl localhost:8084/internal/stock/SKU-1001 -H "authorization: Bearer $STAFF"     # {"available":1,"reserved":2,...}
+curl -X POST localhost:8084/internal/reservations/0193a1b0-0000-7000-8000-000000000001/commit -H "authorization: Bearer $SVC"
+curl -i -X POST localhost:8084/internal/reservations/0193a1b0-0000-7000-8000-000000000001/commit   # 401 without a token
 ```
 
 ## Operations

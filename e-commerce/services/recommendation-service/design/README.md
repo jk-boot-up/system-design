@@ -87,4 +87,5 @@ Ties are returned in Redis order: equal scores by SKU, descending.
 | `test_app.py` | use cases with fakes | Same event twice counts once; ranking by count; bad events dead-lettered; store errors propagate (so the offset is not committed); limit bounded |
 | `test_http.py` | API | Shape and cache header; empty list for unknown products; 400 for bad SKU and limit; 503 problem with `Retry-After` when Redis is down |
 | `test_architecture.py` | import boundaries | Domain and use cases import no framework or adapter; adapters independent |
-| `test_containers.py` | Redis + Kafka | Three copies of one order count once; ranking; single-product order ignored; garbage on the DLQ with its reason; API reads the same sets; 20 concurrent duplicate scripts count once; seen key expires; lists trimmed |
+| `test_telemetry.py` | tracing | Kafka headers give the producer's trace; an API request continues the gateway's trace and probes are not traced; log lines carry the trace id |
+| `test_containers.py` | Redis + Kafka | Three copies of one order count once; one consumer span per record, the traced event's continuing its checkout's trace; ranking; single-product order ignored; garbage on the DLQ with its reason; API reads the same sets; 20 concurrent duplicate scripts count once; seen key expires; lists trimmed |

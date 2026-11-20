@@ -645,3 +645,20 @@ spec:
             summary: "The gateway is rate limiting per instance: Redis is unreachable"
             description: "Limits still hold, but per gateway instance rather than globally, so the effective limit is multiplied by the replica count."
             runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#rate-limiter-degraded
+        # PostgreSQL backups (Kubernetes: CloudNativePG with the Barman Cloud plugin, deploy/k8s/base/platform/backups.yaml).
+        - alert: PostgresBackupTooOld
+          expr: time() - max by (cluster) (barman_cloud_cloudnative_pg_io_last_available_backup_timestamp) > 26 * 3600
+          for: 15m
+          labels: { severity: ticket }
+          annotations:
+            summary: "{{ $labels.cluster }}: the last base backup is {{ $value | humanizeDuration }} old"
+            description: "The nightly backup did not complete. Restores still work from the older backup plus the WAL archive, but take longer and depend on more files."
+            runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#postgresql-backups
+        - alert: PostgresWalArchivingStalled
+          expr: max by (cluster) (cnpg_pg_stat_archiver_seconds_since_last_archival) > 900
+          for: 5m
+          labels: { severity: page }
+          annotations:
+            summary: "{{ $labels.cluster }}: no WAL file archived for {{ $value | humanizeDuration }}"
+            description: "Point-in-time recovery stops at the last archived file, and unarchived WAL accumulates on the database's disk until it fills."
+            runbook_url: https://github.com/jk-boot-up/system-design/blob/main/e-commerce/deploy/observability/RUNBOOK.md#postgresql-backups

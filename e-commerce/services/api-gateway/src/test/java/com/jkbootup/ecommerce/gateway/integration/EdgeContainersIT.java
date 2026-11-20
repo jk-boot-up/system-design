@@ -33,6 +33,7 @@ class EdgeContainersIT {
     static HttpServer upstream;
     static final AtomicInteger HITS = new AtomicInteger();
     static final AtomicReference<String> LAST = new AtomicReference<>();
+    static final AtomicReference<String> TRACEPARENT = new AtomicReference<>();
     static GenericContainer<?> edge;
     static HttpClient https;
 
@@ -41,6 +42,7 @@ class EdgeContainersIT {
         upstream = HttpServer.create(new InetSocketAddress("0.0.0.0", 0), 0);
         upstream.createContext("/", ex -> {
             HITS.incrementAndGet();
+            TRACEPARENT.set(ex.getRequestHeaders().getFirst("traceparent"));
             LAST.set(ex.getRequestURI() + " id=" + ex.getRequestHeaders().getFirst("X-Request-Id")
                     + " ip=" + ex.getRequestHeaders().getFirst("X-Real-IP"));
             byte[] body = "{\"ok\":true}".getBytes(StandardCharsets.UTF_8);
@@ -146,5 +148,40 @@ class EdgeContainersIT {
         assertThat(page.statusCode()).isEqualTo(200);
         assertThat(page.headers().allValues("Strict-Transport-Security")).hasSize(1);
         assertThat(LAST.get()).startsWith("/cart").contains("ip=");
+    }
+
+    @Test
+    void theFirewallRefusesAttacksBeforeTheyReachTheShopAndLetsOrdinaryRequestsThrough() throws Exception {
+        int before = HITS.get();
+        assertThat(get("/api/v1/search?q=1%27%20OR%20%271%27%3D%271").statusCode()).isEqualTo(403);              // SQL injection
+        assertThat(get("/p/1?ref=%3Cscript%3Ealert(1)%3C%2Fscript%3E").statusCode()).isEqualTo(403);             // XSS
+        assertThat(get("/api/v1/products?file=..%2F..%2F..%2Fetc%2Fpasswd").statusCode()).isEqualTo(403);         // path traversal
+        assertThat(get("/", "User-Agent", "sqlmap/1.8").statusCode()).isEqualTo(403);                              // known scanner
+        assertThat(HITS.get()).isEqualTo(before);
+
+        assertThat(get("/api/v1/search?q=o%27reilly%20t-shirt%20%26%20socks").statusCode()).isEqualTo(200);
+        // The sign-in callback carries Keycloak's issuer URL (RFC 9207); elsewhere the same URL in a parameter is refused.
+        String issuer = "iss=http%3A%2F%2Flocalhost%3A8180%2Frealms%2Fshop";
+        assertThat(get("/auth/callback?state=abc&code=x.y.z&" + issuer).statusCode()).isEqualTo(200);
+        assertThat(get("/p/1?" + issuer).statusCode()).isEqualTo(403);
+        // A brand that happens to be a sample database's name is ordinary text on the staff product form.
+        assertThat(get("/staff/products/new?brand=Northwind").statusCode()).isEqualTo(200);
+        assertThat(get("/api/v1/admin/products/42?brand=Northwind").statusCode()).isEqualTo(200);
+        assertThat(get("/p/1?brand=Northwind").statusCode()).isEqualTo(403);
+        HttpResponse<String> post = https.send(HttpRequest.newBuilder(URI.create("https://localhost:" + edge.getMappedPort(8443) + "/cart"))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString("intent=add&sku=SKU-1&quantity=2&_csrf=k3J9_x-QzR8vT2mWbYp4LsN7eHc"))
+                .build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(post.statusCode()).isEqualTo(200);
+        assertThat(HITS.get() - before).isEqualTo(5);
+    }
+
+    @Test
+    void theEdgeStartsATraceOrContinuesTheCallersAndPassesItUpstream() throws Exception {
+        get("/api/v1/orders");
+        assertThat(TRACEPARENT.get()).matches("00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]");
+        String incoming = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+        get("/api/v1/orders", "traceparent", incoming);
+        assertThat(TRACEPARENT.get()).startsWith("00-4bf92f3577b34da6a3ce929d0e0e4736-").doesNotContain("00f067aa0ba902b7");
     }
 }

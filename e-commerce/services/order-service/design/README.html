@@ -325,9 +325,14 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <td>Layering and adapter independence</td>
 </tr>
 <tr>
+<td><code>ServiceTokensTest</code></td>
+<td>adapter, real HTTP token endpoint</td>
+<td>Client-credentials request with basic auth; token reused until two thirds of its life; one request for 32 concurrent callers; a failed renewal keeps the current token and retries at most every 5 s; no token → the call is not sent (<code>ResourceAccessException</code>)</td>
+</tr>
+<tr>
 <td><code>OrderContainersIT</code></td>
 <td>PostgreSQL + Kafka + real HTTP</td>
-<td>End-to-end checkout, monthly partition used, replay, 402 and 409 mappings, events on Kafka, private paginated history, cancellation, validation</td>
+<td>Every downstream call carries order-service's own token (one token for all five); end-to-end checkout, monthly partition used, replay, 402 and 409 mappings, events on Kafka, private paginated history, cancellation, validation</td>
 </tr>
 </tbody>
 </table>

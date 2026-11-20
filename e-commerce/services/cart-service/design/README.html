@@ -202,9 +202,14 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <td>Layering</td>
 </tr>
 <tr>
+<td><code>ServiceTokensTest</code></td>
+<td>adapter, real HTTP token endpoint</td>
+<td>Client-credentials request with basic auth; token reused until two thirds of its life; one request for 32 concurrent callers; a failed renewal keeps the current token and retries at most every 5 s; no token → the call is not sent (<code>ResourceAccessException</code>)</td>
+</tr>
+<tr>
 <td><code>CartContainersIT</code></td>
 <td>Redis + Kafka + fake catalog over HTTP</td>
-<td>Guest cart priced and stored with expiry, merge on sign-in, snapshot; catalogue outage → PENDING and 503 snapshot; <code>OrderConfirmed</code> empties the cart; validation and auth</td>
+<td>Guest cart priced and stored with expiry, merge on sign-in, snapshot; catalogue outage → PENDING and 503 snapshot; <code>OrderConfirmed</code> empties the cart; validation and auth; price lookups carry cart-service's token; only order-service's token reads a snapshot (none → 401, a customer's, another service's, or one for another audience → 403)</td>
 </tr>
 </tbody>
 </table>

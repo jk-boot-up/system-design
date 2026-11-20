@@ -113,7 +113,7 @@ customers check out the same item at the same moment.</p>
 docker build -t e-commerce/inventory-service .</code></pre>
 <h2 id="run-locally">Run locally<a class="headerlink" href="#run-locally" title="Permanent link">#</a></h2>
 <pre class="highlight"><code class="language-bash"># infrastructure only (from e-commerce/deploy/compose)
-docker compose up -d postgres kafka
+docker compose up -d postgres kafka keycloak
 # the service
 ./gradlew bootRun</code></pre>
 <p>Configuration (environment variables):</p>
@@ -147,6 +147,11 @@ docker compose up -d postgres kafka
 <td>Kafka bootstrap servers</td>
 </tr>
 <tr>
+<td><code>JWT_ISSUER</code></td>
+<td><code>http://localhost:8180/realms/shop</code></td>
+<td>Keycloak realm. Reservations need order-service's service token (audience <code>inventory-service</code>); stock needs a staff token (<a href="../../design/adr/0014-service-identity-with-client-credentials-tokens.html">ADR 0014</a>)</td>
+</tr>
+<tr>
 <td><code>PORT</code></td>
 <td><code>8084</code></td>
 <td>HTTP port</td>
@@ -154,11 +159,16 @@ docker compose up -d postgres kafka
 </tbody>
 </table>
 <h2 id="try-it">Try it<a class="headerlink" href="#try-it" title="Permanent link">#</a></h2>
-<pre class="highlight"><code class="language-bash">curl -X PUT localhost:8084/internal/stock/SKU-1001 -H 'content-type: application/json' -d '{"available": 3}'
-curl -X POST localhost:8084/internal/reservations -H 'content-type: application/json' \
+<pre class="highlight"><code class="language-bash"># a service token as order-service gets one (client credentials; realm client "order-service")
+SVC=$(curl -s -u order-service:dev-order-service-secret-change-me-0123456789 -d grant_type=client_credentials \
+  localhost:8180/realms/shop/protocol/openid-connect/token | jq -r .access_token)
+STAFF=…   # a staff access token (realm shop, role staff)
+curl -X PUT localhost:8084/internal/stock/SKU-1001 -H "authorization: Bearer $STAFF" -H 'content-type: application/json' -d '{"available": 3}'
+curl -X POST localhost:8084/internal/reservations -H "authorization: Bearer $SVC" -H 'content-type: application/json' \
      -d '{"orderId":"0193a1b0-0000-7000-8000-000000000001","lines":[{"sku":"SKU-1001","quantity":2}]}'
-curl localhost:8084/internal/stock/SKU-1001        # {"available":1,"reserved":2,...}
-curl -X POST localhost:8084/internal/reservations/0193a1b0-0000-7000-8000-000000000001/commit</code></pre>
+curl localhost:8084/internal/stock/SKU-1001 -H "authorization: Bearer $STAFF"     # {"available":1,"reserved":2,...}
+curl -X POST localhost:8084/internal/reservations/0193a1b0-0000-7000-8000-000000000001/commit -H "authorization: Bearer $SVC"
+curl -i -X POST localhost:8084/internal/reservations/0193a1b0-0000-7000-8000-000000000001/commit   # 401 without a token</code></pre>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">#</a></h2>
 <table>
 <thead>
