@@ -4,6 +4,7 @@ package kafka
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -32,9 +33,24 @@ func New(brokers []string) (*Consumer, error) {
 
 func (c *Consumer) Close() { c.client.Close() }
 
-// DeadEvent implements app.DeadEvents: the record goes to order.events.dlq with the reason as a header.
+// sourceKey carries the record being routed, so DeadEvent can keep its key and headers.
+type sourceKey struct{}
+
+// DeadEvent implements app.DeadEvents: the record goes to order.events.dlq with its original key and headers (so a
+// replay lands on the same partition and keeps its traceparent), plus the reason and where it came from.
 func (c *Consumer) DeadEvent(ctx context.Context, value []byte, reason string) error {
-	r := &kgo.Record{Topic: Topic + ".dlq", Value: value, Headers: []kgo.RecordHeader{{Key: "x-reason", Value: []byte(reason)}}}
+	r := &kgo.Record{Topic: Topic + ".dlq", Value: value}
+	if src, ok := ctx.Value(sourceKey{}).(*kgo.Record); ok {
+		r.Key = src.Key
+		r.Headers = append(r.Headers, src.Headers...)
+		r.Headers = append(r.Headers,
+			kgo.RecordHeader{Key: "x-original-topic", Value: []byte(src.Topic)},
+			kgo.RecordHeader{Key: "x-original-partition", Value: []byte(strconv.Itoa(int(src.Partition)))},
+			kgo.RecordHeader{Key: "x-original-offset", Value: []byte(strconv.FormatInt(src.Offset, 10))})
+	}
+	r.Headers = append(r.Headers,
+		kgo.RecordHeader{Key: "x-original-group", Value: []byte(Group)},
+		kgo.RecordHeader{Key: "x-reason", Value: []byte(reason)})
 	return c.client.ProduceSync(ctx, r).FirstErr()
 }
 
@@ -53,7 +69,7 @@ func (c *Consumer) Run(ctx context.Context, router app.Router, observe func(app.
 		fetches.EachRecord(func(r *kgo.Record) {
 			backoff := 200 * time.Millisecond
 			for ctx.Err() == nil {
-				res, err := router.Route(ctx, r.Value)
+				res, err := router.Route(context.WithValue(ctx, sourceKey{}, r), r.Value)
 				if err == nil {
 					observe(res)
 					done = append(done, r)

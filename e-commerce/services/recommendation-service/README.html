@@ -70,7 +70,7 @@ both marks the order as seen and counts its pairs, so each order counts exactly 
 </tr>
 <tr>
 <td>Dead letters</td>
-<td>Unreadable events → <code>order.events.dlq</code></td>
+<td>Unreadable events → <code>order.events.dlq</code> with their key and headers, plus <code>x-reason</code> and <code>x-original-*</code> (replay with <a href="../../deploy/tools/dlq-replay/README.html">dlq-replay</a>)</td>
 </tr>
 <tr>
 <td>Called by</td>

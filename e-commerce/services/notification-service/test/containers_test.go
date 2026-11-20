@@ -228,7 +228,15 @@ func TestEventsBecomeEmailsOnceWithRetriesAndDeadLetters(t *testing.T) {
 	if len(recs) != 1 || string(recs[0].Value) != "this is not json" {
 		t.Fatalf("dlq records %d", len(recs))
 	}
-	if !strings.Contains(string(recs[0].Headers[0].Value), "bad event") {
-		t.Fatalf("reason header %q", recs[0].Headers[0].Value)
+	headers := map[string]string{}
+	for _, h := range recs[0].Headers {
+		headers[h.Key] = string(h.Value)
+	}
+	if !strings.Contains(headers["x-reason"], "bad event") {
+		t.Fatalf("reason header %q", headers["x-reason"])
+	}
+	// The key and the origin are kept, so the replay tool can put it back on the same partition.
+	if string(recs[0].Key) != "o-6" || headers["x-original-group"] != kafka.Group || headers["x-original-topic"] != kafka.Topic {
+		t.Fatalf("dlq key %q headers %v", recs[0].Key, headers)
 	}
 }

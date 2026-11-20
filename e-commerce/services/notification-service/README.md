@@ -11,7 +11,7 @@ publisher confirms, before the Kafka offset is committed). A **worker** sends ea
 | Queues | RabbitMQ quorum queues: `email.send`, `email.retry.<delay>`, `email.dead` |
 | Store | Redis: `notif:sent:<eventId>` (7 days), `notif:claim:<eventId>` (2-minute lease) |
 | Sends | SMTP: Mailpit locally, the email provider's relay in production |
-| Dead letters | Unreadable events → `order.events.dlq`; unsendable jobs → `email.dead` |
+| Dead letters | Unreadable events → `order.events.dlq` (key and headers kept, plus `x-reason` and `x-original-*`); unsendable jobs → `email.dead` |
 | Port | 8088 (`/healthz`, `/readyz`, `/metrics`) |
 | Design | [design/README.md](design/README.md) · [walkthrough](design/walkthrough/index.html) |
 | Prerequisites | [PREREQUISITES.md](PREREQUISITES.md) |
@@ -60,4 +60,4 @@ open http://localhost:8025                               # Mailpit: the emails i
 | Events by outcome | `notification_events_total{result="queued|ignored|dead_letter"}` |
 | Backlog | RabbitMQ `email.send` depth (KEDA scales workers on it); Kafka lag of group `notification-service` |
 | Poison jobs | `email.dead` depth > 0 alerts; each message carries `x-reason` and `x-attempt` headers. Move back with a shovel once fixed |
-| Unreadable events | `order.events.dlq` |
+| Unreadable events | `order.events.dlq`; list and replay with [dlq-replay](../../deploy/tools/dlq-replay/README.md) |

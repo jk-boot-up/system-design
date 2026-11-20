@@ -168,7 +168,7 @@ acceptable, and a sharded design would count per-product with idempotent increme
 </tr>
 <tr>
 <td>Unreadable event</td>
-<td><code>order.events.dlq</code> with an <code>x-reason</code> header</td>
+<td><code>order.events.dlq</code> with its key and headers, plus <code>x-reason</code>, <code>x-original-group</code>, <code>-topic</code>, <code>-partition</code>, <code>-offset</code></td>
 </tr>
 </tbody>
 </table>

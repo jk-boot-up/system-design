@@ -1,0 +1,32 @@
+# Runs the replay tool once in the shop namespace. Not part of any overlay: an operator applies it during an incident
+# (see README.md), after editing the arguments.
+#   kubectl -n e-commerce-shop apply -f networkpolicy.yaml
+#   kubectl -n e-commerce-shop create -f job.yaml && kubectl -n e-commerce-shop logs -f job/dlq-replay
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dlq-replay
+  labels: { app.kubernetes.io/name: dlq-replay, app.kubernetes.io/part-of: e-commerce }
+spec:
+  backoffLimit: 0                # a failed replay is looked at, not retried blindly
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: dlq-replay }
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: dlq-replay
+          image: registry.shop.example/e-commerce/dlq-replay:latest
+          args: [replay, --dlq, order.events.dlq, --dry-run]   # start with a dry run; remove --dry-run to replay
+          env:
+            - { name: KAFKA_BOOTSTRAP, value: kafka-bootstrap:9092 }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }

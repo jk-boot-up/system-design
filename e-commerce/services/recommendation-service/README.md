@@ -9,7 +9,7 @@ both marks the order as seen and counts its pairs, so each order counts exactly 
 | Language / framework | Python 3.14, FastAPI, aiokafka, redis-py (asyncio), Prometheus client |
 | Consumes | `order.OrderConfirmed` on `order.events` (group `recommendation-service`); other types ignored |
 | Store | Redis: `reco:also:<sku>` sorted set `otherSku → times bought together` (top 200 kept), `reco:seen:<eventId>` (14 days) |
-| Dead letters | Unreadable events → `order.events.dlq` |
+| Dead letters | Unreadable events → `order.events.dlq` with their key and headers, plus `x-reason` and `x-original-*` (replay with [dlq-replay](../../deploy/tools/dlq-replay/README.md)) |
 | Called by | api-gateway: `GET /api/v1/products/{sku}/recommendations?limit=10` |
 | Port | 8089 (`/healthz`, `/readyz`, `/metrics`) |
 | Design | [design/README.md](design/README.md) · [walkthrough](design/walkthrough/index.html) |

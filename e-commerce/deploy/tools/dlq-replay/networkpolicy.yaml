@@ -1,0 +1,12 @@
+# The replay Job talks only to Kafka in the platform namespace (and DNS); nothing connects to it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dlq-replay
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: dlq-replay } }
+  policyTypes: [Ingress, Egress]
+  egress:
+    - to: [ { namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: e-commerce-platform } } } ]
+      ports: [ { port: 9092 } ]
+    - ports: [ { port: 53, protocol: UDP }, { port: 53, protocol: TCP } ]

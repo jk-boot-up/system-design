@@ -1,0 +1,25 @@
+name: e-commerce / dlq-replay
+
+on:
+  push:
+    paths: ['e-commerce/deploy/tools/dlq-replay/**', '.github/workflows/e-commerce-dlq-replay.yml']
+  pull_request:
+    paths: ['e-commerce/deploy/tools/dlq-replay/**', '.github/workflows/e-commerce-dlq-replay.yml']
+
+defaults:
+  run:
+    working-directory: e-commerce/deploy/tools/dlq-replay
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.14', cache: pip, cache-dependency-path: e-commerce/deploy/tools/dlq-replay/tests/requirements.txt }
+      - run: pip install -r tests/requirements.txt
+      - name: Tests against Kafka in a container
+        run: pytest
+      - name: Container image
+        run: docker build -t e-commerce/dlq-replay:${{ github.sha }} .

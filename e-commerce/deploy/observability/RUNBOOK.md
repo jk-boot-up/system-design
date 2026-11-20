@@ -43,9 +43,11 @@ publishes.
 `DeadLetterQueueNotEmpty` (ticket), label `topic`: events failed five times and were parked in `<topic>.dlq`.
 
 * **Impact:** the effect of those events is missing (a cart not cleared, a review not allowed, an email not sent).
-* **Confirm:** read the parked events (`kafka-console-consumer --topic <topic>.dlq --from-beginning
-  --property print.headers=true`); the `traceparent` header leads to the trace, the consumer's log has the exception.
-* **Act:** fix the cause, then replay the events onto the main topic; consumers are idempotent, so replaying is safe.
+* **Confirm:** `dlq_replay.py list --dlq <topic>.dlq` ([dlq-replay](../tools/dlq-replay/README.md)) shows each event's
+  key, the group that parked it and the reason; the `traceparent` header leads to the trace, the consumer's log has the
+  exception.
+* **Act:** fix the cause, then `dlq_replay.py replay --dlq <topic>.dlq` (try `--dry-run` first). Replayed events are
+  deleted from the DLQ, so the alert resolves; consumers are idempotent, so replaying is safe.
 
 ## Consumer lag
 

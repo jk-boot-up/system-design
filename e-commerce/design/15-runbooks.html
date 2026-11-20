@@ -76,19 +76,18 @@ alerts, including the ones that need several steps or a decision.</p>
 <ul>
 <li><strong>Signals:</strong> <code>DeadLetterQueueNotEmpty</code> (ticket); a consumer's effect is missing (a cart not cleared, a review not
   allowed, an email not sent).</li>
-<li><strong>Confirm:</strong> read the parked events with their headers:
-  <pre class="highlight"><code class="language-bash">kubectl -n e-commerce-platform exec -it kafka-combined-0 -- bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 \
-  --topic order.events.dlq --from-beginning --property print.headers=true --property print.key=true</code></pre>
+<li><strong>Confirm:</strong> list the parked events with the group that parked them and the reason
+  (<a href="../deploy/tools/dlq-replay/README.html">dlq-replay</a>):
+  <pre class="highlight"><code class="language-bash">dlq_replay.py list --dlq order.events.dlq</code></pre>
   The <code>traceparent</code> header leads to the failed attempt's trace; the consumer's log has the exception.</li>
 <li><strong>Act:</strong>
   1. Fix the cause (a bug, a missing schema version, a dependency that was down).
   2. Deploy the fix.
-  3. Replay: copy the parked events back onto the main topic with the same key, then empty the DLQ by moving the
-     consumer's offset. Consumers are idempotent (processed-events ledger), so replaying an event that did get through is
-     harmless.</li>
+  3. Replay: <code>dlq_replay.py replay --dlq order.events.dlq --dry-run</code>, check the list, then run it without <code>--dry-run</code>
+     (narrow it with <code>--group</code> or <code>--reason</code> if only some events are fixed). It copies each event back onto the main
+     topic with its key and headers, then deletes the replayed events from the DLQ, so the alert resolves. Consumers are
+     idempotent (processed-events ledger), so replaying an event that did get through is harmless.</li>
 <li><strong>Over when:</strong> the DLQ depth is zero and the missing effects are visible.</li>
-<li><strong>Note:</strong> there is no replay tool yet; a small one (read DLQ, write main topic, same key and headers) belongs in
-  <code>deploy/tools</code>.</li>
 </ul>
 <h2 id="153-stuck-checkout-sagas">15.3 Stuck checkout sagas<a class="headerlink" href="#153-stuck-checkout-sagas" title="Permanent link">#</a></h2>
 <ul>

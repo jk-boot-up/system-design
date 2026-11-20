@@ -70,7 +70,11 @@ async def test_kafka_to_redis_counts_each_order_once_and_dead_letters_garbage(co
         batch = await dlq.getmany(timeout_ms=10_000)
         records = [r for rs in batch.values() for r in rs]
         assert [r.value for r in records] == [b"not json"]
-        assert dict(records[0].headers)["x-reason"].startswith(b"not JSON")
+        headers = dict(records[0].headers)
+        assert headers["x-reason"].startswith(b"not JSON")
+        # Kept for the replay tool: the key (same partition on replay) and where the event came from.
+        assert records[0].key is not None
+        assert headers["x-original-group"] == b"recommendation-service" and headers["x-original-topic"] == TOPIC.encode()
     finally:
         await dlq.stop()
 

@@ -46,7 +46,9 @@ e-commerce/
 │  └─ storefront/                the web shop: React Router server rendering + backend-for-frontend (design/16)
 ├─ deploy/                       RUNNING THE WHOLE SYSTEM
 │  ├─ compose/                   local stack (project name "e-commerce"): data stores, brokers, Keycloak, observability, services
-│  └─ k8s/overlays/              dev / staging / prod overlays composing every service's k8s base
+│  ├─ k8s/overlays/              dev / staging / prod overlays composing every service's k8s base
+│  ├─ observability/             traces, logs, SLOs, alerts, dashboards (ADR 0013)
+│  └─ tools/dlq-replay/          list and replay events parked on a dead-letter topic (runbook 15.2)
 ├─ tests/                        WHOLE-SYSTEM TESTS
 │  ├─ e2e/                       end-to-end journeys against the running stack
 │  └─ performance/               Gatling simulations held to the p99 budgets, with a regression check

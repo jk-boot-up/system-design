@@ -78,7 +78,7 @@ publisher confirms, before the Kafka offset is committed). A <strong>worker</str
 </tr>
 <tr>
 <td>Dead letters</td>
-<td>Unreadable events → <code>order.events.dlq</code>; unsendable jobs → <code>email.dead</code></td>
+<td>Unreadable events → <code>order.events.dlq</code> (key and headers kept, plus <code>x-reason</code> and <code>x-original-*</code>); unsendable jobs → <code>email.dead</code></td>
 </tr>
 <tr>
 <td>Port</td>
@@ -185,7 +185,7 @@ open http://localhost:8025                               # Mailpit: the emails i
 </tr>
 <tr>
 <td>Unreadable events</td>
-<td><code>order.events.dlq</code></td>
+<td><code>order.events.dlq</code>; list and replay with <a href="../../deploy/tools/dlq-replay/README.html">dlq-replay</a></td>
 </tr>
 </tbody>
 </table>

@@ -32,21 +32,20 @@ Common first steps for every incident:
 
 * **Signals:** `DeadLetterQueueNotEmpty` (ticket); a consumer's effect is missing (a cart not cleared, a review not
   allowed, an email not sent).
-* **Confirm:** read the parked events with their headers:
+* **Confirm:** list the parked events with the group that parked them and the reason
+  ([dlq-replay](../deploy/tools/dlq-replay/README.md)):
   ```bash
-  kubectl -n e-commerce-platform exec -it kafka-combined-0 -- bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 \
-    --topic order.events.dlq --from-beginning --property print.headers=true --property print.key=true
+  dlq_replay.py list --dlq order.events.dlq
   ```
   The `traceparent` header leads to the failed attempt's trace; the consumer's log has the exception.
 * **Act:**
   1. Fix the cause (a bug, a missing schema version, a dependency that was down).
   2. Deploy the fix.
-  3. Replay: copy the parked events back onto the main topic with the same key, then empty the DLQ by moving the
-     consumer's offset. Consumers are idempotent (processed-events ledger), so replaying an event that did get through is
-     harmless.
+  3. Replay: `dlq_replay.py replay --dlq order.events.dlq --dry-run`, check the list, then run it without `--dry-run`
+     (narrow it with `--group` or `--reason` if only some events are fixed). It copies each event back onto the main
+     topic with its key and headers, then deletes the replayed events from the DLQ, so the alert resolves. Consumers are
+     idempotent (processed-events ledger), so replaying an event that did get through is harmless.
 * **Over when:** the DLQ depth is zero and the missing effects are visible.
-* **Note:** there is no replay tool yet; a small one (read DLQ, write main topic, same key and headers) belongs in
-  `deploy/tools`.
 
 ## 15.3 Stuck checkout sagas
 

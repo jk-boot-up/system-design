@@ -16,11 +16,22 @@ log = logging.getLogger(__name__)
 
 
 class KafkaDeadEvents:
-    def __init__(self, producer: AIOKafkaProducer):
+    """Parks one record on order.events.dlq with its key and headers (so a replay lands on the same partition and keeps
+    its traceparent), plus the reason and where it came from."""
+
+    def __init__(self, producer: AIOKafkaProducer, source=None):
         self._producer = producer
+        self._source = source
 
     async def dead(self, value: bytes, reason: str) -> None:
-        await self._producer.send_and_wait(TOPIC + ".dlq", value, headers=[("x-reason", reason.encode())])
+        src = self._source
+        headers = list(src.headers) if src is not None else []
+        if src is not None:
+            headers += [("x-original-topic", src.topic.encode()), ("x-original-partition", str(src.partition).encode()),
+                        ("x-original-offset", str(src.offset).encode())]
+        headers += [("x-original-group", GROUP.encode()), ("x-reason", reason.encode())]
+        await self._producer.send_and_wait(TOPIC + ".dlq", value, key=src.key if src is not None else None,
+                                           headers=headers)
 
 
 async def consume(bootstrap: str, store: CoPurchaseStore, observe: Callable[[Learned], None], stop: asyncio.Event) -> None:
@@ -29,13 +40,12 @@ async def consume(bootstrap: str, store: CoPurchaseStore, observe: Callable[[Lea
     producer = AIOKafkaProducer(bootstrap_servers=bootstrap, acks="all", client_id="recommendation-service")
     await consumer.start()
     await producer.start()
-    dead = KafkaDeadEvents(producer)
     try:
         while not stop.is_set():
             batches = await consumer.getmany(timeout_ms=500, max_records=200)
             for tp, records in batches.items():
                 for record in records:
-                    await _learn_until_done(record.value, store, dead, observe, stop)
+                    await _learn_until_done(record.value, store, KafkaDeadEvents(producer, record), observe, stop)
                     if stop.is_set():
                         return
                     await consumer.commit({TopicPartition(tp.topic, tp.partition): record.offset + 1})

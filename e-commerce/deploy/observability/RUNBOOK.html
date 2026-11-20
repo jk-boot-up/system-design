@@ -83,9 +83,11 @@ publishes.</p>
 <p><code>DeadLetterQueueNotEmpty</code> (ticket), label <code>topic</code>: events failed five times and were parked in <code>&lt;topic&gt;.dlq</code>.</p>
 <ul>
 <li><strong>Impact:</strong> the effect of those events is missing (a cart not cleared, a review not allowed, an email not sent).</li>
-<li><strong>Confirm:</strong> read the parked events (<code>kafka-console-consumer --topic &lt;topic&gt;.dlq --from-beginning
-  --property print.headers=true</code>); the <code>traceparent</code> header leads to the trace, the consumer's log has the exception.</li>
-<li><strong>Act:</strong> fix the cause, then replay the events onto the main topic; consumers are idempotent, so replaying is safe.</li>
+<li><strong>Confirm:</strong> <code>dlq_replay.py list --dlq &lt;topic&gt;.dlq</code> (<a href="../tools/dlq-replay/README.html">dlq-replay</a>) shows each event's
+  key, the group that parked it and the reason; the <code>traceparent</code> header leads to the trace, the consumer's log has the
+  exception.</li>
+<li><strong>Act:</strong> fix the cause, then <code>dlq_replay.py replay --dlq &lt;topic&gt;.dlq</code> (try <code>--dry-run</code> first). Replayed events are
+  deleted from the DLQ, so the alert resolves; consumers are idempotent, so replaying is safe.</li>
 </ul>
 <h2 id="consumer-lag">Consumer lag<a class="headerlink" href="#consumer-lag" title="Permanent link">#</a></h2>
 <p><code>ConsumerLagGrowing</code> (ticket), labels <code>consumergroup</code>, <code>topic</code>.</p>

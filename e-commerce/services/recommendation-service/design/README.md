@@ -77,7 +77,7 @@ Ties are returned in Redis order: equal scores by SKU, descending.
 | Redis down | Reads: 503 at once. Learning: the event is retried with back-off up to 30 s; the offset waits |
 | Kafka down | Reads unaffected; learning resumes from the committed offset |
 | Crash mid-script | Impossible to observe half: Redis applies the whole script or none of it |
-| Unreadable event | `order.events.dlq` with an `x-reason` header |
+| Unreadable event | `order.events.dlq` with its key and headers, plus `x-reason`, `x-original-group`, `-topic`, `-partition`, `-offset` |
 
 ## 9. Tests
 
