@@ -2,9 +2,9 @@ name: e-commerce / api-gateway
 
 on:
   push:
-    paths: ['e-commerce/services/api-gateway/**', '.github/workflows/e-commerce-api-gateway.yml']
+    paths: ['e-commerce/services/api-gateway/**', '.github/workflows/e-commerce-api-gateway.yml', '.github/workflows/e-commerce-image.yml']
   pull_request:
-    paths: ['e-commerce/services/api-gateway/**', '.github/workflows/e-commerce-api-gateway.yml']
+    paths: ['e-commerce/services/api-gateway/**', '.github/workflows/e-commerce-api-gateway.yml', '.github/workflows/e-commerce-image.yml']
 
 defaults:
   run:
@@ -30,3 +30,15 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with: { name: api-gateway-test-reports, path: e-commerce/services/api-gateway/build/reports }
+
+  image-api-gateway:
+    needs: build
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/e-commerce-image.yml
+    with: { name: api-gateway, context: e-commerce/services/api-gateway }
+
+  image-edge:
+    needs: build
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/e-commerce-image.yml
+    with: { name: edge, context: e-commerce/services/api-gateway/edge }

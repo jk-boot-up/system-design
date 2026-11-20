@@ -2,9 +2,9 @@ name: e-commerce / order-service
 
 on:
   push:
-    paths: ['e-commerce/services/order-service/**', '.github/workflows/e-commerce-order-service.yml']
+    paths: ['e-commerce/services/order-service/**', '.github/workflows/e-commerce-order-service.yml', '.github/workflows/e-commerce-image.yml']
   pull_request:
-    paths: ['e-commerce/services/order-service/**', '.github/workflows/e-commerce-order-service.yml']
+    paths: ['e-commerce/services/order-service/**', '.github/workflows/e-commerce-order-service.yml', '.github/workflows/e-commerce-image.yml']
 
 defaults:
   run:
@@ -21,8 +21,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit, architecture and container tests
         run: ./gradlew build -PwithContainers
-      - name: Container image
-        run: docker build -t e-commerce/order-service:${{ github.sha }} .
       - uses: actions/upload-artifact@v4
         if: failure()
         with: { name: order-service-test-reports, path: e-commerce/services/order-service/build/reports }
+
+  image:
+    needs: build
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/e-commerce-image.yml
+    with: { name: order-service, context: e-commerce/services/order-service }

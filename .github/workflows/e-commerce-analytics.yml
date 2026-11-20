@@ -2,9 +2,9 @@ name: e-commerce / analytics
 
 on:
   push:
-    paths: ['e-commerce/services/analytics/**', '.github/workflows/e-commerce-analytics.yml']
+    paths: ['e-commerce/services/analytics/**', '.github/workflows/e-commerce-analytics.yml', '.github/workflows/e-commerce-image.yml']
   pull_request:
-    paths: ['e-commerce/services/analytics/**', '.github/workflows/e-commerce-analytics.yml']
+    paths: ['e-commerce/services/analytics/**', '.github/workflows/e-commerce-analytics.yml', '.github/workflows/e-commerce-image.yml']
 
 defaults:
   run:
@@ -23,3 +23,9 @@ jobs:
         run: python -m json.tool grafana/dashboards/orders.json > /dev/null
       - name: ClickHouse image + Kafka containers (schema, dedupe, rollups, dashboard queries)
         run: pytest
+
+  image:
+    needs: build
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/e-commerce-image.yml
+    with: { name: analytics, context: e-commerce/services/analytics }

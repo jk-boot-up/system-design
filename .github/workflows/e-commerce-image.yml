@@ -1,0 +1,76 @@
+name: e-commerce / container image
+
+# Called by every service's workflow after its tests pass. Builds the image and writes a CycloneDX SBOM of it on every
+# run. On main it also pushes the image, signs it with Sigstore (keyless: the certificate names this workflow and the
+# commit) and attaches the SBOM and SLSA build provenance as signed attestations. Kubernetes admits only images signed
+# this way (deploy/k8s/components/signed-images).
+on:
+  workflow_call:
+    inputs:
+      name:    { description: image name, e.g. order-service, required: true, type: string }
+      context: { description: build context relative to the repository root, required: true, type: string }
+
+permissions: {}
+
+env:
+  # Set the repository variable E_COMMERCE_REGISTRY to publish elsewhere (it must match the overlays' image names).
+  REGISTRY: ${{ vars.E_COMMERCE_REGISTRY || format('ghcr.io/{0}/e-commerce', github.repository_owner) }}
+  PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write          # push to GHCR
+      id-token: write          # Sigstore keyless signing and attestations
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v4
+      - if: env.PUBLISH == 'true'
+        uses: docker/login-action@v4
+        with: { registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}' }
+      - name: Build${{ env.PUBLISH == 'true' && ' and push' || '' }}
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ inputs.context }}
+          push: ${{ env.PUBLISH == 'true' }}
+          load: ${{ env.PUBLISH != 'true' }}
+          tags: ${{ env.REGISTRY }}/${{ inputs.name }}:${{ github.sha }}
+          provenance: false     # attested below with GitHub's signed provenance instead
+          cache-from: type=gha,scope=${{ inputs.name }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.name }}
+      - name: SBOM (CycloneDX, from the image)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ inputs.name }}:${{ github.sha }}
+          format: cyclonedx-json
+          output-file: ${{ inputs.name }}.cdx.json
+          artifact-name: ${{ inputs.name }}-sbom.cdx.json
+      - name: Vulnerabilities (fail on fixable critical)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: sbom
+          scan-ref: ${{ inputs.name }}.cdx.json
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - if: env.PUBLISH == 'true'
+        uses: sigstore/cosign-installer@v4
+      - name: Sign the image and attest its SBOM
+        if: env.PUBLISH == 'true'
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ inputs.name }}@${{ steps.build.outputs.digest }}
+        run: |
+          cosign sign --yes "$IMAGE"
+          cosign attest --yes --type cyclonedx --predicate "${{ inputs.name }}.cdx.json" "$IMAGE"
+      - name: Build provenance (SLSA)
+        if: env.PUBLISH == 'true'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ inputs.name }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

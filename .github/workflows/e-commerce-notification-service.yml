@@ -2,9 +2,9 @@ name: e-commerce / notification-service
 
 on:
   push:
-    paths: ['e-commerce/services/notification-service/**', '.github/workflows/e-commerce-notification-service.yml']
+    paths: ['e-commerce/services/notification-service/**', '.github/workflows/e-commerce-notification-service.yml', '.github/workflows/e-commerce-image.yml']
   pull_request:
-    paths: ['e-commerce/services/notification-service/**', '.github/workflows/e-commerce-notification-service.yml']
+    paths: ['e-commerce/services/notification-service/**', '.github/workflows/e-commerce-notification-service.yml', '.github/workflows/e-commerce-image.yml']
 
 defaults:
   run:
@@ -24,5 +24,9 @@ jobs:
         run: go test -race ./internal/...
       - name: Container tests (Kafka, RabbitMQ, Redis, Mailpit)
         run: go test -tags containers -timeout 6m ./test/
-      - name: Container image
-        run: docker build -t e-commerce/notification-service:${{ github.sha }} .
+
+  image:
+    needs: build
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/e-commerce-image.yml
+    with: { name: notification-service, context: e-commerce/services/notification-service }

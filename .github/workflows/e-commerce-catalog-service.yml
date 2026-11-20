@@ -2,9 +2,9 @@ name: e-commerce / catalog-service
 
 on:
   push:
-    paths: ['e-commerce/services/catalog-service/**', '.github/workflows/e-commerce-catalog-service.yml']
+    paths: ['e-commerce/services/catalog-service/**', '.github/workflows/e-commerce-catalog-service.yml', '.github/workflows/e-commerce-image.yml']
   pull_request:
-    paths: ['e-commerce/services/catalog-service/**', '.github/workflows/e-commerce-catalog-service.yml']
+    paths: ['e-commerce/services/catalog-service/**', '.github/workflows/e-commerce-catalog-service.yml', '.github/workflows/e-commerce-image.yml']
 
 defaults:
   run:
@@ -21,8 +21,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit, architecture and container tests (PostgreSQL, Redis, Kafka, MinIO)
         run: ./gradlew build -PwithContainers
-      - name: Container image
-        run: docker build -t e-commerce/catalog-service:${{ github.sha }} .
       - uses: actions/upload-artifact@v4
         if: failure()
         with: { name: catalog-service-test-reports, path: e-commerce/services/catalog-service/build/reports }
+
+  image:
+    needs: build
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/e-commerce-image.yml
+    with: { name: catalog-service, context: e-commerce/services/catalog-service }

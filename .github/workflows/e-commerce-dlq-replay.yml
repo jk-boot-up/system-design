@@ -2,9 +2,9 @@ name: e-commerce / dlq-replay
 
 on:
   push:
-    paths: ['e-commerce/deploy/tools/dlq-replay/**', '.github/workflows/e-commerce-dlq-replay.yml']
+    paths: ['e-commerce/deploy/tools/dlq-replay/**', '.github/workflows/e-commerce-dlq-replay.yml', '.github/workflows/e-commerce-image.yml']
   pull_request:
-    paths: ['e-commerce/deploy/tools/dlq-replay/**', '.github/workflows/e-commerce-dlq-replay.yml']
+    paths: ['e-commerce/deploy/tools/dlq-replay/**', '.github/workflows/e-commerce-dlq-replay.yml', '.github/workflows/e-commerce-image.yml']
 
 defaults:
   run:
@@ -21,5 +21,9 @@ jobs:
       - run: pip install -r tests/requirements.txt
       - name: Tests against Kafka in a container
         run: pytest
-      - name: Container image
-        run: docker build -t e-commerce/dlq-replay:${{ github.sha }} .
+
+  image:
+    needs: build
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/e-commerce-image.yml
+    with: { name: dlq-replay, context: e-commerce/deploy/tools/dlq-replay }

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Dependency updates for every project in this repository (Gradle, npm, Go, Python, Dockerfiles, compose, Kubernetes manifests, GitHub Actions). One pull request per project and kind of update, so each service's own CI checks it. Nothing merges by itself.",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommitsDisabled",
+    "helpers:pinGitHubActionDigestsToSemver"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 4,
+  "minimumReleaseAge": "14 days",
+  "internalChecksFilter": "strict",
+  "rangeStrategy": "pin",
+  "vulnerabilityAlerts": { "enabled": true, "minimumReleaseAge": null, "schedule": ["at any time"], "labels": ["security"] },
+  "osvVulnerabilityAlerts": true,
+  "kubernetes": { "managerFilePatterns": ["/^e-commerce/(deploy/k8s|deploy/observability/k8s|services/[^/]+/k8s|web/storefront/k8s|deploy/tools/[^/]+)/.+\\.ya?ml$/"] },
+  "packageRules": [
+    {
+      "description": "One branch per project: services, the storefront, tools, deployment",
+      "matchFileNames": ["e-commerce/services/*/**", "e-commerce/web/*/**", "e-commerce/deploy/tools/*/**", "e-commerce/tests/*/**"],
+      "additionalBranchPrefix": "{{packageFileDir}}-",
+      "commitMessageSuffix": "in {{packageFileDir}}"
+    },
+    {
+      "description": "Patch and minor updates of a project's libraries travel together; majors stay separate",
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "{{packageFileDir}} minor and patch",
+      "matchFileNames": ["e-commerce/services/*/**", "e-commerce/web/*/**", "e-commerce/deploy/tools/*/**", "e-commerce/tests/*/**"]
+    },
+    {
+      "description": "Operator CRDs and the versions verify.sh checks against are updated together, by hand, with the operators",
+      "matchFileNames": ["e-commerce/deploy/k8s/**"],
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/cloudnative-pg/**", "keycloak/keycloak", "quay.io/strimzi/**"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Database engine majors need a migration plan (design/15-runbooks.md)",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["postgres", "ghcr.io/cloudnative-pg/postgresql", "cassandra", "clickhouse/clickhouse-server", "opensearchproject/opensearch"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "GitHub Actions: one weekly group",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    }
+  ]
+}

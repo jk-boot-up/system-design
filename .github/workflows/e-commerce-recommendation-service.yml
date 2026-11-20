@@ -2,9 +2,9 @@ name: e-commerce / recommendation-service
 
 on:
   push:
-    paths: ['e-commerce/services/recommendation-service/**', '.github/workflows/e-commerce-recommendation-service.yml']
+    paths: ['e-commerce/services/recommendation-service/**', '.github/workflows/e-commerce-recommendation-service.yml', '.github/workflows/e-commerce-image.yml']
   pull_request:
-    paths: ['e-commerce/services/recommendation-service/**', '.github/workflows/e-commerce-recommendation-service.yml']
+    paths: ['e-commerce/services/recommendation-service/**', '.github/workflows/e-commerce-recommendation-service.yml', '.github/workflows/e-commerce-image.yml']
 
 defaults:
   run:
@@ -25,5 +25,9 @@ jobs:
         run: pytest
       - name: Container tests (Redis, Kafka)
         run: pytest -m containers
-      - name: Container image
-        run: docker build -t e-commerce/recommendation-service:${{ github.sha }} .
+
+  image:
+    needs: build
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/e-commerce-image.yml
+    with: { name: recommendation-service, context: e-commerce/services/recommendation-service }
