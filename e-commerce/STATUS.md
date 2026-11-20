@@ -170,6 +170,31 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 * Video pipeline: narrated walkthrough videos and upload sheets (prepared only, never uploaded).
 
+## Resuming on another machine
+
+State on 2026-11-20: every gap that can be closed in code is closed and committed on `system-design-e-commerce-draft-1`
+(not yet merged to `main`). Work resumes on a machine with 16 GB of memory, in this order:
+
+1. **Checks that needed more Docker memory than 4 GB** (give Docker 8 GB or more):
+   * the search Gatling simulation and its first baseline: `tests/performance`, `run-compose.sh` with the search profile;
+   * the reviews end-to-end journey: `tests/e2e/run-compose.sh reviews`;
+   * every profile once more: `tests/e2e/run-compose.sh` (core search reviews async analytics);
+   * a log line's `trace_id` in Loki opens its trace in Tempo, and a storefront page through the edge shows one trace
+     from the edge (NGINX) through the storefront, the gateway and the services (`observability` profile).
+   Fix what they find, update this file and the design documents, rebuild the docs (`tools/docs.sh`,
+   `tools/check_links.py`), commit.
+2. **Then the video pipeline:** narrated 4K videos with subtitles and thumbnails of the walkthroughs, and an upload sheet
+   per project (`docs/youtube.md`), made like the security repository's (videokit, Piper voice `en_US-amy-medium`,
+   speed 0.8). Prepare the files and sheets only: nothing is uploaded, scheduled or published.
+
+Still open by design (design/12 §12.8): encryption between pods (a mesh or WireGuard) and bot management at a CDN; the
+`review.events` consumer is marked future in the event catalogue.
+
+Setup notes for the new machine: tool versions are in [PREREQUISITES.md](PREREQUISITES.md); build compose images one
+at a time (`COMPOSE_PARALLEL_LIMIT=1`, set by the e2e script); Python container tests on Docker Desktop need
+`TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`; if Docker builds cannot download the Gradle distribution,
+see the note below.
+
 ## Risks and notes
 
 | Item | Note |
