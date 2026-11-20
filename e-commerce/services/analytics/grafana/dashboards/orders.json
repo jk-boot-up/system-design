@@ -153,7 +153,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT count() AS errors FROM analytics.order_event_errors WHERE received_at >= now() - INTERVAL 1 DAY"
+          "rawSql": "SELECT (SELECT count() FROM analytics.order_event_errors WHERE received_at >= now() - INTERVAL 1 DAY) + (SELECT count() FROM analytics.payment_event_errors WHERE received_at >= now() - INTERVAL 1 DAY) AS errors"
         }
       ]
     },
@@ -185,6 +185,78 @@
           "unit": "s"
         }
       }
+    },
+    {
+      "id": 8,
+      "title": "Payment declines, last hour (%)",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT round(countIf(event_type = 'payment.PaymentFailed') / greatest(countIf(event_type IN ('payment.PaymentCaptured', 'payment.PaymentFailed')), 1) * 100, 1) AS decline_pct FROM analytics.payment_facts FINAL WHERE occurred_at >= now() - INTERVAL 1 HOUR"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Payment failures by reason, last day",
+      "type": "piechart",
+      "gridPos": {
+        "x": 18,
+        "y": 16,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT if(reason = '', 'UNKNOWN', reason) AS reason, count() AS payments FROM analytics.payment_facts FINAL WHERE event_type = 'payment.PaymentFailed' AND occurred_at >= now() - INTERVAL 1 DAY GROUP BY reason ORDER BY payments DESC"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Daily payments: captured, failed, refunded",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT day, currency, captured, failed, round(failed / greatest(captured + failed, 1) * 100, 1) AS decline_pct, refunded, captured_sum, refunded_sum, captured_sum - refunded_sum AS net FROM analytics.payments_per_day WHERE $__timeFilter(day) ORDER BY day DESC, currency"
+        }
+      ]
     }
   ]
 }

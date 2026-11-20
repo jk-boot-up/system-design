@@ -11,5 +11,14 @@
             <kafka_num_consumers>1</kafka_num_consumers>
             <kafka_flush_interval_ms>1000</kafka_flush_interval_ms>
         </order_events>
+        <payment_events>
+            <kafka_broker_list from_env="KAFKA_BROKERS"/>
+            <kafka_topic_list>payment.events</kafka_topic_list>
+            <kafka_group_name>analytics-payments</kafka_group_name>
+            <kafka_format>JSONAsString</kafka_format>
+            <kafka_handle_error_mode>stream</kafka_handle_error_mode>
+            <kafka_num_consumers>1</kafka_num_consumers>
+            <kafka_flush_interval_ms>1000</kafka_flush_interval_ms>
+        </payment_events>
     </named_collections>
 </clickhouse>

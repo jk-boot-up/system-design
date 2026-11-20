@@ -114,7 +114,7 @@ add its revenue twice; the duplicate fact disappears only later, at merge time, 
 <h3 id="a-duplicate-delivery">A duplicate delivery<a class="headerlink" href="#a-duplicate-delivery" title="Permanent link">#</a></h3>
 <p><figure class="diagram"><img alt="A duplicate delivery diagram" src="diagrams/analytics--a-duplicate-delivery.light.svg" data-light="diagrams/analytics--a-duplicate-delivery.light.svg" data-dark="diagrams/analytics--a-duplicate-delivery.dark.svg" loading="lazy"></figure></p>
 <h2 id="6-data-model">6. Data model<a class="headerlink" href="#6-data-model" title="Permanent link">#</a></h2>
-<p>Schema: <a href="../sql/001_order_events.sql">001_order_events.sql</a>, <a href="../sql/002_rollups.sql">002_rollups.sql</a>.</p>
+<p>Schema: <a href="../sql/001_order_events.sql">001_order_events.sql</a>, <a href="../sql/002_rollups.sql">002_rollups.sql</a>, <a href="../sql/003_payment_events.sql">003_payment_events.sql</a>.</p>
 <table>
 <thead>
 <tr>
@@ -148,6 +148,24 @@ add its revenue twice; the duplicate fact disappears only later, at merge time, 
 <td>MergeTree, replaced every hour</td>
 <td><code>(day, currency)</code></td>
 <td>Placed, confirmed, cancelled, revenue, average order, customers</td>
+</tr>
+<tr>
+<td><code>payment_facts</code></td>
+<td>ReplacingMergeTree</td>
+<td><code>(event_type, occurred_at, event_id)</code>, monthly partitions</td>
+<td>25-month TTL; from <code>payment.events</code> (group <code>analytics-payments</code>); links to orders by <code>order_id</code></td>
+</tr>
+<tr>
+<td><code>payment_event_errors</code></td>
+<td>MergeTree</td>
+<td><code>received_at</code></td>
+<td>30-day TTL</td>
+</tr>
+<tr>
+<td><code>payments_per_day</code></td>
+<td>MergeTree, replaced every 5 minutes</td>
+<td><code>(day, currency)</code></td>
+<td>Captured, failed, refunded, captured and refunded sums; the dashboard derives the decline rate and net</td>
 </tr>
 </tbody>
 </table>

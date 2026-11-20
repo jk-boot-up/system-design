@@ -163,12 +163,12 @@ cooperate in the key flows. Names are the names in the code (<code>services/*</c
 <td>analytics</td>
 <td>—</td>
 <td>—</td>
-<td><code>order.events</code> (ClickHouse Kafka engine)</td>
+<td><code>order.events</code>, <code>payment.events</code> (ClickHouse Kafka engine)</td>
 </tr>
 </tbody>
 </table>
-<p><code>payment.events</code> and <code>review.events</code> have no consumer in the code yet. The <a href="10-event-catalogue.html">event catalogue</a> lists
-analytics and a future catalogue rating cache as their readers.</p>
+<p><code>review.events</code> has no consumer in the code yet; the <a href="10-event-catalogue.html">event catalogue</a> lists a future catalogue
+rating cache as its reader.</p>
 <p>No service calls a service that calls it back, and every synchronous chain is at most two hops deep (gateway → order →
 inventory). Everything else that one service must learn from another arrives as an event, so a slow consumer never slows
 a request.</p>

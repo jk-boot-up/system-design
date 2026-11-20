@@ -45,9 +45,9 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </header>
 <main>
 <h1 id="analytics-clickhouse">analytics (ClickHouse)<a class="headerlink" href="#analytics-clickhouse" title="Permanent link">#</a></h1>
-<p>Business numbers in near real time. ClickHouse reads <code>order.events</code> straight from Kafka with a <strong>Kafka engine table</strong>; a
-<strong>materialised view</strong> parses each message into <code>order_facts</code>; <strong>refreshable materialised views</strong> compute exact rollups
-(revenue per minute within 30 seconds, daily figures every hour); a <strong>Grafana</strong> dashboard shows them. No service code: the whole
+<p>Business numbers in near real time. ClickHouse reads <code>order.events</code> and <code>payment.events</code> straight from Kafka with a <strong>Kafka engine table</strong>; a
+<strong>materialised view</strong> parses each message into <code>order_facts</code> or <code>payment_facts</code>; <strong>refreshable materialised views</strong> compute exact rollups
+(revenue per minute within 30 seconds, daily order figures every hour, daily payment figures every 5 minutes); a <strong>Grafana</strong> dashboard shows them. No service code: the whole
 pipeline is SQL plus configuration.</p>
 <table>
 <thead>
@@ -63,11 +63,11 @@ pipeline is SQL plus configuration.</p>
 </tr>
 <tr>
 <td>Consumes</td>
-<td><code>order.events</code> (group <code>analytics-orders</code>): <code>OrderPlaced</code>, <code>OrderConfirmed</code>, <code>OrderCancelled</code></td>
+<td><code>order.events</code> (group <code>analytics-orders</code>): <code>OrderPlaced</code>, <code>OrderConfirmed</code>, <code>OrderCancelled</code>; <code>payment.events</code> (group <code>analytics-payments</code>): <code>PaymentCaptured</code>, <code>PaymentFailed</code>, <code>PaymentRefunded</code></td>
 </tr>
 <tr>
 <td>Tables</td>
-<td><code>order_facts</code> (ReplacingMergeTree, monthly partitions, 25-month TTL), <code>order_event_errors</code> (30 days), <code>revenue_per_minute</code>, <code>orders_per_day</code></td>
+<td><code>order_facts</code> (ReplacingMergeTree, monthly partitions, 25-month TTL), <code>order_event_errors</code> (30 days), <code>revenue_per_minute</code>, <code>orders_per_day</code>; <code>payment_facts</code>, <code>payment_event_errors</code>, <code>payments_per_day</code></td>
 </tr>
 <tr>
 <td>Dashboard</td>
@@ -93,9 +93,10 @@ pipeline is SQL plus configuration.</p>
 </table>
 <h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">#</a></h2>
 <pre class="highlight"><code>analytics/
-├─ README.md, PREREQUISITES.md, design/, contracts/consumed/ (order event schemas)
+├─ README.md, PREREQUISITES.md, design/, contracts/consumed/ (order and payment event schemas)
 ├─ sql/001_order_events.sql     Kafka engine table, facts, errors, parsing views
 ├─ sql/002_rollups.sql          refreshable views: revenue_per_minute (30 s), orders_per_day (1 h)
+├─ sql/003_payment_events.sql   payment events: queue, facts, errors, payments_per_day (5 min)
 ├─ config.d/                    Kafka named collection (brokers from KAFKA_BROKERS), Prometheus endpoint
 ├─ users.d/                     named-collection grant; read-only grafana user (password from the environment)
 ├─ grafana/                     datasource and dashboard provisioning, orders.json
@@ -143,7 +144,7 @@ curl -s 'localhost:8123/?query=SELECT+*+FROM+analytics.revenue_per_minute+ORDER+
 <tbody>
 <tr>
 <td>Consumer health</td>
-<td><code>SELECT * FROM system.kafka_consumers</code> (assignments, last exception); Kafka lag of group <code>analytics-orders</code></td>
+<td><code>SELECT * FROM system.kafka_consumers</code> (assignments, last exception); Kafka lag of groups <code>analytics-orders</code> and <code>analytics-payments</code></td>
 </tr>
 <tr>
 <td>Freshness</td>
@@ -151,11 +152,11 @@ curl -s 'localhost:8123/?query=SELECT+*+FROM+analytics.revenue_per_minute+ORDER+
 </tr>
 <tr>
 <td>Bad messages</td>
-<td><code>analytics.order_event_errors</code> (dashboard panel "Unreadable events")</td>
+<td><code>analytics.order_event_errors</code> and <code>analytics.payment_event_errors</code> (dashboard panel "Unreadable events")</td>
 </tr>
 <tr>
 <td>Rebuild</td>
-<td><code>TRUNCATE analytics.order_facts</code>, reset the group's offsets to the earliest, then <code>SYSTEM REFRESH VIEW</code> on both rollups</td>
+<td><code>TRUNCATE analytics.order_facts</code> (or <code>payment_facts</code>), reset that group's offsets to the earliest, then <code>SYSTEM REFRESH VIEW</code> on its rollups</td>
 </tr>
 </tbody>
 </table>

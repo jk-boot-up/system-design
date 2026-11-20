@@ -1,5 +1,7 @@
 flowchart LR
     O[order-service] -- "OrderPlaced / Confirmed / Cancelled" --> K{{Kafka order.events}}
+    PS[payment-service] -- "PaymentCaptured / Failed / Refunded" --> KP{{Kafka payment.events}}
     K -- "group analytics-orders" --> CH((ClickHouse))
+    KP -- "group analytics-payments" --> CH
     GF[Grafana] -- "read-only user, native protocol" --> CH
     P[Prometheus] -- ":9363/metrics" --> CH

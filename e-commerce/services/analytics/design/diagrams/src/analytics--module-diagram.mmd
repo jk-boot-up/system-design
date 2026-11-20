@@ -5,4 +5,7 @@ flowchart LR
     MV2 --> E[(order_event_errors)]
     F -- "FINAL, every 30 s" --> R1[revenue_per_minute_mv] --> T1[(revenue_per_minute)]
     F -- "FINAL, every hour" --> R2[orders_per_day_mv] --> T2[(orders_per_day)]
-    T1 & T2 & F & E --> G[Grafana dashboard]
+    PQ[payment_events_queue<br/>Kafka engine] --> PMV1[payment_facts_mv] --> PF[(payment_facts<br/>ReplacingMergeTree)]
+    PQ --> PMV2[payment_event_errors_mv] --> PE[(payment_event_errors)]
+    PF -- "FINAL, every 5 min" --> R3[payments_per_day_mv] --> T3[(payments_per_day)]
+    T1 & T2 & T3 & F & PF & E & PE --> G[Grafana dashboard]

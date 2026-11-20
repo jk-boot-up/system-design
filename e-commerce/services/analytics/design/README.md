@@ -49,7 +49,7 @@ add its revenue twice; the duplicate fact disappears only later, at merge time, 
 
 ## 6. Data model
 
-Schema: [001_order_events.sql](../sql/001_order_events.sql), [002_rollups.sql](../sql/002_rollups.sql).
+Schema: [001_order_events.sql](../sql/001_order_events.sql), [002_rollups.sql](../sql/002_rollups.sql), [003_payment_events.sql](../sql/003_payment_events.sql).
 
 | Table | Engine | Key | Notes |
 |---|---|---|---|
@@ -57,6 +57,9 @@ Schema: [001_order_events.sql](../sql/001_order_events.sql), [002_rollups.sql](.
 | `order_event_errors` | MergeTree | `received_at` | 30-day TTL; the raw message and the reason |
 | `revenue_per_minute` | MergeTree, replaced every 30 s | `(minute, currency)` | Last two days of confirmed orders |
 | `orders_per_day` | MergeTree, replaced every hour | `(day, currency)` | Placed, confirmed, cancelled, revenue, average order, customers |
+| `payment_facts` | ReplacingMergeTree | `(event_type, occurred_at, event_id)`, monthly partitions | 25-month TTL; from `payment.events` (group `analytics-payments`); links to orders by `order_id` |
+| `payment_event_errors` | MergeTree | `received_at` | 30-day TTL |
+| `payments_per_day` | MergeTree, replaced every 5 minutes | `(day, currency)` | Captured, failed, refunded, captured and refunded sums; the dashboard derives the decline rate and net |
 
 ## 7. Scaling and performance
 

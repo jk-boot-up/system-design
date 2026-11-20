@@ -40,10 +40,10 @@ Solid arrows are synchronous HTTP (inside the cluster); dotted arrows are Kafka 
 | review-service | — | `review.events` | `order.events` (who may review what) |
 | recommendation-service | — | — | `order.events` (bought-together pairs) |
 | notification-service | Mailpit / SMTP | — (RabbitMQ `email.send`, `email.retry.*`) | `order.events` |
-| analytics | — | — | `order.events` (ClickHouse Kafka engine) |
+| analytics | — | — | `order.events`, `payment.events` (ClickHouse Kafka engine) |
 
-`payment.events` and `review.events` have no consumer in the code yet. The [event catalogue](10-event-catalogue.md) lists
-analytics and a future catalogue rating cache as their readers.
+`review.events` has no consumer in the code yet; the [event catalogue](10-event-catalogue.md) lists a future catalogue
+rating cache as its reader.
 
 No service calls a service that calls it back, and every synchronous chain is at most two hops deep (gateway → order →
 inventory). Everything else that one service must learn from another arrives as an event, so a slow consumer never slows

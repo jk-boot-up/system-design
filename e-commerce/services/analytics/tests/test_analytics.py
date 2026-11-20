@@ -48,7 +48,7 @@ def stack():
                 for _ in range(180):  # ready once the init scripts have created the last view
                     try:
                         if db.scalar("SELECT count() FROM system.tables WHERE database = 'analytics' "
-                                     "AND name = 'orders_per_day_mv'") == 1:
+                                     "AND name = 'payments_per_day_mv'") == 1:
                             break
                     except OSError:
                         pass
@@ -135,7 +135,61 @@ async def test_events_become_exact_facts_rollups_and_dashboards(stack):
     dashboard = json.loads((ROOT / "grafana" / "dashboards" / "orders.json").read_text())
     for panel in dashboard["panels"]:
         sql = panel["targets"][0]["rawSql"]
+        if "payment_facts" in sql or "payments_per_day" in sql:
+            continue  # the payment test below checks these
         sql = sql.replace("$__timeFilter(minute)", "minute >= now() - INTERVAL 6 HOUR") \
                  .replace("$__timeFilter(day)", "day >= today() - 30")
         rows = db.query(sql)
         assert rows, panel["title"]
+
+
+def payment(kind: str, amount: str, *, event_id=None, reason=None) -> bytes:
+    occurred = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
+    order_id = str(uuid.uuid4())
+    status = {"PaymentCaptured": "CAPTURED", "PaymentFailed": "FAILED", "PaymentRefunded": "REFUNDED"}[kind]
+    payload = {"paymentId": str(uuid.uuid4()), "orderId": order_id, "amount": {"amount": amount, "currency": "EUR"},
+               "status": status, "reason": reason}
+    return json.dumps({"eventId": event_id or str(uuid.uuid4()), "type": f"payment.{kind}", "version": 1,
+                       "occurredAt": occurred, "aggregateId": order_id, "payload": payload}).encode()
+
+
+async def test_payment_events_become_exact_facts_and_daily_figures(stack):
+    db, bootstrap = stack
+    admin = AIOKafkaAdminClient(bootstrap_servers=bootstrap)
+    await admin.start()
+    await admin.create_topics([NewTopic("payment.events", 3, 1)])
+    await admin.close()
+
+    duplicate_id = str(uuid.uuid4())
+    producer = AIOKafkaProducer(bootstrap_servers=bootstrap)
+    await producer.start()
+    for i, m in enumerate([
+        payment("PaymentCaptured", "100.00", event_id=duplicate_id),
+        payment("PaymentCaptured", "100.00", event_id=duplicate_id),  # delivered twice
+        payment("PaymentCaptured", "50.00"),
+        payment("PaymentFailed", "20.00", reason="CARD_DECLINED"),
+        payment("PaymentRefunded", "50.00"),
+        b"{broken",
+    ]):
+        await producer.send_and_wait("payment.events", m, key=str(i).encode())
+    await producer.stop()
+
+    wait_until(lambda: db.scalar("SELECT count() FROM analytics.payment_facts FINAL") == 4
+               and db.scalar("SELECT count() FROM analytics.payment_event_errors") == 1,
+               explain=lambda: json.dumps(db.query(
+                   "SELECT (SELECT count() FROM analytics.payment_facts) AS facts, "
+                   "(SELECT count() FROM analytics.payment_event_errors) AS errors")))
+    assert db.scalar("SELECT reason FROM analytics.payment_facts FINAL WHERE event_type = 'payment.PaymentFailed'") \
+        == "CARD_DECLINED"
+
+    db.query("SYSTEM REFRESH VIEW analytics.payments_per_day_mv")
+    db.query("SYSTEM WAIT VIEW analytics.payments_per_day_mv")
+    day = db.query("SELECT captured, failed, refunded, toString(captured_sum) AS captured_sum, "
+                   "toString(refunded_sum) AS refunded_sum FROM analytics.payments_per_day")
+    assert day == [{"captured": 2, "failed": 1, "refunded": 1, "captured_sum": "150", "refunded_sum": "50"}]
+
+    dashboard = json.loads((ROOT / "grafana" / "dashboards" / "orders.json").read_text())
+    for panel in dashboard["panels"]:
+        if "payment_facts" in panel["targets"][0]["rawSql"] or "payments_per_day" in panel["targets"][0]["rawSql"]:
+            sql = panel["targets"][0]["rawSql"].replace("$__timeFilter(day)", "day >= today() - 30")
+            assert db.query(sql), panel["title"]
