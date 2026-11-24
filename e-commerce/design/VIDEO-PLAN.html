@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video plan</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0b1020;--panel:#151c2f;--panel2:#1c2540;--line:#2c3757;--fg:#e6ebf5;--mut:#93a0bd;--accent:#6d8cff;--code:#0f1528}
+[data-theme="medium"]{--bg:#2a3142;--panel:#353d51;--panel2:#3f485e;--line:#566079;--fg:#eef1f7;--mut:#b5bdd0;--accent:#8aa5ff;--code:#262c3b}
+[data-theme="light"]{--bg:#f4f6fb;--panel:#ffffff;--panel2:#eef2fa;--line:#d5dbe8;--fg:#1b2333;--mut:#5d6880;--accent:#3d63f2;--code:#f1f4fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:10px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+header a.home{color:var(--fg);font-weight:700;text-decoration:none}
+header .src{color:var(--mut);font-size:13px}
+.themes{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.themes button{background:var(--panel);color:var(--mut);border:0;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+.themes button.on{background:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+h1,h2,h3{line-height:1.25}
+h1{font-size:2rem;margin-top:0}
+h2{margin-top:2.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+a.headerlink{opacity:0;margin-left:.4rem;text-decoration:none}
+h2:hover a.headerlink,h3:hover a.headerlink{opacity:.7}
+table{border-collapse:collapse;width:100%;margin:1rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+code{background:var(--code);padding:.1em .35em;border-radius:5px;font:14px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0}
+figure.diagram{margin:1.2rem 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:center;overflow-x:auto}
+figure.diagram img{max-width:100%;height:auto}
+blockquote{margin:1rem 0;padding:.4rem 1rem;border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0}
+hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="../README.html">E-commerce platform</a>
+  <span class="src">VIDEO-PLAN.md</span>
+  <div class="themes" role="group" aria-label="Theme">
+    <button data-theme="light">☀ Light</button><button data-theme="medium">◐ Medium</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<main>
+<h1 id="video-plan">Video plan<a class="headerlink" href="#video-plan" title="Permanent link">#</a></h1>
+<p>Plans and progress: <a href="DESIGN-PLAN.html">design plan</a> · <a href="IMPLEMENTATION-PLAN.html">implementation plan</a> · <a href="../STATUS.html">status</a></p>
+<p>How the e-commerce platform is taught on video: a set of short videos, one per topic, and one long video that covers
+the entire system. This document is the plan; nothing in it is built yet.</p>
+<p><strong>Files are prepared, never uploaded.</strong> The work ends with the video files and one upload sheet per video. Uploading,
+scheduling and publishing are done by the author, by hand.</p>
+<h2 id="1-what-is-made">1. What is made<a class="headerlink" href="#1-what-is-made" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Output</th>
+<th style="text-align: right;">Count</th>
+<th>Length</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Short videos</td>
+<td style="text-align: right;">25</td>
+<td>5 to 12 min each</td>
+<td>One topic each; found by search; watched in playlist order</td>
+</tr>
+<tr>
+<td>Long video</td>
+<td style="text-align: right;">1</td>
+<td>about 3 h</td>
+<td>The entire system in one sitting, with chapters</td>
+</tr>
+</tbody>
+</table>
+<p>About 26 uploads in all. The short videos are the source of truth: the long video is assembled from them by a script
+and is never scripted or narrated separately, so a fix is made once and reaches both.</p>
+<h2 id="2-the-short-videos">2. The short videos<a class="headerlink" href="#2-the-short-videos" title="Permanent link">#</a></h2>
+<p>Uploaded in this order. Each playlist lists its videos in the order below.</p>
+<h3 id="20-overview-first-video-of-playlist-a">2.0 Overview (first video of playlist A)<a class="headerlink" href="#20-overview-first-video-of-playlist-a" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">#</th>
+<th>Video</th>
+<th>Built from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td>The e-commerce platform: architecture, request path and event flow</td>
+<td>walkthrough scenario <code>tour</code>, <a href="01-high-level-design.html">high-level design</a>, <a href="11-system-module-service-diagrams.html">system diagrams</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="21-playlist-a-system-walkthrough">2.1 Playlist A: System walkthrough<a class="headerlink" href="#21-playlist-a-system-walkthrough" title="Permanent link">#</a></h3>
+<p>One video per scenario of the <a href="walkthrough/index.html">system walkthrough</a>, told with its steps and diagrams.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">#</th>
+<th>Video</th>
+<th>Walkthrough scenario</th>
+<th>Also uses</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">A1</td>
+<td>Browse and search</td>
+<td><code>browse</code></td>
+<td>catalog and search designs, <a href="04-database-design.html">database design</a></td>
+</tr>
+<tr>
+<td style="text-align: right;">A2</td>
+<td>Add to cart</td>
+<td><code>cart</code></td>
+<td>cart design, Redis keys</td>
+</tr>
+<tr>
+<td style="text-align: right;">A3</td>
+<td>Checkout that succeeds</td>
+<td><code>checkout</code></td>
+<td><a href="05-sequence-diagrams.html">sequence diagrams</a>, saga and outbox</td>
+</tr>
+<tr>
+<td style="text-align: right;">A4</td>
+<td>Out of stock</td>
+<td><code>oos</code></td>
+<td><a href="06-flow-diagrams.html">flow diagrams</a>, reservation states</td>
+</tr>
+<tr>
+<td style="text-align: right;">A5</td>
+<td>Payment declined</td>
+<td><code>declined</code></td>
+<td><a href="07-state-diagrams.html">state diagrams</a></td>
+</tr>
+<tr>
+<td style="text-align: right;">A6</td>
+<td>Payment timeout</td>
+<td><code>timeout</code></td>
+<td>saga recovery, idempotency</td>
+</tr>
+<tr>
+<td style="text-align: right;">A7</td>
+<td>Cancellation and refund</td>
+<td><code>cancel</code></td>
+<td>compensation steps</td>
+</tr>
+<tr>
+<td style="text-align: right;">A8</td>
+<td>Event fan-out</td>
+<td><code>fanout</code></td>
+<td><a href="10-event-catalogue.html">event catalogue</a></td>
+</tr>
+<tr>
+<td style="text-align: right;">A9</td>
+<td>Flash sale</td>
+<td><code>flash</code></td>
+<td><a href="14-capacity-and-performance.html">capacity model</a>, hot SKU</td>
+</tr>
+<tr>
+<td style="text-align: right;">A10</td>
+<td>A dependency fails</td>
+<td><code>failure</code></td>
+<td>degrade instead of falling over: timeouts, circuit breakers, retries</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-playlist-b-services">2.2 Playlist B: Services<a class="headerlink" href="#22-playlist-b-services" title="Permanent link">#</a></h3>
+<p>One video per service, from its own <code>services/&lt;service&gt;/design/README.md</code>: what it owns, its data, its APIs and
+events, the decisions behind it (with their ADRs) and a short tour of its code.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">#</th>
+<th>Service</th>
+<th>Key ideas</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">B1</td>
+<td>API gateway and edge</td>
+<td>NGINX edge, WAF, routing, rate limits, token checks</td>
+</tr>
+<tr>
+<td style="text-align: right;">B2</td>
+<td>Catalog</td>
+<td>cache-aside with jitter and single-flight, PgBouncer</td>
+</tr>
+<tr>
+<td style="text-align: right;">B3</td>
+<td>Search</td>
+<td>OpenSearch indexing from events</td>
+</tr>
+<tr>
+<td style="text-align: right;">B4</td>
+<td>Cart</td>
+<td>Redis, guest and signed-in carts, current prices with a circuit breaker</td>
+</tr>
+<tr>
+<td style="text-align: right;">B5</td>
+<td>Inventory</td>
+<td>reservations, expiry, hot SKUs</td>
+</tr>
+<tr>
+<td style="text-align: right;">B6</td>
+<td>Order</td>
+<td>checkout saga, transactional outbox</td>
+</tr>
+<tr>
+<td style="text-align: right;">B7</td>
+<td>Payment</td>
+<td>idempotent charges, timeouts, refunds</td>
+</tr>
+<tr>
+<td style="text-align: right;">B8</td>
+<td>Review</td>
+<td>Cassandra tables shaped per query, verified badge, resumable posting</td>
+</tr>
+<tr>
+<td style="text-align: right;">B9</td>
+<td>Notification (Go)</td>
+<td>Kafka to RabbitMQ, sent log in Redis, delayed retries, dead letters</td>
+</tr>
+<tr>
+<td style="text-align: right;">B10</td>
+<td>Recommendation (Python)</td>
+<td>bought-together counts in Redis sorted sets, exactly-once counting with Lua</td>
+</tr>
+<tr>
+<td style="text-align: right;">B11</td>
+<td>Analytics</td>
+<td>ClickHouse ingestion from order and payment events</td>
+</tr>
+</tbody>
+</table>
+<h3 id="23-playlist-c-operating-it">2.3 Playlist C: Operating it<a class="headerlink" href="#23-playlist-c-operating-it" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">#</th>
+<th>Video</th>
+<th>Built from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">C1</td>
+<td>Observability and SLOs</td>
+<td><a href="13-observability-and-slos.html">observability and SLOs</a>: one trace across the outbox, burn-rate alerts</td>
+</tr>
+<tr>
+<td style="text-align: right;">C2</td>
+<td>Security and the supply chain</td>
+<td><a href="12-security-design.html">security design</a>: service identity, SBOM, signing, Kyverno, WAF</td>
+</tr>
+<tr>
+<td style="text-align: right;">C3</td>
+<td>Resilience and runbooks</td>
+<td><a href="15-runbooks.html">runbooks</a>: DLQ replay, stuck sagas, failover, cache stampede</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-the-long-video">3. The long video<a class="headerlink" href="#3-the-long-video" title="Permanent link">#</a></h2>
+<p><em>The E-commerce Platform: Full System Design Course</em>, about 3 hours.</p>
+<ul>
+<li><strong>Assembled, not recorded:</strong> a script joins the final short videos in upload order (0, A1 to A10, B1 to B11, C1 to
+  C3).</li>
+<li><strong>Each part enters through its body.</strong> Every short video is rendered as a full video (opening, credit, closing) and
+  as a <em>part</em> (body only). The long video uses the parts, so the credit and the like-and-subscribe closing appear
+  once, not 25 times.</li>
+<li><strong>Its own frame:</strong> an intro of about 2 minutes (what the course covers, how the system fits together, the three
+  sections), a title card with one spoken line before each part, a section card before each playlist's parts, and a
+  closing summary.</li>
+<li><strong>Captions:</strong> the parts' <code>.srt</code> files are merged, each shifted by its part's start time, together with the captions
+  of the intro, cards and summary.</li>
+<li><strong>Chapters:</strong> one per part, timed from the merged captions; the description lists them, starting at <code>00:00</code>.</li>
+<li><strong>Rebuilt whenever a short video changes</strong>, then checked again in full: sound, chapter times and captions against
+  the picture.</li>
+<li><strong>Made last</strong>, after every short video is final.</li>
+</ul>
+<h2 id="4-how-each-video-is-made">4. How each video is made<a class="headerlink" href="#4-how-each-video-is-made" title="Permanent link">#</a></h2>
+<p>The same pipeline and rules as the security repository (<code>jk-boot-up/security</code>, <code>docs/beginner-plan.md</code> sections 6
+and 8, and its video teaching standard):</p>
+<ul>
+<li><strong>Tooling:</strong> videokit (Piper narration, slides, video, captions).</li>
+<li><strong>Voice:</strong> Piper <code>en_US-amy-medium</code>, speed 0.8, −16 LUFS, peaks limited to −1.5 dBFS.</li>
+<li><strong>Picture:</strong> slides laid out at 1920×1080 and encoded at 3840×2160 (H.264, CRF 18, BT.709); readable text sizes.</li>
+<li><strong>Content:</strong> diagrams and walkthrough steps with real values (order IDs, SKUs, amounts, topic names), input and
+  result shown apart, every acronym spelled out, a short tour of the code where it helps.</li>
+<li><strong>Narration:</strong> third-person credit ("This video is presented by Jayasekhar Konduru."); "ID" spoken "I D"; the
+  closing never names the next video.</li>
+<li><strong>Per video:</strong> <code>.mp4</code>, <code>.srt</code>, a 1280×720 thumbnail, and its upload sheet.</li>
+</ul>
+<h2 id="5-upload-sheets">5. Upload sheets<a class="headerlink" href="#5-upload-sheets" title="Permanent link">#</a></h2>
+<p>One sheet per video, prepared and never acted on:</p>
+<ul>
+<li>title (at most 100 characters), description (first sentence names and defines the topic; no <code>http://</code> or
+  <code>https://</code>; no <code>&lt;</code> or <code>&gt;</code>), tags including the author's name and the repository;</li>
+<li>chapters timed from the video's own <code>.srt</code>, starting at <code>00:00</code>, at least three;</li>
+<li>the playlist and the video's position in it;</li>
+<li>for the long video, its chapter list; for each short video, a line naming the long video as the full course;</li>
+<li>settings: Unlisted first, then Public after the quality check; not made for kids; category Science &amp; Technology;
+  English; captions from the <code>.srt</code>.</li>
+</ul>
+<p>Sheets are written to <code>docs/youtube.md</code> beside the videos, with one index for the whole set.</p>
+<h2 id="6-order-of-work">6. Order of work<a class="headerlink" href="#6-order-of-work" title="Permanent link">#</a></h2>
+<ol>
+<li><strong>Before any video:</strong> the checks that need more than 4 GB of Docker memory (<a href="../STATUS.html">status</a>, "Resuming on
+   another machine"), so the videos show a system with no open gaps.</li>
+<li><strong>Scripts first:</strong> write every video's script and review it for technical accuracy against the code and design
+   documents. Mistakes are cheapest here, before anything is rendered.</li>
+<li><strong>The overview first, rendered and checked with the author;</strong> it fixes the style for the rest.</li>
+<li><strong>Playlist A, then B, then C</strong>, each video rendered, checked (sound, captions against slides, length, thumbnail)
+   and its sheet written.</li>
+<li><strong>The long video last</strong>, assembled from the final parts and checked in full.</li>
+<li><strong>Hand-over:</strong> every file and sheet committed; the author uploads in the order of section 2, then the long video.</li>
+</ol>
+<h2 id="7-done-when">7. Done when<a class="headerlink" href="#7-done-when" title="Permanent link">#</a></h2>
+<ul>
+<li>25 short videos and 1 long video, each with <code>.mp4</code>, <code>.srt</code>, thumbnail and upload sheet;</li>
+<li>every script reviewed for accuracy, every video passing its checks;</li>
+<li>the long video's chapters and captions match its picture;</li>
+<li>nothing uploaded, scheduled or published.</li>
+</ul>
+</main>
+<script>
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sd-theme", t); } catch (e) {}
+  document.querySelectorAll(".themes button").forEach(b => b.classList.toggle("on", b.dataset.theme === t));
+  document.querySelectorAll("img[data-light]").forEach(i => { i.src = t === "light" ? i.dataset.light : i.dataset.dark; });
+}
+document.querySelectorAll(".themes button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+let saved = "dark"; try { saved = localStorage.getItem("sd-theme") || saved; } catch (e) {}
+setTheme(saved);
+</script>
+</body>
+</html>

@@ -168,7 +168,7 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## In progress
 
-* Video pipeline: narrated walkthrough videos and upload sheets (prepared only, never uploaded).
+* Video pipeline: planned in the [video plan](design/VIDEO-PLAN.md) (25 short videos and one long one, with upload sheets; prepared only, never uploaded).
 
 ## Resuming on another machine
 
@@ -183,9 +183,11 @@ State on 2026-11-20: every gap that can be closed in code is closed and committe
      from the edge (NGINX) through the storefront, the gateway and the services (`observability` profile).
    Fix what they find, update this file and the design documents, rebuild the docs (`tools/docs.sh`,
    `tools/check_links.py`), commit.
-2. **Then the video pipeline:** narrated 4K videos with subtitles and thumbnails of the walkthroughs, and an upload sheet
-   per project (`docs/youtube.md`), made like the security repository's (videokit, Piper voice `en_US-amy-medium`,
-   speed 0.8). Prepare the files and sheets only: nothing is uploaded, scheduled or published.
+2. **Then the video pipeline,** as set out in the [video plan](design/VIDEO-PLAN.md): 25 short videos (an overview, the
+   10 walkthrough scenarios, the 11 services and 3 on operating the system, in three playlists) and one long video of
+   about 3 hours that covers the entire system, assembled from the short ones. Each comes with captions, a thumbnail and
+   an upload sheet, made like the security repository's (videokit, Piper voice `en_US-amy-medium`, speed 0.8). Prepare
+   the files and sheets only: nothing is uploaded, scheduled or published.
 
 Still open by design (design/12 §12.8): encryption between pods (a mesh or WireGuard) and bot management at a CDN; the
 `review.events` consumer is marked future in the event catalogue.

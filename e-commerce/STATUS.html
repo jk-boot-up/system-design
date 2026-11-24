@@ -395,7 +395,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ul>
 <h2 id="in-progress">In progress<a class="headerlink" href="#in-progress" title="Permanent link">#</a></h2>
 <ul>
-<li>Video pipeline: narrated walkthrough videos and upload sheets (prepared only, never uploaded).</li>
+<li>Video pipeline: planned in the <a href="design/VIDEO-PLAN.html">video plan</a> (25 short videos and one long one, with upload sheets; prepared only, never uploaded).</li>
 </ul>
 <h2 id="resuming-on-another-machine">Resuming on another machine<a class="headerlink" href="#resuming-on-another-machine" title="Permanent link">#</a></h2>
 <p>State on 2026-11-20: every gap that can be closed in code is closed and committed on <code>system-design-e-commerce-draft-1</code>
@@ -409,9 +409,11 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
      from the edge (NGINX) through the storefront, the gateway and the services (<code>observability</code> profile).
    Fix what they find, update this file and the design documents, rebuild the docs (<code>tools/docs.sh</code>,
    <code>tools/check_links.py</code>), commit.</li>
-<li><strong>Then the video pipeline:</strong> narrated 4K videos with subtitles and thumbnails of the walkthroughs, and an upload sheet
-   per project (<code>docs/youtube.md</code>), made like the security repository's (videokit, Piper voice <code>en_US-amy-medium</code>,
-   speed 0.8). Prepare the files and sheets only: nothing is uploaded, scheduled or published.</li>
+<li><strong>Then the video pipeline,</strong> as set out in the <a href="design/VIDEO-PLAN.html">video plan</a>: 25 short videos (an overview, the
+   10 walkthrough scenarios, the 11 services and 3 on operating the system, in three playlists) and one long video of
+   about 3 hours that covers the entire system, assembled from the short ones. Each comes with captions, a thumbnail and
+   an upload sheet, made like the security repository's (videokit, Piper voice <code>en_US-amy-medium</code>, speed 0.8). Prepare
+   the files and sheets only: nothing is uploaded, scheduled or published.</li>
 </ol>
 <p>Still open by design (design/12 §12.8): encryption between pods (a mesh or WireGuard) and bot management at a CDN; the
 <code>review.events</code> consumer is marked future in the event catalogue.</p>
