@@ -172,8 +172,8 @@ Current progress of the e-commerce platform. Updated with every change of state;
 
 ## Resuming on another machine
 
-State on 2026-11-20: every gap that can be closed in code is closed and committed on `system-design-e-commerce-draft-1`
-(not yet merged to `main`). Work resumes on a machine with 16 GB of memory, in this order:
+State on 2026-11-24: every gap that can be closed in code is closed and committed on `system-design-e-commerce-draft-1`,
+and `main` is level with it. Work resumes on a machine with 16 GB of memory, in this order:
 
 1. **Checks that needed more Docker memory than 4 GB** (give Docker 8 GB or more):
    * the search Gatling simulation and its first baseline: `tests/performance`, `run-compose.sh` with the search profile;
@@ -191,6 +191,9 @@ State on 2026-11-20: every gap that can be closed in code is closed and committe
 
 Still open by design (design/12 §12.8): encryption between pods (a mesh or WireGuard) and bot management at a CDN; the
 `review.events` consumer is marked future in the event catalogue.
+
+The machine is a Windows laptop with 16 GB of memory, working inside WSL 2 (Ubuntu); its full setup, Docker memory and
+videokit included, is section 8 of the [video plan](design/VIDEO-PLAN.md). The Mac (8 GB) cannot run the step 1 checks.
 
 Setup notes for the new machine: tool versions are in [PREREQUISITES.md](PREREQUISITES.md); build compose images one
 at a time (`COMPOSE_PARALLEL_LIMIT=1`, set by the e2e script); Python container tests on Docker Desktop need

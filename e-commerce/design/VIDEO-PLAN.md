@@ -122,7 +122,8 @@ Sheets are written to `docs/youtube.md` beside the videos, with one index for th
 ## 6. Order of work
 
 1. **Before any video:** the checks that need more than 4 GB of Docker memory ([status](../STATUS.md), "Resuming on
-   another machine"), so the videos show a system with no open gaps.
+   another machine"), so the videos show a system with no open gaps. They run on the Windows laptop (16 GB) under
+   WSL 2, set up as in section 8; the Mac (8 GB) cannot give Docker enough memory.
 2. **Scripts first:** write every video's script and review it for technical accuracy against the code and design
    documents. Mistakes are cheapest here, before anything is rendered.
 3. **The overview first, rendered and checked with the author;** it fixes the style for the rest.
@@ -137,3 +138,103 @@ Sheets are written to `docs/youtube.md` beside the videos, with one index for th
 - every script reviewed for accuracy, every video passing its checks;
 - the long video's chapters and captions match its picture;
 - nothing uploaded, scheduled or published.
+
+## 8. Working machine: Windows laptop with WSL 2
+
+The work resumes on a Windows laptop with 16 GB of memory, because the Mac has 8 GB and its Docker VM gets only 4 GB.
+Everything runs inside WSL 2 (Ubuntu): the Docker checks, the docs tooling and videokit. The bash scripts run there
+unchanged, and Piper with the same `en_US-amy-medium` model and settings gives the same voice as on the Mac.
+
+### 8.1 WSL 2 and its memory
+
+In PowerShell as administrator:
+
+```powershell
+wsl --install -d Ubuntu-24.04     # restart Windows when asked, then create the Linux user
+wsl --update
+```
+
+Give WSL 2 most of the memory (by default it gets half). Create `%UserProfile%\.wslconfig`:
+
+```ini
+[wsl2]
+memory=12GB
+processors=6
+swap=8GB
+```
+
+Then run `wsl --shutdown` and open Ubuntu again; `free -g` shows about 12 GB.
+
+### 8.2 Docker Desktop
+
+Install Docker Desktop for Windows with the **WSL 2 based engine**, and under *Settings → Resources → WSL integration*
+turn on the Ubuntu distribution. Docker's memory is the WSL 2 limit above, so the 6 GB+ checks fit. In Ubuntu,
+`docker version` and `docker info | grep -i memory` confirm it.
+
+### 8.3 Tools inside Ubuntu
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git curl jq unzip zip build-essential python3 python3-venv python3-pip ffmpeg
+# JDK 25 through SDKMAN
+curl -s https://get.sdkman.io | bash && source ~/.sdkman/bin/sdkman-init.sh && sdk install java 25-tem
+# Go (version from PREREQUISITES.md or newer)
+curl -LO https://go.dev/dl/go1.27.4.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf go1.27.4.linux-amd64.tar.gz
+echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+# Node.js 26
+curl -fsSL https://deb.nodesource.com/setup_26.x | sudo -E bash - && sudo apt-get install -y nodejs
+```
+
+Versions are listed in [PREREQUISITES.md](../PREREQUISITES.md). Check with `java -version`, `go version`,
+`node --version`, `python3 --version`, `ffmpeg -version`.
+
+### 8.4 Repositories
+
+Keep the repositories in the Linux file system (`~/`), never under `/mnt/c`: file access there is many times slower and
+line endings and file modes get changed.
+
+```bash
+git config --global core.autocrlf false
+ssh-keygen -t ed25519      # add ~/.ssh/id_ed25519.pub to GitHub
+mkdir -p ~/gitbase/jk-boot-up/system-design/main ~/gitbase/jk-boot-up/security/main
+git clone git@github.com:jk-boot-up/system-design.git ~/gitbase/jk-boot-up/system-design/main/system-design
+git clone git@github.com:jk-boot-up/security.git ~/gitbase/jk-boot-up/security/main/security
+```
+
+The security repository is needed for videokit (`tools/videokit`), which the videos reuse.
+
+### 8.5 Docs tooling and end-to-end tests
+
+```bash
+cd ~/gitbase/jk-boot-up/system-design/main/system-design/e-commerce
+python3 -m venv ~/.cache/ecommerce-docs-venv
+~/.cache/ecommerce-docs-venv/bin/pip install -r tools/requirements-docs.txt
+(cd tests/e2e && npm ci && npx playwright install --with-deps chromium)
+```
+
+### 8.6 videokit
+
+```bash
+sudo apt-get install -y espeak-ng      # phonemiser data used by Piper
+~/gitbase/jk-boot-up/security/main/security/tools/videokit/videokit.sh help
+```
+
+The first run creates its Python environment and voice model in `~/.cache/videokit`. Render one short test phrase and
+listen to it before any real video, to confirm the voice matches the Mac's (speed 0.8, −16 LUFS).
+
+### 8.7 Claude Code
+
+Install Claude Code inside Ubuntu (`npm install -g @anthropic-ai/claude-code`) and start it in
+`~/gitbase/jk-boot-up/system-design/main/system-design`. Its memory from the Mac does not travel with it, so resume from
+the files: say "resume" and point it to [STATUS.md](../STATUS.md) ("Resuming on another machine") and this plan.
+
+### 8.8 Differences from the Mac
+
+- `bash` is version 5 and `timeout` exists: the macOS work-arounds (bash 3.2 limits, `perl -e 'alarm N'`) are not
+  needed, and the scripts still run.
+- Testcontainers may not need `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`; set it to `/var/run/docker.sock` if Python
+  container tests cannot reach Docker.
+- Build compose images one at a time as before (`COMPOSE_PARALLEL_LIMIT=1`, set by the e2e script).
+- If Docker builds cannot download the Gradle distribution, seed the build cache as described in
+  [STATUS.md](../STATUS.md) ("Risks and notes").
+- Port 3000 may be free here (on the Mac the author's open-webui container held it).

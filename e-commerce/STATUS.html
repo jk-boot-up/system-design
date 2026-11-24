@@ -398,8 +398,8 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 <li>Video pipeline: planned in the <a href="design/VIDEO-PLAN.html">video plan</a> (25 short videos and one long one, with upload sheets; prepared only, never uploaded).</li>
 </ul>
 <h2 id="resuming-on-another-machine">Resuming on another machine<a class="headerlink" href="#resuming-on-another-machine" title="Permanent link">#</a></h2>
-<p>State on 2026-11-20: every gap that can be closed in code is closed and committed on <code>system-design-e-commerce-draft-1</code>
-(not yet merged to <code>main</code>). Work resumes on a machine with 16 GB of memory, in this order:</p>
+<p>State on 2026-11-24: every gap that can be closed in code is closed and committed on <code>system-design-e-commerce-draft-1</code>,
+and <code>main</code> is level with it. Work resumes on a machine with 16 GB of memory, in this order:</p>
 <ol>
 <li><strong>Checks that needed more Docker memory than 4 GB</strong> (give Docker 8 GB or more):
    * the search Gatling simulation and its first baseline: <code>tests/performance</code>, <code>run-compose.sh</code> with the search profile;
@@ -417,6 +417,8 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 </ol>
 <p>Still open by design (design/12 §12.8): encryption between pods (a mesh or WireGuard) and bot management at a CDN; the
 <code>review.events</code> consumer is marked future in the event catalogue.</p>
+<p>The machine is a Windows laptop with 16 GB of memory, working inside WSL 2 (Ubuntu); its full setup, Docker memory and
+videokit included, is section 8 of the <a href="design/VIDEO-PLAN.html">video plan</a>. The Mac (8 GB) cannot run the step 1 checks.</p>
 <p>Setup notes for the new machine: tool versions are in <a href="PREREQUISITES.html">PREREQUISITES.md</a>; build compose images one
 at a time (<code>COMPOSE_PARALLEL_LIMIT=1</code>, set by the e2e script); Python container tests on Docker Desktop need
 <code>TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock</code>; if Docker builds cannot download the Gradle distribution,

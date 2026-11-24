@@ -312,7 +312,8 @@ and 8, and its video teaching standard):</p>
 <h2 id="6-order-of-work">6. Order of work<a class="headerlink" href="#6-order-of-work" title="Permanent link">#</a></h2>
 <ol>
 <li><strong>Before any video:</strong> the checks that need more than 4 GB of Docker memory (<a href="../STATUS.html">status</a>, "Resuming on
-   another machine"), so the videos show a system with no open gaps.</li>
+   another machine"), so the videos show a system with no open gaps. They run on the Windows laptop (16 GB) under
+   WSL 2, set up as in section 8; the Mac (8 GB) cannot give Docker enough memory.</li>
 <li><strong>Scripts first:</strong> write every video's script and review it for technical accuracy against the code and design
    documents. Mistakes are cheapest here, before anything is rendered.</li>
 <li><strong>The overview first, rendered and checked with the author;</strong> it fixes the style for the rest.</li>
@@ -327,6 +328,70 @@ and 8, and its video teaching standard):</p>
 <li>every script reviewed for accuracy, every video passing its checks;</li>
 <li>the long video's chapters and captions match its picture;</li>
 <li>nothing uploaded, scheduled or published.</li>
+</ul>
+<h2 id="8-working-machine-windows-laptop-with-wsl-2">8. Working machine: Windows laptop with WSL 2<a class="headerlink" href="#8-working-machine-windows-laptop-with-wsl-2" title="Permanent link">#</a></h2>
+<p>The work resumes on a Windows laptop with 16 GB of memory, because the Mac has 8 GB and its Docker VM gets only 4 GB.
+Everything runs inside WSL 2 (Ubuntu): the Docker checks, the docs tooling and videokit. The bash scripts run there
+unchanged, and Piper with the same <code>en_US-amy-medium</code> model and settings gives the same voice as on the Mac.</p>
+<h3 id="81-wsl-2-and-its-memory">8.1 WSL 2 and its memory<a class="headerlink" href="#81-wsl-2-and-its-memory" title="Permanent link">#</a></h3>
+<p>In PowerShell as administrator:</p>
+<pre class="highlight"><code class="language-powershell">wsl --install -d Ubuntu-24.04     # restart Windows when asked, then create the Linux user
+wsl --update</code></pre>
+<p>Give WSL 2 most of the memory (by default it gets half). Create <code>%UserProfile%\.wslconfig</code>:</p>
+<pre class="highlight"><code class="language-ini">[wsl2]
+memory=12GB
+processors=6
+swap=8GB</code></pre>
+<p>Then run <code>wsl --shutdown</code> and open Ubuntu again; <code>free -g</code> shows about 12 GB.</p>
+<h3 id="82-docker-desktop">8.2 Docker Desktop<a class="headerlink" href="#82-docker-desktop" title="Permanent link">#</a></h3>
+<p>Install Docker Desktop for Windows with the <strong>WSL 2 based engine</strong>, and under <em>Settings → Resources → WSL integration</em>
+turn on the Ubuntu distribution. Docker's memory is the WSL 2 limit above, so the 6 GB+ checks fit. In Ubuntu,
+<code>docker version</code> and <code>docker info | grep -i memory</code> confirm it.</p>
+<h3 id="83-tools-inside-ubuntu">8.3 Tools inside Ubuntu<a class="headerlink" href="#83-tools-inside-ubuntu" title="Permanent link">#</a></h3>
+<pre class="highlight"><code class="language-bash">sudo apt-get update
+sudo apt-get install -y git curl jq unzip zip build-essential python3 python3-venv python3-pip ffmpeg
+# JDK 25 through SDKMAN
+curl -s https://get.sdkman.io | bash &amp;&amp; source ~/.sdkman/bin/sdkman-init.sh &amp;&amp; sdk install java 25-tem
+# Go (version from PREREQUISITES.md or newer)
+curl -LO https://go.dev/dl/go1.27.4.linux-amd64.tar.gz &amp;&amp; sudo tar -C /usr/local -xzf go1.27.4.linux-amd64.tar.gz
+echo 'export PATH=$PATH:/usr/local/go/bin' &gt;&gt; ~/.bashrc
+# Node.js 26
+curl -fsSL https://deb.nodesource.com/setup_26.x | sudo -E bash - &amp;&amp; sudo apt-get install -y nodejs</code></pre>
+<p>Versions are listed in <a href="../PREREQUISITES.html">PREREQUISITES.md</a>. Check with <code>java -version</code>, <code>go version</code>,
+<code>node --version</code>, <code>python3 --version</code>, <code>ffmpeg -version</code>.</p>
+<h3 id="84-repositories">8.4 Repositories<a class="headerlink" href="#84-repositories" title="Permanent link">#</a></h3>
+<p>Keep the repositories in the Linux file system (<code>~/</code>), never under <code>/mnt/c</code>: file access there is many times slower and
+line endings and file modes get changed.</p>
+<pre class="highlight"><code class="language-bash">git config --global core.autocrlf false
+ssh-keygen -t ed25519      # add ~/.ssh/id_ed25519.pub to GitHub
+mkdir -p ~/gitbase/jk-boot-up/system-design/main ~/gitbase/jk-boot-up/security/main
+git clone git@github.com:jk-boot-up/system-design.git ~/gitbase/jk-boot-up/system-design/main/system-design
+git clone git@github.com:jk-boot-up/security.git ~/gitbase/jk-boot-up/security/main/security</code></pre>
+<p>The security repository is needed for videokit (<code>tools/videokit</code>), which the videos reuse.</p>
+<h3 id="85-docs-tooling-and-end-to-end-tests">8.5 Docs tooling and end-to-end tests<a class="headerlink" href="#85-docs-tooling-and-end-to-end-tests" title="Permanent link">#</a></h3>
+<pre class="highlight"><code class="language-bash">cd ~/gitbase/jk-boot-up/system-design/main/system-design/e-commerce
+python3 -m venv ~/.cache/ecommerce-docs-venv
+~/.cache/ecommerce-docs-venv/bin/pip install -r tools/requirements-docs.txt
+(cd tests/e2e &amp;&amp; npm ci &amp;&amp; npx playwright install --with-deps chromium)</code></pre>
+<h3 id="86-videokit">8.6 videokit<a class="headerlink" href="#86-videokit" title="Permanent link">#</a></h3>
+<pre class="highlight"><code class="language-bash">sudo apt-get install -y espeak-ng      # phonemiser data used by Piper
+~/gitbase/jk-boot-up/security/main/security/tools/videokit/videokit.sh help</code></pre>
+<p>The first run creates its Python environment and voice model in <code>~/.cache/videokit</code>. Render one short test phrase and
+listen to it before any real video, to confirm the voice matches the Mac's (speed 0.8, −16 LUFS).</p>
+<h3 id="87-claude-code">8.7 Claude Code<a class="headerlink" href="#87-claude-code" title="Permanent link">#</a></h3>
+<p>Install Claude Code inside Ubuntu (<code>npm install -g @anthropic-ai/claude-code</code>) and start it in
+<code>~/gitbase/jk-boot-up/system-design/main/system-design</code>. Its memory from the Mac does not travel with it, so resume from
+the files: say "resume" and point it to <a href="../STATUS.html">STATUS.md</a> ("Resuming on another machine") and this plan.</p>
+<h3 id="88-differences-from-the-mac">8.8 Differences from the Mac<a class="headerlink" href="#88-differences-from-the-mac" title="Permanent link">#</a></h3>
+<ul>
+<li><code>bash</code> is version 5 and <code>timeout</code> exists: the macOS work-arounds (bash 3.2 limits, <code>perl -e 'alarm N'</code>) are not
+  needed, and the scripts still run.</li>
+<li>Testcontainers may not need <code>TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE</code>; set it to <code>/var/run/docker.sock</code> if Python
+  container tests cannot reach Docker.</li>
+<li>Build compose images one at a time as before (<code>COMPOSE_PARALLEL_LIMIT=1</code>, set by the e2e script).</li>
+<li>If Docker builds cannot download the Gradle distribution, seed the build cache as described in
+  <a href="../STATUS.html">STATUS.md</a> ("Risks and notes").</li>
+<li>Port 3000 may be free here (on the Mac the author's open-webui container held it).</li>
 </ul>
 </main>
 <script>
